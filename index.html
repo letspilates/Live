@@ -28,6 +28,60 @@
 
     <!--Google Webfonts-->
     <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700,800' rel='stylesheet' type='text/css'>
+    <style>
+        /* New Footer Styles */
+        #landing-footer {
+            background-color: #333;
+            color: #fff;
+            padding: 40px 0 20px;
+        }
+
+        .footer-content {
+            padding-bottom: 20px;
+        }
+
+        .footer-content h4 {
+            color: #fff;
+            margin-bottom: 20px;
+        }
+
+        .footer-content ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .footer-content ul li {
+            margin-bottom: 10px;
+        }
+
+        .footer-content ul li a {
+            color: #ccc;
+            text-decoration: none;
+        }
+
+        .footer-content ul li a:hover {
+            color: #fff;
+        }
+
+        .footer-bottom {
+            border-top: 1px solid #555;
+            padding-top: 20px;
+        }
+
+        #copyright {
+            margin: 0;
+        }
+
+        .social-icons {
+            text-align: right;
+        }
+
+        .social-icons li {
+            display: inline-block;
+            margin-left: 15px;
+        }
+    </style>
+    
 </head>
 <body>
 
@@ -305,11 +359,7 @@
          
 
           <!--Instagram widget-->
-        <aside id="gallery" class="row text-center scrollto clearfix" data-featherlight-gallery
-                 data-featherlight-filter="a">
-
-                 <div data-mc-src="45441f2a-fd07-49d5-b912-acf0b4f6d9b8#instagram"></div>
-                    <script src="https://cdn2.woxo.tech/a.js#65c798fc13d9d3047af7df8a" async data-usrc> </script>
+        
        <!--
 
                 <a href="images/gallery-images/gallery-image-1.jpg" data-featherlight="image" class="col-3 wow fadeIn"
@@ -401,44 +451,41 @@
     <!--End Main Content Area-->
 
 
-    <!--Footer-->
-    <footer id="landing-footer" class="clearfix">
+ <!--Footer-->
+ <footer id="landing-footer" class="clearfix">
+    <div class="footer-content">
         <div class="row clearfix">
-
-            <p id="copyright" class="col-2">Made by<a href="https://www.shapingrain.com"> Let's Pilates LA</a></p>
-
-            <!--Social Icons in Footer-->
-            <ul class="col-2 social-icons">
-                <!--
-                <li>
-                    <a target="_blank" title="youtube" href="https://www.facebook.com/username">
-                        <i class="fa fa-facebook fa-1x"></i><span>Facebook</span>
-                    </a>
-                </li>
-                <li>
-                    <a target="_blank" title="Google+" href="http://google.com/+username">
-                        <i class="fa fa-google-plus fa-1x"></i><span>Google+</span>
-                    </a>
-                </li>
-                <li>
-                    <a target="_blank" title="Twitter" href="http://www.twitter.com/username">
-                        <i class="fa fa-twitter fa-1x"></i><span>Twitter</span>
-                    </a>
-                </li>
-                -->
-                <li>
-                    <a target="_blank" title="Instagram" href="https://www.instagram.com/letspilates_la">
-                        <i class="fa fa-instagram fa-1x"></i><span>Instagram</span>
-                    </a>
-                </li>
-               
-            </ul>
-            <!--End of Social Icons in Footer-->
+            <div class="col-3">
+                <h4>About Let's Pilates</h4>
+                <p>At Let's Pilates, we believe in the power of mindful movement to transform lives. Join us on a journey to strength, flexibility, and inner balance.</p>
+            </div>
+            <div class="col-3">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li> <a target="_blank" title="Instagram" href="https://www.instagram.com/letspilates_la">
+                        <i class="fa fa-instagram fa-1x"></i><span>  Instagram</span></li>
+                   
+                </ul>
+            </div>
+            <div class="col-3">
+                <h4>Contact Us</h4>
+                <p>505 Shatto Pl, Suite 202, Los Angeles, CA 90020</p>
+                <p>Phone: 310-995-0046 </p>
+                <p>Email: letspilatesla@gmail.com</p>
+            </div>
         </div>
-    </footer>
-    <!--End of Footer-->
+    </div>
+    <div class="footer-bottom">
+        <div class="row clearfix">
+            <p id="copyright" class="col-2">Copyright © 2024 Let's Pilates LA. All rights reserved.</p>
+           
+        </div>
+    </div>
+</footer>
 
 </div>
+
+
 
 <!-- Include JavaScript resources -->
 <script src="js/jquery.1.8.3.min.js"></script>
@@ -453,6 +500,7 @@
 <script src="js/images-loaded.min.js"></script>
 <script src="js/lightbox.min.js"></script>
 <script src="js/site.js"></script>
+
 
 
 </body>
