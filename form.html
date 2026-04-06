@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gyrotonic® Educational Courses — Registration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #FAFAF8;
+      --card-bg: #FFFFFF;
+      --text: #2C2C2C;
+      --text-light: #6B6B6B;
+      --accent: #B8860B;
+      --accent-light: #D4A84220;
+      --accent-hover: #9A7209;
+      --border: #E8E6E1;
+      --border-focus: #B8860B;
+      --error: #C0392B;
+      --success: #27AE60;
+      --radius: 12px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.06);
+      --shadow-lg: 0 12px 48px rgba(0,0,0,0.1);
+      --font-heading: 'Cormorant Garamond', Georgia, serif;
+      --font-body: 'Inter', -apple-system, sans-serif;
+      --font-kr: 'Noto Sans KR', sans-serif;
+      --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    body.lang-kr { font-family: var(--font-kr), var(--font-body); }
+
+    /* ── Language Toggle ── */
+    .lang-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 50;
+      display: flex;
+      background: var(--card-bg);
+      border: 1.5px solid var(--border);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    .lang-btn {
+      padding: 7px 14px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: var(--text-light);
+      transition: all var(--transition);
+      font-family: var(--font-body);
+    }
+    .lang-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .lang-btn:hover:not(.active) {
+      background: #F5F3EF;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      padding: 48px 24px 0;
+    }
+    .header h1 {
+      font-family: var(--font-heading);
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .header p {
+      font-size: 0.95rem;
+      color: var(--text-light);
+      margin-top: 8px;
+      font-weight: 300;
+    }
+
+    /* ── Progress Bar ── */
+    .progress-container {
+      max-width: 520px;
+      margin: 36px auto 0;
+      padding: 0 24px;
+    }
+    .progress-steps {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+    }
+    .progress-steps::before {
+      content: '';
+      position: absolute;
+      top: 18px;
+      left: 36px;
+      right: 36px;
+      height: 2px;
+      background: var(--border);
+    }
+    .progress-line {
+      position: absolute;
+      top: 18px;
+      left: 36px;
+      height: 2px;
+      background: var(--accent);
+      transition: width 0.5s ease;
+      width: 0;
+    }
+    .progress-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+    .step-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--card-bg);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-light);
+      transition: all var(--transition);
+    }
+    .progress-step.active .step-circle {
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-light);
+    }
+    .progress-step.completed .step-circle {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .step-label {
+      margin-top: 10px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      transition: color var(--transition);
+    }
+    .progress-step.active .step-label,
+    .progress-step.completed .step-label {
+      color: var(--accent);
+    }
+
+    /* ── Form Container ── */
+    .form-wrapper {
+      max-width: 760px;
+      margin: 36px auto 60px;
+      padding: 0 24px;
+    }
+    .form-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: clamp(28px, 5vw, 48px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Step Panels ── */
+    .step-panel {
+      display: none;
+      animation: fadeSlideIn 0.4s ease forwards;
+    }
+    .step-panel.active { display: block; }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .step-title {
+      font-family: var(--font-heading);
+      font-size: clamp(1.4rem, 3vw, 1.9rem);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .step-subtitle {
+      font-size: 0.88rem;
+      color: var(--text-light);
+      margin-bottom: 28px;
+      font-weight: 300;
+    }
+
+    /* ── Course Cards ── */
+    .course-grid { display: flex; flex-direction: column; gap: 12px; }
+
+    .course-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 20px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all var(--transition);
+      user-select: none;
+    }
+    .course-card:hover {
+      border-color: #C9B06A;
+      background: #FDFCF9;
+    }
+    .course-card.selected {
+      border-color: var(--accent);
+      background: var(--accent-light);
+      box-shadow: 0 0 0 3px rgba(184,134,11,0.1);
+    }
+    .course-card input[type="checkbox"] { display: none; }
+
+    .course-badge {
+      flex-shrink: 0;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: #F5F3EF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-heading);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-light);
+      transition: all var(--transition);
+    }
+    .course-card.selected .course-badge {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .course-info { flex: 1; min-width: 0; }
+    .course-name {
+      font-weight: 500;
+      font-size: 0.92rem;
+      line-height: 1.4;
+    }
+    .course-meta {
+      font-size: 0.78rem;
+      color: var(--text-light);
+      margin-top: 3px;
+    }
+    .course-duration {
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-light);
+      background: #F5F3EF;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+    .course-card.selected .course-duration {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .course-check {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+    }
+    .course-card.selected .course-check {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .course-check svg { opacity: 0; transition: opacity 0.2s; }
+    .course-card.selected .course-check svg { opacity: 1; }
+
+    /* ── Form Fields ── */
+    .form-group {
+      margin-bottom: 22px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .form-group label .optional {
+      color: var(--text-light);
+      font-weight: 400;
+      font-style: italic;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 520px) {
+      .form-row { grid-template-columns: 1fr; }
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    textarea {
+      width: 100%;
+      padding: 12px 16px;
+      font-family: var(--font-body);
+      font-size: 0.88rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: #FDFCFA;
+      color: var(--text);
+      outline: none;
+      transition: all var(--transition);
+    }
+    body.lang-kr input, body.lang-kr textarea {
+      font-family: var(--font-kr), var(--font-body);
+    }
+    input:focus, textarea:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-light);
+      background: #fff;
+    }
+    input.error, textarea.error {
+      border-color: var(--error);
+      box-shadow: 0 0 0 3px rgba(192,57,43,0.08);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+    ::placeholder { color: #B0ADA6; }
+
+    /* ── Radio Groups ── */
+    .radio-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .radio-option { position: relative; }
+    .radio-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .radio-option label.radio-label {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 24px;
+      font-size: 0.82rem;
+      font-weight: 400;
+      cursor: pointer;
+      transition: all var(--transition);
+      color: var(--text);
+      margin-bottom: 0;
+    }
+    .radio-option label.radio-label:hover {
+      border-color: #C9B06A;
+      background: #FDFCF9;
+    }
+    .radio-option input[type="radio"]:checked + label.radio-label {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .other-input {
+      margin-top: 8px;
+      display: none;
+    }
+    .other-input.visible { display: block; }
+
+    /* ── Validation Message ── */
+    .validation-msg {
+      font-size: 0.78rem;
+      color: var(--error);
+      margin-top: 6px;
+      display: none;
+    }
+    .validation-msg.show { display: block; }
+
+    /* ── Navigation Buttons ── */
+    .form-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 36px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+    .btn {
+      font-family: var(--font-body);
+      font-size: 0.88rem;
+      font-weight: 500;
+      padding: 12px 32px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all var(--transition);
+      letter-spacing: 0.02em;
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    .btn-next, .btn-submit {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(184,134,11,0.2);
+    }
+    .btn-next:hover:not(:disabled), .btn-submit:hover:not(:disabled) {
+      background: var(--accent-hover);
+      box-shadow: 0 4px 16px rgba(184,134,11,0.3);
+      transform: translateY(-1px);
+    }
+    .btn-back {
+      background: transparent;
+      color: var(--text-light);
+      padding: 12px 20px;
+    }
+    .btn-back:hover { color: var(--text); }
+    .btn:active:not(:disabled) { transform: translateY(0); }
+    .btn-spacer { flex: 1; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Thank You Overlay ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(44,44,44,0.5);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+      padding: 24px;
+    }
+    .overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .overlay-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      padding: 48px 40px;
+      max-width: 500px;
+      text-align: center;
+      transform: scale(0.92);
+      transition: transform 0.4s ease;
+    }
+    .overlay.show .overlay-card { transform: scale(1); }
+
+    .overlay-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #E8F5E9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+    }
+    .overlay-icon svg { color: var(--success); }
+
+    .overlay-card h2 {
+      font-family: var(--font-heading);
+      font-size: 1.6rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .overlay-card p {
+      font-size: 0.9rem;
+      color: var(--text-light);
+      line-height: 1.7;
+    }
+    .btn-close-overlay {
+      margin-top: 28px;
+      background: var(--accent);
+      color: #fff;
+      padding: 12px 36px;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .btn-close-overlay:hover { background: var(--accent-hover); }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      padding: 0 24px 36px;
+      font-size: 0.75rem;
+      color: var(--text-light);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .course-card { flex-wrap: wrap; gap: 10px; padding: 14px 16px; }
+      .course-duration { order: 3; }
+      .form-card { padding: 24px 20px; }
+      .step-label { font-size: 0.62rem; }
+      .radio-group { gap: 6px; }
+      .lang-toggle { top: 12px; right: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Language Toggle -->
+  <div class="lang-toggle">
+    <button class="lang-btn active" data-lang="en" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" data-lang="kr" onclick="setLang('kr')">한국어</button>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Gyrotonic® Educational Courses</h1>
+    <p data-i18n="header_sub">Registration Form</p>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-container">
+    <div class="progress-steps">
+      <div class="progress-line" id="progressLine"></div>
+      <div class="progress-step active" data-step="1">
+        <div class="step-circle">1</div>
+        <div class="step-label" data-i18n="step1_label">Programs</div>
+      </div>
+      <div class="progress-step" data-step="2">
+        <div class="step-circle">2</div>
+        <div class="step-label" data-i18n="step2_label">Information</div>
+      </div>
+      <div class="progress-step" data-step="3">
+        <div class="step-circle">3</div>
+        <div class="step-label" data-i18n="step3_label">Confirmation</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <div class="form-wrapper">
+    <div class="form-card">
+      <form id="registrationForm" novalidate>
+
+        <!-- ═══════════ STEP 1 ═══════════ -->
+        <div class="step-panel active" data-panel="1">
+          <h2 class="step-title" data-i18n="s1_title">Program Selection</h2>
+          <p class="step-subtitle" data-i18n="s1_subtitle">Please select the course(s) you wish to attend.</p>
+
+          <div class="course-grid">
+            <label class="course-card" data-course="A">
+              <input type="checkbox" name="courses" value="A - Gyrotonic® Level 1 Foundation Course">
+              <div class="course-badge">A</div>
+              <div class="course-info">
+                <div class="course-name">Gyrotonic® Level 1 Foundation Course</div>
+                <div class="course-meta">Apr 10–12, Apr 17–19, Apr 24–26 &amp; May 1–3</div>
+              </div>
+              <div class="course-duration">12 Days</div>
+              <div class="course-check">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </label>
+
+            <label class="course-card" data-course="B">
+              <input type="checkbox" name="courses" value="B - Gyrotonic® Level 2 Program 1 – Pre-Training">
+              <div class="course-badge">B</div>
+              <div class="course-info">
+                <div class="course-name">Gyrotonic® Level 2 Program 1 – Pre-Training</div>
+                <div class="course-meta">July 24–26</div>
+              </div>
+              <div class="course-duration">3 Days</div>
+              <div class="course-check">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </label>
+
+            <label class="course-card" data-course="C">
+              <input type="checkbox" name="courses" value="C - Jumping Stretching Board Course">
+              <div class="course-badge">C</div>
+              <div class="course-info">
+                <div class="course-name">Jumping Stretching Board Course</div>
+                <div class="course-meta">Aug 7–9 &amp; Aug 13–Sep 16</div>
+              </div>
+              <div class="course-duration">7 Days</div>
+              <div class="course-check">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </label>
+
+            <label class="course-card" data-course="D">
+              <input type="checkbox" name="courses" value="D - Gyrotonic® Level 1 Apprentice Review Course">
+              <div class="course-badge">D</div>
+              <div class="course-info">
+                <div class="course-name">Gyrotonic® Level 1 Apprentice Review Course</div>
+                <div class="course-meta">Oct 16–18 &amp; Oct 23–25</div>
+              </div>
+              <div class="course-duration">6 Days</div>
+              <div class="course-check">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </label>
+
+            <label class="course-card" data-course="E">
+              <input type="checkbox" name="courses" value="E - Gyrotonic® Level 2 Program 1 – Foundation Course">
+              <div class="course-badge">E</div>
+              <div class="course-info">
+                <div class="course-name">Gyrotonic® Level 2 Program 1 – Foundation Course</div>
+                <div class="course-meta">Oct 29 – Nov 1</div>
+              </div>
+              <div class="course-duration">4 Days</div>
+              <div class="course-check">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </label>
+          </div>
+
+          <div class="validation-msg" id="courseError" data-i18n="err_course">Please select at least one course to continue.</div>
+
+          <div class="form-nav">
+            <div class="btn-spacer"></div>
+            <button type="button" class="btn btn-next" onclick="nextStep(1)" data-i18n="btn_next">Next</button>
+          </div>
+        </div>
+
+        <!-- ═══════════ STEP 2 ═══════════ -->
+        <div class="step-panel" data-panel="2">
+          <h2 class="step-title" data-i18n="s2_title">Personal Information</h2>
+          <p class="step-subtitle" data-i18n="s2_subtitle">Please provide your contact details for registration.</p>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="fullName" data-i18n="lbl_name">Full Name</label>
+              <input type="text" id="fullName" name="fullName" required data-ph-en="Your full name" data-ph-kr="성함을 입력해 주세요" placeholder="Your full name">
+            </div>
+            <div class="form-group">
+              <label for="email" data-i18n="lbl_email">Email Address</label>
+              <input type="email" id="email" name="email" required placeholder="you@example.com">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="phone" data-i18n="lbl_phone">Phone Number</label>
+              <input type="tel" id="phone" name="phone" required data-ph-en="(555) 123-4567" data-ph-kr="010-1234-5678" placeholder="(555) 123-4567">
+            </div>
+            <div class="form-group">
+              <label for="certification" data-i18n="lbl_cert">Current Certification Status</label>
+              <input type="text" id="certification" name="certification" required data-ph-en="e.g., Level 1 Pre-Training completed" data-ph-kr="예: Level 1 Pre-Training 수료" placeholder="e.g., Level 1 Pre-Training completed">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="studio"><span data-i18n="lbl_studio">Studio Affiliation</span> <span class="optional" data-i18n="optional">(Optional)</span></label>
+              <input type="text" id="studio" name="studio" data-ph-en="Studio name" data-ph-kr="소속 스튜디오명" placeholder="Studio name">
+            </div>
+            <div class="form-group">
+              <label for="cityState"><span data-i18n="lbl_city">City / State</span> <span class="optional" data-i18n="optional">(Optional)</span></label>
+              <input type="text" id="cityState" name="cityState" data-ph-en="City, State" data-ph-kr="도시, 지역" placeholder="City, State">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="questions"><span data-i18n="lbl_questions">Questions or Additional Requests</span> <span class="optional" data-i18n="optional">(Optional)</span></label>
+            <textarea id="questions" name="questions" data-ph-en="Any questions, notes, or special requests..." data-ph-kr="질문이나 요청사항을 입력해 주세요..." placeholder="Any questions, notes, or special requests..."></textarea>
+          </div>
+
+          <div class="validation-msg" id="personalError" data-i18n="err_personal">Please fill in all required fields.</div>
+
+          <div class="form-nav">
+            <button type="button" class="btn btn-back" onclick="prevStep(2)" data-i18n="btn_back">← Back</button>
+            <button type="button" class="btn btn-next" onclick="nextStep(2)" data-i18n="btn_next">Next</button>
+          </div>
+        </div>
+
+        <!-- ═══════════ STEP 3 ═══════════ -->
+        <div class="step-panel" data-panel="3">
+          <h2 class="step-title" data-i18n="s3_title">Final Confirmation</h2>
+          <p class="step-subtitle" data-i18n="s3_subtitle">Just a few more details to complete your registration.</p>
+
+          <div class="form-group">
+            <label data-i18n="lbl_stage">What is your current stage in the Gyrotonic® educational track?</label>
+            <div class="radio-group">
+              <div class="radio-option">
+                <input type="radio" id="stage-new" name="stage" value="New Student">
+                <label class="radio-label" for="stage-new" data-i18n="stage_new">New Student</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="stage-l1" name="stage" value="Level 1 Trainee">
+                <label class="radio-label" for="stage-l1" data-i18n="stage_l1">Level 1 Trainee</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="stage-app" name="stage" value="Apprentice">
+                <label class="radio-label" for="stage-app" data-i18n="stage_app">Apprentice</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="stage-cert" name="stage" value="Certified Trainer">
+                <label class="radio-label" for="stage-cert" data-i18n="stage_cert">Certified Trainer</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="stage-cont" name="stage" value="Continuing Education">
+                <label class="radio-label" for="stage-cont" data-i18n="stage_cont">Continuing Education</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="stage-other" name="stage" value="Other">
+                <label class="radio-label" for="stage-other" data-i18n="stage_other">Other</label>
+              </div>
+            </div>
+            <div class="other-input" id="stageOtherWrap">
+              <input type="text" id="stageOther" name="stageOther" data-ph-en="Please specify..." data-ph-kr="기타 사항을 입력해 주세요..." placeholder="Please specify...">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label data-i18n="lbl_prereq">Do you meet the prerequisite requirements for your selected course(s)?</label>
+            <div class="radio-group">
+              <div class="radio-option">
+                <input type="radio" id="prereq-yes" name="prereq" value="Yes">
+                <label class="radio-label" for="prereq-yes" data-i18n="yes">Yes</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="prereq-no" name="prereq" value="No">
+                <label class="radio-label" for="prereq-no" data-i18n="no">No</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="prereq-notsure" name="prereq" value="Not sure">
+                <label class="radio-label" for="prereq-notsure" data-i18n="not_sure">Not sure</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label data-i18n="lbl_avail">Are you fully available for all scheduled training dates?</label>
+            <div class="radio-group">
+              <div class="radio-option">
+                <input type="radio" id="avail-yes" name="availability" value="Yes">
+                <label class="radio-label" for="avail-yes" data-i18n="yes">Yes</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="avail-no" name="availability" value="No">
+                <label class="radio-label" for="avail-no" data-i18n="no">No</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="avail-discuss" name="availability" value="Need to discuss">
+                <label class="radio-label" for="avail-discuss" data-i18n="need_discuss">Need to discuss</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="anythingElse"><span data-i18n="lbl_anything">Anything else we should know?</span> <span class="optional" data-i18n="optional">(Optional)</span></label>
+            <textarea id="anythingElse" name="anythingElse" data-ph-en="Physical concerns, prior training details, questions..." data-ph-kr="신체적 우려사항, 이전 교육 이력, 질문 등..." placeholder="Physical concerns, prior training details, questions..."></textarea>
+          </div>
+
+          <div class="form-nav">
+            <button type="button" class="btn btn-back" onclick="prevStep(3)" data-i18n="btn_back">← Back</button>
+            <button type="submit" class="btn btn-submit" id="submitBtn" data-i18n="btn_submit">Submit Registration</button>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Thank You Overlay -->
+  <div class="overlay" id="thankYouOverlay">
+    <div class="overlay-card">
+      <div class="overlay-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <h2 data-i18n="ty_title">Thank You</h2>
+      <p data-i18n="ty_msg">Thank you for your interest in our Gyrotonic® Educational Courses. Our team will review your information and contact you with the next steps.</p>
+      <button class="btn-close-overlay" onclick="closeOverlay()" data-i18n="btn_close">Close</button>
+    </div>
+  </div>
+
+  <div class="footer">
+    &copy; 2026 Gyrotonic® Educational Courses. All rights reserved.
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════
+    // Google Sheets Web App URL
+    // ═══════════════════════════════════════
+    // 1. Open Google Sheets → Extensions → Apps Script
+    // 2. Paste the code from google-apps-script.js
+    // 3. Deploy → New deployment → Web app → Anyone
+    // 4. Copy the URL and paste below
+    const GOOGLE_SHEETS_URL = 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE';
+
+    // ═══════════════════════════════════════
+    // i18n translations
+    // ═══════════════════════════════════════
+    const i18n = {
+      en: {
+        header_sub: 'Registration Form',
+        step1_label: 'Programs',
+        step2_label: 'Information',
+        step3_label: 'Confirmation',
+        s1_title: 'Program Selection',
+        s1_subtitle: 'Please select the course(s) you wish to attend.',
+        s2_title: 'Personal Information',
+        s2_subtitle: 'Please provide your contact details for registration.',
+        s3_title: 'Final Confirmation',
+        s3_subtitle: 'Just a few more details to complete your registration.',
+        lbl_name: 'Full Name',
+        lbl_email: 'Email Address',
+        lbl_phone: 'Phone Number',
+        lbl_cert: 'Current Certification Status',
+        lbl_studio: 'Studio Affiliation',
+        lbl_city: 'City / State',
+        lbl_questions: 'Questions or Additional Requests',
+        lbl_stage: 'What is your current stage in the Gyrotonic® educational track?',
+        lbl_prereq: 'Do you meet the prerequisite requirements for your selected course(s)?',
+        lbl_avail: 'Are you fully available for all scheduled training dates?',
+        lbl_anything: 'Anything else we should know?',
+        stage_new: 'New Student',
+        stage_l1: 'Level 1 Trainee',
+        stage_app: 'Apprentice',
+        stage_cert: 'Certified Trainer',
+        stage_cont: 'Continuing Education',
+        stage_other: 'Other',
+        yes: 'Yes',
+        no: 'No',
+        not_sure: 'Not sure',
+        need_discuss: 'Need to discuss',
+        optional: '(Optional)',
+        btn_next: 'Next',
+        btn_back: '← Back',
+        btn_submit: 'Submit Registration',
+        btn_close: 'Close',
+        btn_submitting: 'Submitting...',
+        err_course: 'Please select at least one course to continue.',
+        err_personal: 'Please fill in all required fields.',
+        err_submit: 'Submission failed. Please try again.',
+        ty_title: 'Thank You',
+        ty_msg: 'Thank you for your interest in our Gyrotonic® Educational Courses. Our team will review your information and contact you with the next steps.',
+      },
+      kr: {
+        header_sub: '수강 등록 신청서',
+        step1_label: '프로그램',
+        step2_label: '개인정보',
+        step3_label: '최종확인',
+        s1_title: '프로그램 선택',
+        s1_subtitle: '수강을 희망하는 코스를 선택해 주세요.',
+        s2_title: '개인 정보',
+        s2_subtitle: '등록 및 연락을 위한 정보를 입력해 주세요.',
+        s3_title: '최종 확인',
+        s3_subtitle: '등록을 완료하기 위해 몇 가지만 더 확인해 주세요.',
+        lbl_name: '성함',
+        lbl_email: '이메일 주소',
+        lbl_phone: '전화번호',
+        lbl_cert: '현재 자격 상태',
+        lbl_studio: '소속 스튜디오',
+        lbl_city: '도시 / 지역',
+        lbl_questions: '질문 또는 추가 요청사항',
+        lbl_stage: '현재 Gyrotonic® 교육 과정에서 어떤 단계에 있으신가요?',
+        lbl_prereq: '선택하신 코스의 선수과목 요건을 충족하시나요?',
+        lbl_avail: '모든 교육 일정에 참석 가능하신가요?',
+        lbl_anything: '그 외 알려주실 사항이 있으신가요?',
+        stage_new: '신규 수강생',
+        stage_l1: 'Level 1 수련생',
+        stage_app: '견습생 (Apprentice)',
+        stage_cert: '인증 트레이너',
+        stage_cont: '보수 교육',
+        stage_other: '기타',
+        yes: '예',
+        no: '아니오',
+        not_sure: '잘 모르겠습니다',
+        need_discuss: '상담 필요',
+        optional: '(선택사항)',
+        btn_next: '다음',
+        btn_back: '← 이전',
+        btn_submit: '등록 신청하기',
+        btn_close: '닫기',
+        btn_submitting: '제출 중...',
+        err_course: '최소 하나의 코스를 선택해 주세요.',
+        err_personal: '필수 항목을 모두 입력해 주세요.',
+        err_submit: '제출에 실패했습니다. 다시 시도해 주세요.',
+        ty_title: '감사합니다',
+        ty_msg: 'Gyrotonic® 교육 코스에 관심을 가져주셔서 감사합니다. 저희 팀이 접수 내용을 검토한 후 다음 단계를 안내드리겠습니다.',
+      }
+    };
+
+    let currentLang = 'en';
+    let currentStep = 1;
+
+    // ── Language ──
+    function setLang(lang) {
+      currentLang = lang;
+      document.body.classList.toggle('lang-kr', lang === 'kr');
+
+      document.querySelectorAll('.lang-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.lang === lang);
+      });
+
+      // Update text content
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.dataset.i18n;
+        if (i18n[lang][key]) el.textContent = i18n[lang][key];
+      });
+
+      // Update placeholders
+      const phKey = lang === 'kr' ? 'data-ph-kr' : 'data-ph-en';
+      document.querySelectorAll(`[${phKey}]`).forEach(el => {
+        el.placeholder = el.getAttribute(phKey);
+      });
+    }
+
+    // ── Course card toggle ──
+    document.querySelectorAll('.course-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const cb = card.querySelector('input[type="checkbox"]');
+        cb.checked = !cb.checked;
+        card.classList.toggle('selected', cb.checked);
+        hideError('courseError');
+      });
+    });
+
+    // ── "Other" stage radio toggle ──
+    document.querySelectorAll('input[name="stage"]').forEach(r => {
+      r.addEventListener('change', () => {
+        document.getElementById('stageOtherWrap').classList.toggle('visible', r.value === 'Other' && r.checked);
+      });
+    });
+
+    // ── Navigation ──
+    function nextStep(from) {
+      if (!validateStep(from)) return;
+      goToStep(from + 1);
+    }
+
+    function prevStep(from) {
+      goToStep(from - 1);
+    }
+
+    function goToStep(step) {
+      document.querySelector('.step-panel.active').classList.remove('active');
+      document.querySelector(`[data-panel="${step}"]`).classList.add('active');
+
+      document.querySelectorAll('.progress-step').forEach(s => {
+        const n = parseInt(s.dataset.step);
+        s.classList.remove('active', 'completed');
+        if (n === step) s.classList.add('active');
+        else if (n < step) s.classList.add('completed');
+      });
+
+      const pct = ((step - 1) / 2) * 100;
+      document.getElementById('progressLine').style.width = pct + '%';
+
+      currentStep = step;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── Validation ──
+    function validateStep(step) {
+      if (step === 1) {
+        const checked = document.querySelectorAll('input[name="courses"]:checked');
+        if (checked.length === 0) { showError('courseError'); return false; }
+        return true;
+      }
+      if (step === 2) {
+        const fields = ['fullName', 'email', 'phone', 'certification'];
+        let valid = true;
+        fields.forEach(id => {
+          const el = document.getElementById(id);
+          if (!el.value.trim()) { el.classList.add('error'); valid = false; }
+          else { el.classList.remove('error'); }
+        });
+        const emailEl = document.getElementById('email');
+        if (emailEl.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim())) {
+          emailEl.classList.add('error');
+          valid = false;
+        }
+        if (!valid) showError('personalError');
+        else hideError('personalError');
+        return valid;
+      }
+      return true;
+    }
+
+    function showError(id) { document.getElementById(id).classList.add('show'); }
+    function hideError(id) { document.getElementById(id).classList.remove('show'); }
+
+    document.querySelectorAll('#registrationForm input, #registrationForm textarea').forEach(el => {
+      el.addEventListener('input', () => el.classList.remove('error'));
+    });
+
+    // ── Collect form data ──
+    function collectFormData() {
+      const courses = Array.from(document.querySelectorAll('input[name="courses"]:checked')).map(c => c.value);
+      const stage = document.querySelector('input[name="stage"]:checked');
+      const prereq = document.querySelector('input[name="prereq"]:checked');
+      const avail = document.querySelector('input[name="availability"]:checked');
+
+      return {
+        timestamp: new Date().toISOString(),
+        courses: courses.join(', '),
+        fullName: document.getElementById('fullName').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        certification: document.getElementById('certification').value.trim(),
+        studio: document.getElementById('studio').value.trim(),
+        cityState: document.getElementById('cityState').value.trim(),
+        questions: document.getElementById('questions').value.trim(),
+        stage: stage ? (stage.value === 'Other' ? 'Other: ' + document.getElementById('stageOther').value.trim() : stage.value) : '',
+        prereq: prereq ? prereq.value : '',
+        availability: avail ? avail.value : '',
+        anythingElse: document.getElementById('anythingElse').value.trim(),
+      };
+    }
+
+    // ── Submit ──
+    document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const btn = document.getElementById('submitBtn');
+      const t = i18n[currentLang];
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span>${t.btn_submitting}`;
+
+      const data = collectFormData();
+
+      try {
+        if (GOOGLE_SHEETS_URL && GOOGLE_SHEETS_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+          await fetch(GOOGLE_SHEETS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+        }
+        document.getElementById('thankYouOverlay').classList.add('show');
+      } catch (err) {
+        alert(t.err_submit);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t.btn_submit;
+      }
+    });
+
+    function closeOverlay() {
+      document.getElementById('thankYouOverlay').classList.remove('show');
+    }
+  </script>
+</body>
+</html>
