@@ -13,28 +13,37 @@
  * 7. Set "Execute as": Me
  * 8. Set "Who has access": Anyone
  * 9. Click Deploy and authorize
- * 10. Copy the Web app URL → paste into index.html (GOOGLE_SHEETS_URL)
+ * 10. Copy the Web app URL → paste into form.html (GOOGLE_SHEETS_URL)
  */
 
 function doPost(e) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    var data = JSON.parse(e.postData.contents);
+    var data;
+
+    // Handle both JSON and form POST data
+    if (e.postData && e.postData.type === 'application/json') {
+      data = JSON.parse(e.postData.contents);
+    } else if (e.parameter) {
+      data = e.parameter;
+    } else {
+      data = JSON.parse(e.postData.contents);
+    }
 
     sheet.appendRow([
-      data.timestamp,
-      data.courses,
-      data.fullName,
-      data.email,
-      data.phone,
-      data.certification,
-      data.studio,
-      data.cityState,
-      data.questions,
-      data.stage,
-      data.prereq,
-      data.availability,
-      data.anythingElse,
+      data.timestamp || new Date().toISOString(),
+      data.courses || '',
+      data.fullName || '',
+      data.email || '',
+      data.phone || '',
+      data.certification || '',
+      data.studio || '',
+      data.cityState || '',
+      data.questions || '',
+      data.stage || '',
+      data.prereq || '',
+      data.availability || '',
+      data.anythingElse || '',
     ]);
 
     return ContentService
@@ -47,7 +56,7 @@ function doPost(e) {
   }
 }
 
-// Required for CORS preflight (though no-cors mode is used)
+// Required for CORS preflight
 function doGet(e) {
   return ContentService
     .createTextOutput('Registration endpoint is active.')

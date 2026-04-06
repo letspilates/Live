@@ -832,7 +832,7 @@
     // 2. Paste the code from google-apps-script.js
     // 3. Deploy → New deployment → Web app → Anyone
     // 4. Copy the URL and paste below
-    const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzJkHkk63v0oaBxKnzVIz8VeR6pyxtISU2SkpNe-UdkOQ3GPkTCGa7jakP_W7fkG8xu/exec';
+    const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyTr-4dV5Q-dweH7QAB4i6UeFkt2eh97kHMgrNEpF2n7mGCfC3y2c6J2zWuPpGoJcAS/exec';
 
     // ═══════════════════════════════════════
     // i18n translations
@@ -1079,12 +1079,35 @@
 
       try {
         if (GOOGLE_SHEETS_URL && GOOGLE_SHEETS_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
-          await fetch(GOOGLE_SHEETS_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify(data),
+          // Use hidden iframe + form POST for reliable Google Apps Script submission
+          const iframeName = 'hidden_iframe_' + Date.now();
+          const iframe = document.createElement('iframe');
+          iframe.name = iframeName;
+          iframe.style.display = 'none';
+          document.body.appendChild(iframe);
+
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = GOOGLE_SHEETS_URL;
+          form.target = iframeName;
+
+          // Send each field as a form input
+          Object.keys(data).forEach(key => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = data[key];
+            form.appendChild(input);
           });
+
+          document.body.appendChild(form);
+          form.submit();
+
+          // Clean up after submission
+          setTimeout(() => {
+            form.remove();
+            iframe.remove();
+          }, 5000);
         }
         document.getElementById('thankYouOverlay').classList.add('show');
       } catch (err) {
