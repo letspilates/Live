@@ -550,12 +550,12 @@
     }
   </style>
 </head>
-<body>
+<body class="lang-kr">
 
   <!-- Language Toggle -->
   <div class="lang-toggle">
-    <button class="lang-btn active" data-lang="en" onclick="setLang('en')">EN</button>
-    <button class="lang-btn" data-lang="kr" onclick="setLang('kr')">한국어</button>
+    <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+    <button class="lang-btn active" data-lang="kr" onclick="setLang('kr')">한국어</button>
   </div>
 
   <!-- Header -->
@@ -938,7 +938,7 @@
       }
     };
 
-    let currentLang = 'en';
+    let currentLang = 'kr';
     let currentStep = 1;
 
     // ── Language ──
@@ -1098,6 +1098,9 @@
     function closeOverlay() {
       document.getElementById('thankYouOverlay').classList.remove('show');
     }
+
+    // 페이지 로드 시 한국어로 초기화
+    document.addEventListener('DOMContentLoaded', () => setLang('kr'));
   </script>
 </body>
 </html>
