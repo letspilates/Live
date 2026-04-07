@@ -1079,35 +1079,12 @@
 
       try {
         if (GOOGLE_SHEETS_URL && GOOGLE_SHEETS_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
-          // Use hidden iframe + form POST for reliable Google Apps Script submission
-          const iframeName = 'hidden_iframe_' + Date.now();
-          const iframe = document.createElement('iframe');
-          iframe.name = iframeName;
-          iframe.style.display = 'none';
-          document.body.appendChild(iframe);
-
-          const form = document.createElement('form');
-          form.method = 'POST';
-          form.action = GOOGLE_SHEETS_URL;
-          form.target = iframeName;
-
-          // Send each field as a form input
-          Object.keys(data).forEach(key => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = data[key];
-            form.appendChild(input);
+          await fetch(GOOGLE_SHEETS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
           });
-
-          document.body.appendChild(form);
-          form.submit();
-
-          // Clean up after submission
-          setTimeout(() => {
-            form.remove();
-            iframe.remove();
-          }, 5000);
         }
         document.getElementById('thankYouOverlay').classList.add('show');
       } catch (err) {
