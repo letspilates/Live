@@ -1120,6 +1120,12 @@
 
     function closeOverlay() {
       document.getElementById('thankYouOverlay').classList.remove('show');
+      document.getElementById('registrationForm').reset();
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      document.getElementById('step1').classList.add('active');
+      currentStep = 1;
+      updateProgress();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // 페이지 로드 시 한국어로 초기화
