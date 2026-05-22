@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Let's Pilates — Warm Boutique concept</title>
+<meta name="description" content="Let's Pilates LA — a warm, intimate boutique Pilates & Gyrotonic studio. Move well, live well, be well." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Mulish:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cream:#FBF6F0;
+  --blush:#EBD9D0;
+  --blush-deep:#E0C7BB;
+  --sand:#C9A98F;
+  --taupe:#B69B85;
+  --wine:#6E3D34;
+  --wine-deep:#532A24;
+  --ink:#3A2A24;
+  --ink-soft:#6A554C;
+  --line:rgba(110,61,52,.16);
+  --serif:"Playfair Display",Georgia,serif;
+  --sans:"Mulish",-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E");
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--sans);background:var(--cream);color:var(--ink);font-weight:300;
+  line-height:1.75;-webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+body::before{content:"";position:fixed;inset:0;background-image:var(--grain);opacity:.04;pointer-events:none;z-index:9999;mix-blend-mode:multiply}
+h1,h2,h3{font-family:var(--serif);font-weight:400;line-height:1.1}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1220px;margin:0 auto;padding:0 40px}
+.eyebrow{font-size:.72rem;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--sand);display:inline-block}
+.btn{
+  font-family:var(--sans);font-size:.78rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  padding:17px 40px;border-radius:40px;background:var(--wine);color:var(--cream);display:inline-block;
+  transition:.4s ease;cursor:pointer;border:1px solid var(--wine);
+}
+.btn:hover{background:var(--wine-deep);border-color:var(--wine-deep);transform:translateY(-2px)}
+.btn-outline{background:transparent;color:var(--wine);border:1px solid var(--wine)}
+.btn-outline:hover{background:var(--wine);color:var(--cream)}
+.btn-light{background:var(--cream);color:var(--wine);border-color:var(--cream)}
+.btn-light:hover{background:transparent;color:var(--cream);border-color:rgba(251,246,240,.7)}
+.btn-ghost-light{background:transparent;color:var(--cream);border:1px solid rgba(251,246,240,.55)}
+.btn-ghost-light:hover{background:var(--cream);color:var(--wine)}
+
+/* NAV */
+header.nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:24px 0;transition:.5s ease}
+header.nav.scrolled{background:rgba(251,246,240,.92);backdrop-filter:blur(14px);padding:14px 0;box-shadow:0 8px 30px rgba(110,61,52,.07)}
+.nav-inner{display:flex;align-items:center;justify-content:space-between}
+.brand{font-family:var(--serif);font-size:1.6rem;font-style:italic;color:var(--cream);transition:color .5s}
+header.nav.scrolled .brand{color:var(--wine)}
+.nav-links{display:flex;gap:38px;align-items:center}
+.nav-links a{font-size:.78rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(251,246,240,.9);transition:.3s}
+header.nav.scrolled .nav-links a{color:var(--ink-soft)}
+.nav-links a:not(.nav-cta):hover{color:var(--cream);opacity:.7}
+header.nav.scrolled .nav-links a:not(.nav-cta):hover{color:var(--wine)}
+.nav-cta{background:var(--cream);color:var(--wine)!important;padding:11px 26px;border-radius:30px}
+header.nav.scrolled .nav-cta{background:var(--wine);color:var(--cream)!important}
+.nav-cta:hover{transform:translateY(-2px)}
+.burger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:0}
+.burger span{width:26px;height:2px;background:var(--cream);border-radius:2px;transition:.3s}
+header.nav.scrolled .burger span{background:var(--wine)}
+
+/* HERO */
+.hero{position:relative;height:100vh;min-height:680px;display:flex;align-items:center;overflow:hidden}
+.hero-media{position:absolute;inset:0;z-index:-2}
+.hero-fallback{position:absolute;inset:0;background:radial-gradient(110% 90% at 75% 25%,rgba(201,169,143,.6),transparent 55%),linear-gradient(155deg,#7a463b 0%,#6E3D34 40%,#3A2A24 100%)}
+.hero-photo{
+  position:absolute;inset:0;background-size:cover;background-position:center;
+  background-image:url("https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?auto=format&fit=crop&w=1900&q=80");
+  animation:kenburns 24s ease-in-out infinite alternate;filter:brightness(.7) saturate(1.05);
+}
+@keyframes kenburns{from{transform:scale(1.05)}to{transform:scale(1.15) translate(-2%,-1%)}}
+.hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;filter:brightness(.7)}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(58,42,36,.3),rgba(58,42,36,.55))}
+.hero-content{position:relative;z-index:2;color:var(--cream);max-width:860px}
+.hero .eyebrow{color:var(--blush);margin-bottom:26px;opacity:0;animation:rise .9s .3s forwards}
+.hero h1{font-size:clamp(3rem,8.5vw,7.2rem);color:var(--cream);margin-bottom:30px;font-weight:400}
+.hero h1 span{display:block;opacity:0;animation:rise 1s forwards}
+.hero h1 span:nth-child(1){animation-delay:.45s}
+.hero h1 span:nth-child(2){animation-delay:.6s;font-style:italic;color:var(--blush)}
+.hero p.lede{font-size:1.1rem;max-width:460px;color:rgba(251,246,240,.9);margin-bottom:42px;opacity:0;animation:rise 1s .8s forwards}
+.hero-actions{display:flex;gap:16px;flex-wrap:wrap;opacity:0;animation:rise 1s .95s forwards}
+@keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+.scroll-cue{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);z-index:3;color:rgba(251,246,240,.8);font-size:.66rem;letter-spacing:.28em;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:12px}
+.scroll-cue .dot{width:8px;height:8px;border-radius:50%;background:var(--blush);animation:bounce 1.8s ease-in-out infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(10px)}}
+
+.pad{padding:130px 0}
+.reveal{opacity:0;transform:translateY(38px);transition:1s cubic-bezier(.2,.7,.3,1)}
+.reveal.in{opacity:1;transform:none}
+
+/* intro */
+.intro{text-align:center;background:var(--cream);position:relative}
+.intro .arch{width:120px;height:150px;border-radius:60px 60px 0 0;background:linear-gradient(160deg,var(--blush),var(--blush-deep));margin:0 auto 40px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:24px}
+.intro .arch span{font-family:var(--serif);font-style:italic;font-size:2rem;color:var(--wine)}
+.intro h2{font-size:clamp(2rem,4.6vw,3.5rem);max-width:900px;margin:0 auto 26px}
+.intro h2 em{font-style:italic;color:var(--sand)}
+.intro p{max-width:540px;margin:0 auto;color:var(--ink-soft)}
+
+/* feature split with arch image */
+.split{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:70px;align-items:center}
+.split.alt{direction:rtl}.split.alt>*{direction:ltr}
+.arch-img{aspect-ratio:4/5;border-radius:200px 200px 24px 24px;background-size:cover;background-position:center;background-color:var(--blush-deep);box-shadow:0 30px 60px rgba(110,61,52,.16)}
+.arch-img.i1{background-image:linear-gradient(160deg,rgba(110,61,52,.12),transparent),url("https://images.unsplash.com/photo-1599447421416-3414500d18a5?auto=format&fit=crop&w=1100&q=80")}
+.arch-img.i2{background-image:linear-gradient(160deg,rgba(110,61,52,.12),transparent),url("https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1100&q=80")}
+.split-text .eyebrow{margin-bottom:20px}
+.split-text h2{font-size:clamp(2rem,4vw,3rem);margin-bottom:24px}
+.split-text h2 em{font-style:italic;color:var(--sand)}
+.split-text p{color:var(--ink-soft);margin-bottom:20px}
+.split-text .btn{margin-top:10px}
+
+/* classes */
+.classes{background:var(--blush)}
+.classes .head{text-align:center;margin-bottom:70px}
+.classes h2{font-size:clamp(2rem,4.6vw,3.4rem);margin-top:18px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
+.card{background:var(--cream);border-radius:28px;padding:48px 38px;transition:.45s ease;border:1px solid rgba(110,61,52,.06)}
+.card:hover{transform:translateY(-8px);box-shadow:0 30px 60px rgba(110,61,52,.12)}
+.card .ic{width:58px;height:58px;border-radius:50%;background:linear-gradient(160deg,var(--blush-deep),var(--sand));margin-bottom:26px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-style:italic;color:var(--wine);font-size:1.3rem}
+.card h3{font-size:1.7rem;margin-bottom:14px}
+.card p{font-size:.95rem;color:var(--ink-soft);margin-bottom:22px}
+.card .more{font-size:.74rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--wine)}
+
+/* quote */
+.quote{background:linear-gradient(160deg,#7a463b,#6E3D34);color:var(--cream);text-align:center;padding:140px 0;position:relative;overflow:hidden}
+.quote::before{content:"\201C";position:absolute;top:30px;left:50%;transform:translateX(-50%);font-family:var(--serif);font-size:14rem;color:rgba(251,246,240,.1);line-height:1}
+.quote blockquote{font-family:var(--serif);font-size:clamp(1.8rem,4vw,3rem);font-style:italic;line-height:1.32;max-width:960px;margin:0 auto 30px;color:var(--cream);position:relative;z-index:1}
+.quote cite{font-style:normal;font-size:.78rem;letter-spacing:.22em;text-transform:uppercase;color:var(--blush)}
+
+/* team */
+.team{background:var(--cream)}
+.team .head{text-align:center;margin-bottom:64px}
+.team h2{font-size:clamp(2rem,4.6vw,3.2rem);margin-top:16px}
+.team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:34px}
+.member{text-align:center}
+.member .photo{aspect-ratio:3/4;border-radius:24px;background-size:cover;background-position:center;background-color:var(--blush-deep);margin-bottom:20px}
+.member .photo.p1{background-image:url("https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=800&q=80")}
+.member .photo.p2{background-image:url("https://images.unsplash.com/photo-1518310383802-640c2de311b2?auto=format&fit=crop&w=800&q=80")}
+.member .photo.p3{background-image:url("https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=80")}
+.member h3{font-size:1.5rem;margin-bottom:4px;font-style:italic}
+.member .role{font-size:.72rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--sand)}
+
+/* band */
+.band{background:var(--blush-deep);text-align:center;padding:120px 0}
+.band h2{font-size:clamp(2.2rem,5vw,4rem);margin:18px 0 16px;color:var(--wine)}
+.band h2 em{font-style:italic}
+.band p{color:var(--ink-soft);max-width:500px;margin:0 auto 38px}
+
+/* footer */
+footer{background:var(--wine-deep);color:var(--cream);padding:90px 0 40px}
+.foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:50px;margin-bottom:64px}
+footer .brand{font-size:2.1rem;font-style:italic;color:var(--cream);margin-bottom:18px;display:block}
+footer p{color:rgba(251,246,240,.7);max-width:320px;font-size:.95rem}
+footer h4{font-family:var(--sans);font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--blush);margin-bottom:20px;font-weight:600}
+footer ul{list-style:none}
+footer li{margin-bottom:12px;font-size:.95rem;color:rgba(251,246,240,.78)}
+footer li a:hover{color:var(--cream)}
+.foot-bottom{display:flex;justify-content:space-between;border-top:1px solid rgba(251,246,240,.16);padding-top:28px;font-size:.76rem;letter-spacing:.06em;color:rgba(251,246,240,.6);flex-wrap:wrap;gap:14px}
+
+@media(max-width:900px){
+  .nav-links{display:none}.burger{display:flex}
+  .split,.split.alt{grid-template-columns:1fr;direction:ltr;gap:40px}
+  .arch-img{max-width:440px;margin:0 auto}
+  .cards{grid-template-columns:1fr}
+  .team-grid{grid-template-columns:1fr 1fr}
+  .foot-grid{grid-template-columns:1fr;gap:34px}
+}
+@media(max-width:560px){.wrap{padding:0 24px}.pad{padding:90px 0}.team-grid{grid-template-columns:1fr}.hero{min-height:560px}}
+</style>
+</head>
+<body>
+
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a href="#" class="brand">Let's Pilates</a>
+    <nav class="nav-links">
+      <a href="#about">About</a>
+      <a href="#classes">Classes</a>
+      <a href="#schedule">Schedule</a>
+      <a href="#team">Studio</a>
+      <a href="#visit">Visit</a>
+      <a href="#book" class="nav-cta">Book a Class</a>
+    </nav>
+    <button class="burger" id="burger" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-media">
+    <div class="hero-fallback"></div>
+    <div class="hero-photo"></div>
+  </div>
+  <!-- Drop your studio footage URL here to make this a true video hero -->
+  <video autoplay muted loop playsinline poster="https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?auto=format&fit=crop&w=1900&q=80">
+    <source src="" type="video/mp4">
+  </video>
+  <div class="wrap hero-content">
+    <span class="eyebrow">Boutique Pilates &amp; Gyrotonic · Los Angeles</span>
+    <h1><span>Move well.</span><span>Live well. Be well.</span></h1>
+    <p class="lede">An intimate studio where strength is built gently — with warmth, intention, and a little grace.</p>
+    <div class="hero-actions">
+      <a href="#book" class="btn btn-light">Book a Class</a>
+      <a href="#classes" class="btn btn-ghost-light">Explore Classes</a>
+    </div>
+  </div>
+  <div class="scroll-cue"><span>Scroll</span><span class="dot"></span></div>
+</section>
+
+<section class="intro pad" id="about">
+  <div class="wrap reveal">
+    <div class="arch"><span>LP</span></div>
+    <span class="eyebrow">Mindful Movement</span>
+    <h2>A practice of <em>presence</em> — where the body learns and the mind finally rests.</h2>
+    <p>We keep our classes small and personal, so every session feels less like a workout and more like time made just for you.</p>
+  </div>
+</section>
+
+<section class="pad" style="background:var(--cream)">
+  <div class="wrap split reveal">
+    <div class="arch-img i1"></div>
+    <div class="split-text">
+      <span class="eyebrow">The Studio</span>
+      <h2>A warm little <em>sanctuary</em>.</h2>
+      <p>Soft light, natural materials, and a calm you can feel the moment you walk in. Our space is designed to make you want to stay.</p>
+      <p>Whether it's your first class or your hundredth, you're welcomed by name.</p>
+      <a href="#book" class="btn">Reserve a Visit</a>
+    </div>
+  </div>
+</section>
+
+<section class="pad" style="background:var(--cream);padding-top:0">
+  <div class="wrap split alt reveal">
+    <div class="arch-img i2"></div>
+    <div class="split-text">
+      <span class="eyebrow">The Method</span>
+      <h2>Classical roots, <em>modern</em> care.</h2>
+      <p>Built on the original teachings of Joseph Pilates and refined with today's movement science — challenging, but always kind to your body.</p>
+      <p>Controlled movement. Conscious breath. A stronger, softer you.</p>
+      <a href="#classes" class="btn btn-outline">View the Method</a>
+    </div>
+  </div>
+</section>
+
+<section class="classes pad" id="classes">
+  <div class="wrap">
+    <div class="head reveal">
+      <span class="eyebrow">What We Offer</span>
+      <h2>Classes &amp; Private Sessions</h2>
+    </div>
+    <div class="cards reveal">
+      <div class="card"><div class="ic">01</div><h3>Reformer Pilates</h3><p>Spring-based resistance for full-body strength and length, in groups small enough to feel private.</p><span class="more">Learn more →</span></div>
+      <div class="card"><div class="ic">02</div><h3>Mat &amp; Foundations</h3><p>The essence of the method using your own body — perfect for building a lasting, precise foundation.</p><span class="more">Learn more →</span></div>
+      <div class="card"><div class="ic">03</div><h3>Gyrotonic</h3><p>Fluid, circular movement that decompresses and mobilizes — a beautiful complement to Pilates.</p><span class="more">Learn more →</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="quote" id="schedule">
+  <div class="wrap reveal">
+    <blockquote>"In ten sessions you'll feel the difference, in twenty you'll see the difference, and in thirty you'll have a whole new body."</blockquote>
+    <cite>— Joseph Pilates</cite>
+    <div style="margin-top:44px"><a href="#book" class="btn btn-light">View Class Schedule</a></div>
+  </div>
+</section>
+
+<section class="team pad" id="team">
+  <div class="wrap">
+    <div class="head reveal">
+      <span class="eyebrow">Your Guides</span>
+      <h2>Meet the Instructors</h2>
+    </div>
+    <div class="team-grid reveal">
+      <div class="member"><div class="photo p1"></div><h3>Instructor One</h3><div class="role">Head Instructor</div></div>
+      <div class="member"><div class="photo p2"></div><h3>Instructor Two</h3><div class="role">Reformer · Mat</div></div>
+      <div class="member"><div class="photo p3"></div><h3>Instructor Three</h3><div class="role">Gyrotonic</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="book">
+  <div class="wrap reveal">
+    <span class="eyebrow">Begin</span>
+    <h2>Your first class <em>awaits</em>.</h2>
+    <p>Reserve online in seconds. New clients receive a personal welcome and a movement assessment.</p>
+    <a href="#" class="btn">Book on MindBody</a>
+  </div>
+</section>
+
+<footer id="visit">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <span class="brand">Let's Pilates</span>
+        <p>A warm, intimate Pilates &amp; Gyrotonic studio in the heart of Los Angeles. Move well, live well, be well.</p>
+      </div>
+      <div>
+        <h4>Visit</h4>
+        <ul>
+          <li>674 S. La Fayette Park Place</li>
+          <li>Los Angeles, CA 90057</li>
+          <li><a href="tel:3109950046">310-995-0046</a></li>
+          <li><a href="mailto:letspilatesla@gmail.com">letspilatesla@gmail.com</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Follow</h4>
+        <ul>
+          <li><a href="https://www.instagram.com/letspilates_la" target="_blank" rel="noopener">Instagram</a></li>
+          <li><a href="#classes">Classes</a></li>
+          <li><a href="#book">Book a Class</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© <span id="yr"></span> Let's Pilates LA. All rights reserved.</span>
+      <span>Warm Boutique concept · mockup</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const nav=document.getElementById('nav');
+  addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>60));
+  document.getElementById('burger').addEventListener('click',()=>{document.querySelector('.nav-links').style.display='flex'});
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.15});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+  document.getElementById('yr').textContent=new Date().getFullYear();
+</script>
+</body>
+</html>
