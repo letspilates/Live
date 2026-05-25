@@ -90,7 +90,6 @@ header.nav.scrolled{
 .brand{font-family:var(--serif);font-size:1.5rem;letter-spacing:.02em;color:var(--bone);transition:color .5s}
 .brand b{font-weight:600}
 header.nav.scrolled .brand{color:var(--ink)}
-.nav-actions{display:flex;align-items:center;gap:30px}
 .nav-links{display:flex;gap:40px;align-items:center}
 .nav-links a{
   font-size:.76rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(244,240,234,.85);
@@ -107,19 +106,6 @@ header.nav.scrolled .nav-links a{color:var(--ink-soft)}
 header.nav.scrolled .nav-cta{border-color:var(--ink);color:var(--ink)!important}
 .nav-cta:hover{background:var(--bone);color:var(--ink)!important}
 header.nav.scrolled .nav-cta:hover{background:var(--ink);color:var(--bone)!important}
-
-/* language toggle */
-.lang-toggle{display:inline-flex;align-items:center;border:1px solid rgba(244,240,234,.4);border-radius:30px;padding:3px;flex-shrink:0;transition:border-color .5s}
-.lang-toggle .lt-opt{
-  font-family:var(--sans);font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;
-  color:rgba(244,240,234,.72);background:none;border:0;cursor:pointer;padding:6px 13px;border-radius:30px;
-  transition:.3s;line-height:1;white-space:nowrap;
-}
-.lang-toggle .lt-opt.active{background:var(--bone);color:var(--ink)}
-header.nav.scrolled .lang-toggle{border-color:var(--line)}
-header.nav.scrolled .lang-toggle .lt-opt{color:var(--ink-soft)}
-header.nav.scrolled .lang-toggle .lt-opt.active{background:var(--ink);color:var(--bone)}
-
 .burger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:0}
 .burger span{width:26px;height:1.5px;background:var(--bone);transition:.3s}
 header.nav.scrolled .burger span{background:var(--ink)}
@@ -239,12 +225,7 @@ footer li a:hover{color:var(--ink)}
 .foot-bottom .legal{max-width:560px;text-align:right;opacity:.85;line-height:1.5;letter-spacing:.04em}
 
 @media(max-width:900px){
-  .nav-actions{gap:16px}
   .burger{display:flex;z-index:101}
-  .lang-toggle{position:relative;z-index:101}
-  header.nav.menu-open .lang-toggle{border-color:var(--line)}
-  header.nav.menu-open .lang-toggle .lt-opt{color:var(--ink-soft)}
-  header.nav.menu-open .lang-toggle .lt-opt.active{background:var(--ink);color:var(--bone)}
   .nav-links{
     position:fixed;top:0;right:0;height:100vh;width:80%;max-width:330px;
     flex-direction:column;align-items:flex-start;justify-content:center;gap:30px;
@@ -279,21 +260,15 @@ footer li a:hover{color:var(--ink)}
 <header class="nav" id="nav">
   <div class="wrap nav-inner">
     <a href="#" class="brand">Let's <b>Pilates LA</b></a>
-    <div class="nav-actions">
-      <div class="lang-toggle" role="group" aria-label="Language / 언어">
-        <button type="button" class="lt-opt" data-set-lang="en">EN</button>
-        <button type="button" class="lt-opt" data-set-lang="ko">한국어</button>
-      </div>
-      <nav class="nav-links" id="nav-links">
-        <a href="#about" data-ko="소개">About</a>
-        <a href="#pilates" data-ko="필라테스">Pilates</a>
-        <a href="#gyrotonic" data-ko="자이로토닉">Gyrotonic</a>
-        <a href="#sessions" data-ko="세션">Sessions</a>
-        <a href="#visit" data-ko="오시는 길">Visit</a>
-        <a href="#book" class="nav-cta book-link" data-ko="클래스 예약">Book a Class</a>
-      </nav>
-      <button class="burger" id="burger" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
-    </div>
+    <nav class="nav-links" id="nav-links">
+      <a href="#about">About</a>
+      <a href="#pilates">Pilates</a>
+      <a href="#gyrotonic">Gyrotonic</a>
+      <a href="#sessions">Sessions</a>
+      <a href="#visit">Visit</a>
+      <a href="#book" class="nav-cta book-link">Book a Class</a>
+    </nav>
+    <button class="burger" id="burger" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
   </div>
 </header>
 
@@ -307,26 +282,26 @@ footer li a:hover{color:var(--ink)}
     <source src="" type="video/mp4">
   </video>
   <div class="wrap hero-content">
-    <span class="eyebrow" data-ko="부띠끄 필라테스 &amp; 자이로토닉 · 로스앤젤레스">Boutique Pilates &amp; Gyrotonic · Los Angeles</span>
-    <h1><span data-ko="잘 움직이고,">Move well.</span><span data-ko="잘 살고, 건강하게.">Live well. Be well.</span></h1>
-    <p class="lede" data-ko="필라테스와 자이로토닉을 위한 부띠끄 스튜디오 — 모든 세션은 오직 한 사람, 당신의 몸을 중심으로 설계됩니다.">A boutique studio for Pilates and Gyrotonic — where every session is built around one body: yours.</p>
+    <span class="eyebrow">Boutique Pilates &amp; Gyrotonic · Los Angeles</span>
+    <h1><span>Move well.</span><span>Live well. Be well.</span></h1>
+    <p class="lede">A boutique studio for Pilates and Gyrotonic — where every session is built around one body: yours.</p>
     <div class="hero-actions">
-      <a href="#book" class="btn btn-light book-link" data-ko="클래스 예약">Book a Class</a>
-      <a href="#sessions" class="btn btn-light" data-ko="세션 둘러보기">Explore Sessions</a>
+      <a href="#book" class="btn btn-light book-link">Book a Class</a>
+      <a href="#sessions" class="btn btn-light">Explore Sessions</a>
     </div>
   </div>
-  <div class="scroll-cue"><span data-ko="스크롤">Scroll</span><span class="line"></span></div>
+  <div class="scroll-cue"><span>Scroll</span><span class="line"></span></div>
 </section>
 
 <section class="intro pad" id="about">
   <div class="wrap reveal">
-    <span class="eyebrow" data-ko="철저히 개인 맞춤">Personal by Design</span>
-    <h2 data-ko="당신을 끼워 맞추는 수업이 아닌, <em>당신을 중심으로</em> 설계된 수련.">Not a class you fit into — a practice built <em>around you</em>.</h2>
-    <p data-ko="저희는 대형 피트니스 체인이 아닌 부띠끄 스튜디오입니다. 붐비는 공간도, 천편일률적인 시퀀스도 없습니다 — 오직 프라이빗·소그룹 세션과 온전한 집중, 그리고 당신의 몸에 따라 진화하는 플랜뿐입니다.">We are a boutique studio, not a fitness chain. No crowded rooms, no one-size sequence — only private and small-group sessions, undivided attention, and a plan that evolves as your body does.</p>
+    <span class="eyebrow">Personal by Design</span>
+    <h2>Not a class you fit into — a practice built <em>around you</em>.</h2>
+    <p>We are a boutique studio, not a fitness chain. No crowded rooms, no one-size sequence — only private and small-group sessions, undivided attention, and a plan that evolves as your body does.</p>
     <div class="stats">
-      <div class="stat"><div class="n">10</div><div class="l" data-ko="운영 연수">Years in Practice</div></div>
-      <div class="stat"><div class="n">2</div><div class="l" data-ko="전문 분야">Disciplines</div></div>
-      <div class="stat"><div class="n">3</div><div class="l" data-ko="세션 형태">Session Formats</div></div>
+      <div class="stat"><div class="n">10</div><div class="l">Years in Practice</div></div>
+      <div class="stat"><div class="n">2</div><div class="l">Disciplines</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">Session Formats</div></div>
     </div>
   </div>
 </section>
@@ -334,21 +309,21 @@ footer li a:hover{color:var(--ink)}
 <section class="split" id="pilates">
   <div class="split-media m1 reveal"></div>
   <div class="split-text reveal">
-    <span class="eyebrow" data-ko="전문 분야 01 — 필라테스">Discipline 01 — Pilates</span>
-    <h2 data-ko="고전의 정수를, <em>당신에게 맞게</em>.">Classical intelligence, <em>made personal</em>.</h2>
-    <p data-ko="<strong>STOTT PILATES®</strong> 국제 표준에 따라 지도합니다 — 조셉 필라테스의 원형을 해부학적으로 정교하게 발전시킨 현대적 메소드입니다.">Taught to the <strong>STOTT PILATES®</strong> international standard — a contemporary, anatomically grounded refinement of Joseph Pilates' original method.</p>
-    <p data-ko="리포머, 캐딜락, 체어, 배럴 위에서 모든 세션은 새로운 시퀀스로 구성됩니다 — 당신의 몸과 목표, 그날의 컨디션에 맞춰서요. 정해진 틀은 없습니다.">On the Reformer, Cadillac, Chair and Barrel, every session is a fresh sequence — written for your body, your goals, and how you arrive that day. Never a template.</p>
-    <a href="#sessions" class="btn" data-ko="세션 둘러보기">Explore Sessions</a>
+    <span class="eyebrow">Discipline 01 — Pilates</span>
+    <h2>Classical intelligence, <em>made personal</em>.</h2>
+    <p>Taught to the <strong>STOTT PILATES®</strong> international standard — a contemporary, anatomically grounded refinement of Joseph Pilates' original method.</p>
+    <p>On the Reformer, Cadillac, Chair and Barrel, every session is a fresh sequence — written for your body, your goals, and how you arrive that day. Never a template.</p>
+    <a href="#sessions" class="btn">Explore Sessions</a>
   </div>
 </section>
 
 <section class="split alt" id="gyrotonic">
   <div class="split-text reveal">
-    <span class="eyebrow" data-ko="전문 분야 02 — 자이로토닉">Discipline 02 — Gyrotonic</span>
-    <h2 data-ko="<em>돌고, 휘감고, 자유롭게</em> 하는 움직임.">Movement that <em>circles, spirals, frees</em>.</h2>
-    <p data-ko="그 자체로 독립된 운동 체계입니다 — <strong>필라테스의 한 종류가 아닙니다.</strong> 전직 발레 무용수 줄리우 호바스가 창안한 <strong>GYROTONIC®</strong>은 몸을 유려한 3차원 곡선으로 움직여 관절의 압박을 풀고 척추를 가동합니다.">A distinct system in its own right — <strong>not a form of Pilates.</strong> Created by former ballet dancer Juliu Horvath, <strong>GYROTONIC®</strong> moves the body in flowing, three-dimensional arcs that decompress the joints and mobilize the spine.</p>
-    <p data-ko="무용수와 운동선수들이 오래도록 아껴온 운동이자, 재활과 유연성·가동범위 회복에도 탁월합니다. 전용 기구 — 풀리 타워, 점핑-스트레칭 보드, <strong>ARCHWAY™</strong> — 를 사용해 각 시퀀스를 당신의 몸에 맞춥니다.">Long prized by dancers and athletes, it is equally powerful for rehabilitation and for restoring flexibility and range of motion. Using specialized apparatus — the Pulley Tower, Jumping-Stretching Board and <strong>ARCHWAY™</strong> — each sequence is shaped to your body.</p>
-    <a href="#sessions" class="btn" data-ko="세션 둘러보기">Explore Sessions</a>
+    <span class="eyebrow">Discipline 02 — Gyrotonic</span>
+    <h2>Movement that <em>circles, spirals, frees</em>.</h2>
+    <p>A distinct system in its own right — <strong>not a form of Pilates.</strong> Created by former ballet dancer Juliu Horvath, <strong>GYROTONIC®</strong> moves the body in flowing, three-dimensional arcs that decompress the joints and mobilize the spine.</p>
+    <p>Long prized by dancers and athletes, it is equally powerful for rehabilitation and for restoring flexibility and range of motion. Using specialized apparatus — the Pulley Tower, Jumping-Stretching Board and <strong>ARCHWAY™</strong> — each sequence is shaped to your body.</p>
+    <a href="#sessions" class="btn">Explore Sessions</a>
   </div>
   <div class="split-media m2 reveal"></div>
 </section>
@@ -356,28 +331,28 @@ footer li a:hover{color:var(--ink)}
 <section class="classes pad" id="sessions">
   <div class="wrap">
     <div class="head reveal">
-      <span class="eyebrow" data-ko="함께하는 방식">How We Work Together</span>
-      <h2 data-ko="프라이빗 · 듀엣 · 그룹">Private, Duet &amp; Group</h2>
-      <p class="head-sub" data-ko="필라테스와 자이로토닉 모두 프라이빗, 듀엣, 소그룹 세션으로 제공됩니다.">Both Pilates and Gyrotonic are offered as private, duet, and small-group sessions.</p>
+      <span class="eyebrow">How We Work Together</span>
+      <h2>Private, Duet &amp; Group</h2>
+      <p class="head-sub">Both Pilates and Gyrotonic are offered as private, duet, and small-group sessions.</p>
     </div>
     <div class="cards reveal">
       <div class="card">
         <div class="num">01</div>
-        <h3 data-ko="프라이빗">Private</h3>
-        <p data-ko="일대일 완전 맞춤. 강사가 오직 당신의 몸에 맞춰 모든 시퀀스를 실시간으로 설계하고 조정합니다.">One-to-one and fully bespoke. Your instructor designs and adjusts every sequence in real time, around your body alone.</p>
-        <span class="more" data-ko="자세히 보기">Learn more</span>
+        <h3>Private</h3>
+        <p>One-to-one and fully bespoke. Your instructor designs and adjusts every sequence in real time, around your body alone.</p>
+        <span class="more">Learn more</span>
       </div>
       <div class="card">
         <div class="num">02</div>
-        <h3 data-ko="듀엣">Duet</h3>
-        <p data-ko="두 사람, 하나의 집중. 파트너나 친구와 함께하는 프라이빗의 친밀함 — 같은 정밀함을 함께 나눕니다.">Two people, shared focus. The intimacy of private work with a partner or friend — the same precision, gently shared.</p>
-        <span class="more" data-ko="자세히 보기">Learn more</span>
+        <h3>Duet</h3>
+        <p>Two people, shared focus. The intimacy of private work with a partner or friend — the same precision, gently shared.</p>
+        <span class="more">Learn more</span>
       </div>
       <div class="card">
         <div class="num">03</div>
-        <h3 data-ko="그룹">Group</h3>
-        <p data-ko="처음부터 소규모로 — 필라테스는 최대 5인, 자이로토닉은 4인을 넘지 않습니다. 모든 사람이 끝까지 세심하게 관찰받고 교정받습니다.">Small by design — never more than five in Pilates, four in Gyrotonic. A handful of clients, so every body is seen and corrected throughout.</p>
-        <span class="more" data-ko="자세히 보기">Learn more</span>
+        <h3>Group</h3>
+        <p>Small by design — never more than five in Pilates, four in Gyrotonic. A handful of clients, so every body is seen and corrected throughout.</p>
+        <span class="more">Learn more</span>
       </div>
     </div>
   </div>
@@ -385,26 +360,26 @@ footer li a:hover{color:var(--ink)}
 
 <section class="quote" id="schedule">
   <div class="wrap reveal">
-    <blockquote data-ko="“열 번이면 차이를 느끼고, 스무 번이면 차이가 보이고, 서른 번이면 완전히 새로운 몸을 갖게 됩니다.”">"In ten sessions you'll feel the difference, in twenty you'll see the difference, and in thirty you'll have a whole new body."</blockquote>
-    <cite data-ko="— 조셉 필라테스">— Joseph Pilates</cite>
-    <div style="margin-top:46px"><a href="#book" class="btn book-link" data-ko="클래스 시간표 보기">View Class Schedule</a></div>
+    <blockquote>"In ten sessions you'll feel the difference, in twenty you'll see the difference, and in thirty you'll have a whole new body."</blockquote>
+    <cite>— Joseph Pilates</cite>
+    <div style="margin-top:46px"><a href="#book" class="btn book-link">View Class Schedule</a></div>
   </div>
 </section>
 
 <section class="intro pad" id="first-visit">
   <div class="wrap reveal">
-    <span class="eyebrow" data-ko="첫 방문 안내">Your First Visit</span>
-    <h2 data-ko="이렇게 진행됩니다.">What to expect.</h2>
-    <p data-ko="조금 일찍 도착하셔서 편하게 움직일 수 있는 옷차림이면 충분합니다 — 그 외에는 아무것도 필요 없어요. 첫 세션은 간단한 움직임 평가로 시작하며, 이후 모든 과정이 당신을 중심으로 설계됩니다.">Arrive a little early and wear something you can move in — bring nothing else. Your first session opens with a short movement assessment, so everything that follows is built around you.</p>
+    <span class="eyebrow">Your First Visit</span>
+    <h2>What to expect.</h2>
+    <p>Arrive a little early and wear something you can move in — bring nothing else. Your first session opens with a short movement assessment, so everything that follows is built around you.</p>
   </div>
 </section>
 
 <section class="band" id="book">
   <div class="wrap inner reveal">
-    <span class="eyebrow" data-ko="시작하기">Begin</span>
-    <h2 data-ko="당신의 첫 세션이 기다리고 있습니다.">Your first session awaits.</h2>
-    <p data-ko="잠깐이면 예약 완료 — 저희가 준비해두겠습니다.">Reserve your place in moments — we'll be ready for you.</p>
-    <a href="#" class="btn btn-light book-link" data-ko="클래스 예약">Book a Class</a>
+    <span class="eyebrow">Begin</span>
+    <h2>Your first session awaits.</h2>
+    <p>Reserve your place in moments — we'll be ready for you.</p>
+    <a href="#" class="btn btn-light book-link">Book a Class</a>
   </div>
 </section>
 
@@ -413,10 +388,10 @@ footer li a:hover{color:var(--ink)}
     <div class="foot-grid">
       <div>
         <span class="brand">Let's Pilates LA</span>
-        <p data-ko="로스앤젤레스 중심부의 부띠끄 필라테스 &amp; 자이로토닉 스튜디오. 잘 움직이고, 잘 살고, 건강하게.">A boutique Pilates &amp; Gyrotonic studio in the heart of Los Angeles. Move well, live well, be well.</p>
+        <p>A boutique Pilates &amp; Gyrotonic studio in the heart of Los Angeles. Move well, live well, be well.</p>
       </div>
       <div>
-        <h4 data-ko="오시는 길">Visit</h4>
+        <h4>Visit</h4>
         <ul>
           <li>674 S. La Fayette Park Place</li>
           <li>Los Angeles, CA 90057</li>
@@ -425,11 +400,11 @@ footer li a:hover{color:var(--ink)}
         </ul>
       </div>
       <div>
-        <h4 data-ko="팔로우">Follow</h4>
+        <h4>Follow</h4>
         <ul>
           <li><a href="https://www.instagram.com/letspilates_la" target="_blank" rel="noopener">Instagram</a></li>
-          <li><a href="#sessions" data-ko="세션">Sessions</a></li>
-          <li><a href="#book" data-ko="클래스 예약">Book a Class</a></li>
+          <li><a href="#sessions">Sessions</a></li>
+          <li><a href="#book">Book a Class</a></li>
         </ul>
       </div>
     </div>
@@ -450,26 +425,13 @@ footer li a:hover{color:var(--ink)}
     a.setAttribute('rel','noopener');
   });
 
-  // ── Language toggle (EN / 한국어) ──────────────────────
-  const i18nEls=document.querySelectorAll('[data-ko]');
-  i18nEls.forEach(el=>{el.dataset.en=el.innerHTML;}); // capture English originals
-  function setLang(lang){
-    i18nEls.forEach(el=>{el.innerHTML = (lang==='ko') ? el.dataset.ko : el.dataset.en;});
-    document.documentElement.lang = lang;
-    document.querySelectorAll('.lt-opt').forEach(o=>o.classList.toggle('active', o.dataset.setLang===lang));
-    try{localStorage.setItem('lp-lang',lang);}catch(e){}
-  }
-  document.querySelectorAll('.lt-opt').forEach(o=>o.addEventListener('click',()=>setLang(o.dataset.setLang)));
-  let savedLang='en'; try{savedLang=localStorage.getItem('lp-lang')||'en';}catch(e){}
-  setLang(savedLang);
-
   // ── Sticky nav state ──────────────────────────────────
   const nav=document.getElementById('nav');
   addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>60));
 
   // ── Mobile menu toggle ────────────────────────────────
   const burger=document.getElementById('burger');
-  const closeMenu=()=>{nav.classList.remove('menu-open');burger.setAttribute('aria-expanded','false');};
+  const closeMenu=()=>{nav.classList.remove('menu-open');burger.setAttribute('aria-expanded','false')};
   burger.addEventListener('click',()=>{
     const open=nav.classList.toggle('menu-open');
     burger.setAttribute('aria-expanded',open?'true':'false');
