@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Let's Pilates LA — Boutique Pilates &amp; Gyrotonic Studio | Los Angeles</title>
 <meta name="description" content="A boutique Pilates & Gyrotonic studio in Los Angeles. STOTT PILATES®–based private, duet and small-group sessions, tailored to your body. Move well, live well, be well." />
+<link rel="canonical" href="https://letspilatesla.com/">
+<meta name="theme-color" content="#2B2926">
+<link rel="icon" href="/images/favicon.ico">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Let's Pilates LA — Boutique Pilates &amp; Gyrotonic Studio">
+<meta property="og:description" content="STOTT PILATES®–based private, duet and small-group sessions, tailored to your body. Move well, live well, be well.">
+<meta property="og:url" content="https://letspilatesla.com/">
+<meta property="og:image" content="https://letspilatesla.com/images/logo.png">
+<meta name="twitter:card" content="summary">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -27,6 +36,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1900&q=80">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -40,6 +50,7 @@
   --line:rgba(43,41,38,.14);
   --serif:"Cormorant Garamond",Georgia,serif;
   --sans:"Jost",-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --ease:cubic-bezier(.2,.7,.3,1);
   --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E");
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -58,6 +69,9 @@ body::before{
   content:"";position:fixed;inset:0;background-image:var(--grain);
   opacity:.05;pointer-events:none;z-index:9999;mix-blend-mode:multiply;
 }
+body.menu-open{overflow:hidden}
+::selection{background:var(--sand-deep);color:var(--ink)}
+:focus-visible{outline:1px solid var(--taupe);outline-offset:4px}
 h1,h2,h3{font-family:var(--serif);font-weight:400;line-height:1.08;letter-spacing:-.01em}
 img{display:block;max-width:100%}
 a{color:inherit;text-decoration:none}
@@ -69,13 +83,13 @@ a{color:inherit;text-decoration:none}
 .btn{
   font-family:var(--sans);font-size:.74rem;letter-spacing:.24em;text-transform:uppercase;
   padding:18px 38px;border:1px solid var(--ink);color:var(--ink);background:transparent;
-  display:inline-block;transition:.45s cubic-bezier(.2,.7,.3,1);cursor:pointer;
+  display:inline-block;transition:.45s var(--ease);cursor:pointer;
 }
 .btn:hover{background:var(--ink);color:var(--bone)}
 .btn-light{border-color:rgba(244,240,234,.55);color:var(--bone)}
 .btn-light:hover{background:var(--bone);color:var(--ink);border-color:var(--bone)}
-.btn-solid{background:var(--ink);color:var(--bone);border-color:var(--ink)}
-.btn-solid:hover{background:transparent;color:var(--bone);border-color:var(--bone)}
+.btn-fill{background:var(--bone);color:var(--ink);border-color:var(--bone)}
+.btn-fill:hover{background:transparent;color:var(--bone);border-color:rgba(244,240,234,.7)}
 
 /* ---------- NAV ---------- */
 header.nav{
@@ -99,16 +113,19 @@ header.nav.scrolled .nav-links a{color:var(--ink-soft)}
 .nav-links a:not(.nav-cta)::after{
   content:"";position:absolute;left:0;bottom:-6px;height:1px;width:0;background:currentColor;transition:width .35s;
 }
-.nav-links a:not(.nav-cta):hover::after{width:100%}
+.nav-links a:not(.nav-cta):hover::after,
+.nav-links a:not(.nav-cta).active::after{width:100%}
 .nav-cta{
   border:1px solid rgba(244,240,234,.5);padding:11px 24px;color:var(--bone)!important;
 }
 header.nav.scrolled .nav-cta{border-color:var(--ink);color:var(--ink)!important}
 .nav-cta:hover{background:var(--bone);color:var(--ink)!important}
 header.nav.scrolled .nav-cta:hover{background:var(--ink);color:var(--bone)!important}
-.burger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:0}
+.burger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:0;z-index:101}
 .burger span{width:26px;height:1.5px;background:var(--bone);transition:.3s}
 header.nav.scrolled .burger span{background:var(--ink)}
+.scrim{position:fixed;inset:0;background:rgba(43,41,38,.45);opacity:0;pointer-events:none;transition:opacity .4s;z-index:99}
+body.menu-open .scrim{opacity:1;pointer-events:auto}
 
 /* ---------- HERO ---------- */
 .hero{position:relative;height:100vh;min-height:680px;display:flex;align-items:center;overflow:hidden}
@@ -126,12 +143,12 @@ header.nav.scrolled .burger span{background:var(--ink)}
   filter:grayscale(.15) brightness(.62) contrast(1.02);
 }
 @keyframes kenburns{from{transform:scale(1.06) translate(0,0)}to{transform:scale(1.16) translate(-2%,-2%)}}
-.hero video{
-  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;
+.hero-media video{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
   filter:brightness(.62) grayscale(.15);
 }
 .hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(20,18,16,.35),rgba(20,18,16,.55))}
-.hero-content{position:relative;z-index:2;color:var(--bone);max-width:880px}
+.hero-content{position:relative;z-index:2;color:var(--bone);max-width:880px;will-change:transform,opacity}
 .hero .eyebrow{color:rgba(244,240,234,.8);margin-bottom:30px;opacity:0;animation:rise .9s .3s forwards}
 .hero h1{
   font-size:clamp(3rem,8vw,7rem);font-weight:400;letter-spacing:-.02em;color:var(--bone);
@@ -156,8 +173,12 @@ header.nav.scrolled .burger span{background:var(--ink)}
 /* ---------- SECTIONS ---------- */
 section{position:relative}
 .pad{padding:130px 0}
-.reveal{opacity:0;transform:translateY(38px);transition:1s cubic-bezier(.2,.7,.3,1)}
+.reveal{opacity:0;transform:translateY(38px);transition:1s var(--ease)}
 .reveal.in{opacity:1;transform:none}
+.stagger>*{opacity:0;transform:translateY(30px);transition:.9s var(--ease)}
+.stagger.in>*{opacity:1;transform:none}
+.stagger.in>*:nth-child(2){transition-delay:.14s}
+.stagger.in>*:nth-child(3){transition-delay:.28s}
 
 /* intro */
 .intro{background:var(--bone);text-align:center}
@@ -169,18 +190,41 @@ section{position:relative}
 .stat .n{font-family:var(--serif);font-size:3rem;color:var(--ink);line-height:1}
 .stat .l{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--taupe-deep);margin-top:12px}
 
+/* marquee divider */
+.marquee{overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:30px 0;background:var(--bone)}
+.marquee-track{display:flex;width:max-content;animation:marq 38s linear infinite}
+.marquee-track span{
+  font-family:var(--serif);font-style:italic;font-size:clamp(1.4rem,2.6vw,2rem);
+  color:var(--taupe);white-space:nowrap;letter-spacing:.04em;
+}
+.marquee:hover .marquee-track{animation-play-state:paused}
+@keyframes marq{to{transform:translateX(-50%)}}
+
 /* philosophy split */
 .split{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:0}
 .split.alt{background:var(--sand)}
-.split-media{height:78vh;min-height:560px;background-size:cover;background-position:center;position:relative}
-.split-media.m1{background-image:linear-gradient(135deg,rgba(111,99,79,.25),rgba(43,41,38,.45)),url("https://images.unsplash.com/photo-1599447421416-3414500d18a5?auto=format&fit=crop&w=1300&q=80");background-color:#8d8270}
-.split-media.m2{background-image:linear-gradient(135deg,rgba(111,99,79,.2),rgba(43,41,38,.4)),url("https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1300&q=80");background-color:#9a8c78}
-.split-text{padding:90px clamp(40px,7vw,110px)}
+.split-media{height:78vh;min-height:560px;position:relative;overflow:hidden}
+.media-img{
+  position:absolute;inset:0;background-size:cover;background-position:center;
+  transition:transform 1.4s var(--ease);
+}
+.split:hover .media-img{transform:scale(1.045)}
+.media-img.m1{background-image:linear-gradient(135deg,rgba(111,99,79,.25),rgba(43,41,38,.45)),url("https://images.unsplash.com/photo-1599447421416-3414500d18a5?auto=format&fit=crop&w=1300&q=80");background-color:#8d8270}
+.media-img.m2{background-image:linear-gradient(135deg,rgba(111,99,79,.2),rgba(43,41,38,.4)),url("https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1300&q=80");background-color:#9a8c78}
+.split-text{padding:90px clamp(40px,7vw,110px);position:relative}
 .split-text .eyebrow{margin-bottom:24px}
 .split-text h2{font-size:clamp(2rem,4vw,3rem);margin-bottom:26px}
 .split-text h2 em{font-style:italic;color:var(--taupe)}
 .split-text p{color:var(--ink-soft);margin-bottom:22px;max-width:480px}
 .split-text p strong{font-weight:500;color:var(--ink)}
+.split-num{
+  position:absolute;top:34px;right:clamp(24px,5vw,70px);
+  font-family:var(--serif);font-style:italic;font-size:clamp(5.5rem,9vw,8.5rem);line-height:1;
+  color:rgba(43,41,38,.07);pointer-events:none;user-select:none;
+}
+@supports(-webkit-text-stroke:1px black){
+  .split-num{color:transparent;-webkit-text-stroke:1px rgba(43,41,38,.16)}
+}
 
 /* classes / sessions */
 .classes{background:var(--ink);color:var(--bone)}
@@ -189,15 +233,20 @@ section{position:relative}
 .classes h2{font-size:clamp(2rem,4.4vw,3.4rem);color:var(--bone);margin-top:20px}
 .classes .head-sub{color:rgba(244,240,234,.62);font-weight:300;max-width:540px;margin:18px auto 0;font-size:.98rem}
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(244,240,234,.14)}
-.card{background:var(--ink);padding:54px 40px;transition:.5s ease}
+.card{background:var(--ink);padding:54px 40px;transition:background .5s ease}
 .card:hover{background:#34302a}
 .card .num{font-family:var(--serif);font-style:italic;font-size:1.3rem;color:var(--taupe);margin-bottom:30px}
 .card h3{font-size:1.9rem;color:var(--bone);margin-bottom:18px}
 .card p{font-size:.92rem;color:rgba(244,240,234,.62);font-weight:300;margin-bottom:28px}
-.card .more{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--sand-deep);border-bottom:1px solid var(--taupe-deep);padding-bottom:4px}
+.card .more{
+  font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--sand-deep);
+  border-bottom:1px solid var(--taupe-deep);padding-bottom:4px;transition:.35s;
+}
+.card .more:hover{color:var(--bone);border-color:var(--sand-deep)}
 
 /* quote */
 .quote{background:var(--sand);text-align:center;padding:140px 0}
+.quote .rule{width:54px;height:1px;background:var(--taupe);margin:0 auto 44px}
 .quote blockquote{font-family:var(--serif);font-size:clamp(1.8rem,4vw,3rem);font-style:italic;line-height:1.3;max-width:980px;margin:0 auto 34px;color:var(--ink)}
 .quote cite{font-style:normal;font-size:.78rem;letter-spacing:.24em;text-transform:uppercase;color:var(--taupe-deep)}
 
@@ -214,6 +263,11 @@ section{position:relative}
 
 /* contact / footer */
 footer{background:var(--bone);color:var(--ink);padding:90px 0 40px;border-top:1px solid var(--line)}
+.foot-statement{
+  font-family:var(--serif);font-style:italic;font-size:clamp(2rem,5.2vw,3.8rem);
+  color:var(--ink);text-align:center;line-height:1.18;margin-bottom:90px;
+}
+.foot-statement em{font-style:italic;color:var(--taupe)}
 .foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:50px;margin-bottom:70px}
 footer .brand{font-size:2rem;color:var(--ink);margin-bottom:20px;display:block}
 footer p{color:var(--ink-soft);max-width:320px;font-size:.95rem}
@@ -225,24 +279,25 @@ footer li a:hover{color:var(--ink)}
 .foot-bottom .legal{max-width:560px;text-align:right;opacity:.85;line-height:1.5;letter-spacing:.04em}
 
 @media(max-width:900px){
-  .burger{display:flex;z-index:101}
+  .burger{display:flex}
   .nav-links{
     position:fixed;top:0;right:0;height:100vh;width:80%;max-width:330px;
     flex-direction:column;align-items:flex-start;justify-content:center;gap:30px;
     background:var(--bone);padding:0 44px;
-    transform:translateX(100%);transition:transform .5s cubic-bezier(.2,.7,.3,1);
+    transform:translateX(100%);transition:transform .5s var(--ease);
     box-shadow:-24px 0 70px rgba(43,41,38,.18);
   }
-  header.nav.menu-open .nav-links{transform:translateX(0)}
+  body.menu-open .nav-links{transform:translateX(0)}
   .nav-links a,header.nav.scrolled .nav-links a{color:var(--ink)!important;font-size:.92rem}
   .nav-links a:not(.nav-cta)::after{background:var(--ink)}
   .nav-cta,header.nav.scrolled .nav-cta{border-color:var(--ink)!important;color:var(--ink)!important;padding:14px 28px}
-  header.nav.menu-open .burger span{background:var(--ink)}
-  header.nav.menu-open .burger span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
-  header.nav.menu-open .burger span:nth-child(2){opacity:0}
-  header.nav.menu-open .burger span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
+  body.menu-open .burger span{background:var(--ink)}
+  body.menu-open .burger span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
+  body.menu-open .burger span:nth-child(2){opacity:0}
+  body.menu-open .burger span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
   .split{grid-template-columns:1fr}
   .split-media{height:60vh;min-height:380px}
+  .split-num{display:none}
   .cards{grid-template-columns:1fr}
   .stats{gap:50px}
   .foot-grid{grid-template-columns:1fr;gap:36px}
@@ -252,6 +307,12 @@ footer li a:hover{color:var(--ink)}
   .wrap{padding:0 24px}
   .pad{padding:90px 0}
   .hero{min-height:560px}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  html{scroll-behavior:auto}
+  .hero .eyebrow,.hero h1 span,.hero p.lede,.hero-actions{opacity:1}
+  .reveal,.stagger>*{opacity:1!important;transform:none!important}
 }
 </style>
 </head>
@@ -271,22 +332,20 @@ footer li a:hover{color:var(--ink)}
     <button class="burger" id="burger" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
   </div>
 </header>
+<div class="scrim" id="scrim"></div>
 
 <section class="hero">
   <div class="hero-media">
     <div class="hero-fallback"></div>
     <div class="hero-photo"></div>
+    <!-- Studio footage is injected here when HERO_VIDEO_URL is set (see script below) -->
   </div>
-  <!-- Drop your studio footage URL here to make this a true video hero -->
-  <video autoplay muted loop playsinline poster="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1900&q=80">
-    <source src="" type="video/mp4">
-  </video>
   <div class="wrap hero-content">
     <span class="eyebrow">Boutique Pilates &amp; Gyrotonic · Los Angeles</span>
     <h1><span>Move well.</span><span>Live well. Be well.</span></h1>
     <p class="lede">A boutique studio for Pilates and Gyrotonic — where every session is built around one body: yours.</p>
     <div class="hero-actions">
-      <a href="#book" class="btn btn-light book-link">Book a Class</a>
+      <a href="#book" class="btn btn-fill book-link">Book a Class</a>
       <a href="#sessions" class="btn btn-light">Explore Sessions</a>
     </div>
   </div>
@@ -298,7 +357,7 @@ footer li a:hover{color:var(--ink)}
     <span class="eyebrow">Personal by Design</span>
     <h2>Not a class you fit into — a practice built <em>around you</em>.</h2>
     <p>We are a boutique studio, not a fitness chain. No crowded rooms, no one-size sequence — only private and small-group sessions, undivided attention, and a plan that evolves as your body does.</p>
-    <div class="stats">
+    <div class="stats stagger">
       <div class="stat"><div class="n">10</div><div class="l">Years in Practice</div></div>
       <div class="stat"><div class="n">2</div><div class="l">Disciplines</div></div>
       <div class="stat"><div class="n">3</div><div class="l">Session Formats</div></div>
@@ -306,9 +365,17 @@ footer li a:hover{color:var(--ink)}
   </div>
 </section>
 
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>Pilates&nbsp;·&nbsp;Gyrotonic&nbsp;·&nbsp;Private&nbsp;·&nbsp;Duet&nbsp;·&nbsp;Group&nbsp;·&nbsp;Los&nbsp;Angeles&nbsp;·&nbsp;Est.&nbsp;2015&nbsp;·&nbsp;</span>
+    <span>Pilates&nbsp;·&nbsp;Gyrotonic&nbsp;·&nbsp;Private&nbsp;·&nbsp;Duet&nbsp;·&nbsp;Group&nbsp;·&nbsp;Los&nbsp;Angeles&nbsp;·&nbsp;Est.&nbsp;2015&nbsp;·&nbsp;</span>
+  </div>
+</div>
+
 <section class="split" id="pilates">
-  <div class="split-media m1 reveal"></div>
+  <div class="split-media reveal"><div class="media-img m1"></div></div>
   <div class="split-text reveal">
+    <span class="split-num" aria-hidden="true">01</span>
     <span class="eyebrow">Discipline 01 — Pilates</span>
     <h2>Classical intelligence, <em>made personal</em>.</h2>
     <p>Taught to the <strong>STOTT PILATES®</strong> international standard — a contemporary, anatomically grounded refinement of Joseph Pilates' original method.</p>
@@ -319,13 +386,14 @@ footer li a:hover{color:var(--ink)}
 
 <section class="split alt" id="gyrotonic">
   <div class="split-text reveal">
+    <span class="split-num" aria-hidden="true">02</span>
     <span class="eyebrow">Discipline 02 — Gyrotonic</span>
     <h2>Movement that <em>circles, spirals, frees</em>.</h2>
     <p>A distinct system in its own right — <strong>not a form of Pilates.</strong> Created by former ballet dancer Juliu Horvath, <strong>GYROTONIC®</strong> moves the body in flowing, three-dimensional arcs that decompress the joints and mobilize the spine.</p>
     <p>Long prized by dancers and athletes, it is equally powerful for rehabilitation and for restoring flexibility and range of motion. Using specialized apparatus — the Pulley Tower, Jumping-Stretching Board and <strong>ARCHWAY™</strong> — each sequence is shaped to your body.</p>
     <a href="#sessions" class="btn">Explore Sessions</a>
   </div>
-  <div class="split-media m2 reveal"></div>
+  <div class="split-media reveal"><div class="media-img m2"></div></div>
 </section>
 
 <section class="classes pad" id="sessions">
@@ -335,24 +403,24 @@ footer li a:hover{color:var(--ink)}
       <h2>Private, Duet &amp; Group</h2>
       <p class="head-sub">Both Pilates and Gyrotonic are offered as private, duet, and small-group sessions.</p>
     </div>
-    <div class="cards reveal">
+    <div class="cards stagger">
       <div class="card">
         <div class="num">01</div>
         <h3>Private</h3>
         <p>One-to-one and fully bespoke. Your instructor designs and adjusts every sequence in real time, around your body alone.</p>
-        <span class="more">Learn more</span>
+        <a href="#book" class="more book-link">Reserve</a>
       </div>
       <div class="card">
         <div class="num">02</div>
         <h3>Duet</h3>
         <p>Two people, shared focus. The intimacy of private work with a partner or friend — the same precision, gently shared.</p>
-        <span class="more">Learn more</span>
+        <a href="#book" class="more book-link">Reserve</a>
       </div>
       <div class="card">
         <div class="num">03</div>
         <h3>Group</h3>
         <p>Small by design — never more than five in Pilates, four in Gyrotonic. A handful of clients, so every body is seen and corrected throughout.</p>
-        <span class="more">Learn more</span>
+        <a href="#book" class="more book-link">Reserve</a>
       </div>
     </div>
   </div>
@@ -360,6 +428,7 @@ footer li a:hover{color:var(--ink)}
 
 <section class="quote" id="schedule">
   <div class="wrap reveal">
+    <div class="rule"></div>
     <blockquote>"In ten sessions you'll feel the difference, in twenty you'll see the difference, and in thirty you'll have a whole new body."</blockquote>
     <cite>— Joseph Pilates</cite>
     <div style="margin-top:46px"><a href="#book" class="btn book-link">View Class Schedule</a></div>
@@ -379,12 +448,13 @@ footer li a:hover{color:var(--ink)}
     <span class="eyebrow">Begin</span>
     <h2>Your first session awaits.</h2>
     <p>Reserve your place in moments — we'll be ready for you.</p>
-    <a href="#" class="btn btn-light book-link">Book a Class</a>
+    <a href="mailto:letspilatesla@gmail.com" class="btn btn-light book-link">Book a Class</a>
   </div>
 </section>
 
 <footer id="visit">
   <div class="wrap">
+    <p class="foot-statement reveal">Move well. <em>Live well.</em> Be well.</p>
     <div class="foot-grid">
       <div>
         <span class="brand">Let's Pilates LA</span>
@@ -395,6 +465,7 @@ footer li a:hover{color:var(--ink)}
         <ul>
           <li>674 S. La Fayette Park Place</li>
           <li>Los Angeles, CA 90057</li>
+          <li><a href="https://maps.google.com/?q=674+S.+La+Fayette+Park+Place,+Los+Angeles,+CA+90057" target="_blank" rel="noopener">Get Directions ↗</a></li>
           <li><a href="tel:3109950046">310-995-0046</a></li>
           <li><a href="mailto:letspilatesla@gmail.com">letspilatesla@gmail.com</a></li>
         </ul>
@@ -416,31 +487,64 @@ footer li a:hover{color:var(--ink)}
 </footer>
 
 <script>
-  // ── Booking configuration ─────────────────────────────
-  const BOOKING_URL = "PASTE_MINDBODY_URL_HERE"; // TODO: swap to in-house booking system later
+  // ── Site configuration ────────────────────────────────
+  const BOOKING_URL = ""; // TODO: paste MindBody booking URL; swap to in-house system in Phase 2
+  const HERO_VIDEO_URL = ""; // TODO: drop studio footage URL (mp4) to enable the video hero
   // HOLD: custom booking system integration goes here
-  document.querySelectorAll('.book-link').forEach(a=>{
-    a.setAttribute('href',BOOKING_URL);
-    a.setAttribute('target','_blank');
-    a.setAttribute('rel','noopener');
-  });
+
+  // Booking links fall back to the #book section until BOOKING_URL is set
+  if(BOOKING_URL){
+    document.querySelectorAll('.book-link').forEach(a=>{
+      a.href=BOOKING_URL; a.target='_blank'; a.rel='noopener';
+    });
+  }
+
+  // Video hero only renders when footage is configured (avoids empty-source errors)
+  if(HERO_VIDEO_URL){
+    const v=document.createElement('video');
+    v.autoplay=true; v.muted=true; v.loop=true; v.playsInline=true;
+    v.src=HERO_VIDEO_URL;
+    document.querySelector('.hero-media').appendChild(v);
+  }
 
   // ── Sticky nav state ──────────────────────────────────
   const nav=document.getElementById('nav');
-  addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>60));
+  addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>60),{passive:true});
 
-  // ── Mobile menu toggle ────────────────────────────────
+  // ── Scrollspy: highlight current section in nav ───────
+  const spyLinks=[...document.querySelectorAll('.nav-links a:not(.nav-cta)')];
+  const spy=new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting){
+      spyLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id));
+    }
+  }),{rootMargin:'-40% 0px -55% 0px'});
+  ['about','pilates','gyrotonic','sessions','visit'].forEach(id=>spy.observe(document.getElementById(id)));
+
+  // ── Mobile menu ───────────────────────────────────────
   const burger=document.getElementById('burger');
-  const closeMenu=()=>{nav.classList.remove('menu-open');burger.setAttribute('aria-expanded','false')};
-  burger.addEventListener('click',()=>{
-    const open=nav.classList.toggle('menu-open');
+  const setMenu=open=>{
+    document.body.classList.toggle('menu-open',open);
     burger.setAttribute('aria-expanded',open?'true':'false');
-  });
-  document.querySelectorAll('.nav-links a').forEach(a=>a.addEventListener('click',closeMenu));
+  };
+  burger.addEventListener('click',()=>setMenu(!document.body.classList.contains('menu-open')));
+  document.getElementById('scrim').addEventListener('click',()=>setMenu(false));
+  addEventListener('keydown',e=>{if(e.key==='Escape')setMenu(false)});
+  document.querySelectorAll('.nav-links a').forEach(a=>a.addEventListener('click',()=>setMenu(false)));
 
-  // ── Reveal on scroll ──────────────────────────────────
+  // ── Reveal on scroll (with stagger groups) ────────────
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.15});
-  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+  document.querySelectorAll('.reveal,.stagger').forEach(el=>io.observe(el));
+
+  // ── Hero parallax fade ────────────────────────────────
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    const hc=document.querySelector('.hero-content');
+    addEventListener('scroll',()=>{
+      const y=Math.min(scrollY,innerHeight);
+      hc.style.transform='translateY('+(y*.22)+'px)';
+      hc.style.opacity=Math.max(0,1-y/(innerHeight*.85));
+    },{passive:true});
+  }
+
   document.getElementById('yr').textContent=new Date().getFullYear();
 </script>
 </body>
