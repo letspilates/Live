@@ -12,14 +12,14 @@
 <meta property="og:title" content="Let's Pilates LA — Boutique Pilates &amp; Gyrotonic Studio">
 <meta property="og:description" content="STOTT PILATES®–based private, duet and small-group sessions, tailored to your body. Move well, live well, be well.">
 <meta property="og:url" content="https://letspilatesla.com/">
-<meta property="og:image" content="https://letspilatesla.com/images/logo.png">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://letspilatesla.com/images/banner-images/pilates.jpg">
+<meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "HealthClub",
   "name": "Let's Pilates LA",
-  "image": "https://letspilatesla.com/images/logo.png",
+  "image": "https://letspilatesla.com/images/banner-images/pilates.jpg",
   "url": "https://letspilatesla.com",
   "telephone": "+1-310-995-0046",
   "email": "letspilatesla@gmail.com",
@@ -36,7 +36,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="image" href="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1900&q=80">
+<link rel="preload" as="image" href="/images/banner-images/pilates.jpg">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -54,7 +54,7 @@
   --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E");
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;scroll-padding-top:90px}
 body{
   font-family:var(--sans);
   background:var(--bone);
@@ -90,6 +90,9 @@ a{color:inherit;text-decoration:none}
 .btn-light:hover{background:var(--bone);color:var(--ink);border-color:var(--bone)}
 .btn-fill{background:var(--bone);color:var(--ink);border-color:var(--bone)}
 .btn-fill:hover{background:transparent;color:var(--bone);border-color:rgba(244,240,234,.7)}
+
+/* page hairline frame */
+.frame{position:fixed;inset:16px;border:1px solid rgba(154,140,120,.38);pointer-events:none;z-index:90}
 
 /* ---------- NAV ---------- */
 header.nav{
@@ -137,10 +140,10 @@ body.menu-open .scrim{opacity:1;pointer-events:auto}
     linear-gradient(160deg,#3a352e 0%, #2B2926 45%, #1d1b18 100%);
 }
 .hero-photo{
-  position:absolute;inset:0;background-size:cover;background-position:center;
-  background-image:url("https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1900&q=80");
+  position:absolute;inset:0;background-size:cover;background-position:center 30%;
+  background-image:url("/images/banner-images/pilates.jpg");
   animation:kenburns 22s ease-in-out infinite alternate;
-  filter:grayscale(.15) brightness(.62) contrast(1.02);
+  filter:grayscale(.45) sepia(.18) brightness(.6) contrast(1.05);
 }
 @keyframes kenburns{from{transform:scale(1.06) translate(0,0)}to{transform:scale(1.16) translate(-2%,-2%)}}
 .hero-media video{
@@ -151,17 +154,19 @@ body.menu-open .scrim{opacity:1;pointer-events:auto}
 .hero-content{position:relative;z-index:2;color:var(--bone);max-width:880px;will-change:transform,opacity}
 .hero .eyebrow{color:rgba(244,240,234,.8);margin-bottom:30px;opacity:0;animation:rise .9s .3s forwards}
 .hero h1{
-  font-size:clamp(3rem,8vw,7rem);font-weight:400;letter-spacing:-.02em;color:var(--bone);
+  font-size:clamp(3.1rem,8.4vw,7.4rem);font-weight:400;letter-spacing:-.02em;color:var(--bone);
   margin-bottom:34px;
 }
-.hero h1 span{display:block;opacity:0;animation:rise 1s forwards}
-.hero h1 span:nth-child(1){animation-delay:.45s}
-.hero h1 span:nth-child(2){animation-delay:.6s;font-style:italic;color:var(--sand-deep)}
+.hero h1 .mask{display:block;overflow:hidden;padding-bottom:.08em;margin-bottom:-.08em}
+.hero h1 .mask span{display:block;transform:translateY(115%);animation:liftin 1.15s var(--ease) forwards}
+.hero h1 .mask:nth-child(1) span{animation-delay:.4s}
+.hero h1 .mask:nth-child(2) span{animation-delay:.55s;font-style:italic;color:var(--sand-deep)}
+@keyframes liftin{to{transform:translateY(0)}}
 .hero p.lede{
   font-size:1.08rem;font-weight:300;max-width:480px;color:rgba(244,240,234,.85);
-  margin-bottom:44px;opacity:0;animation:rise 1s .8s forwards;
+  margin-bottom:44px;opacity:0;animation:rise 1s .85s forwards;
 }
-.hero-actions{display:flex;gap:18px;flex-wrap:wrap;opacity:0;animation:rise 1s .95s forwards}
+.hero-actions{display:flex;gap:18px;flex-wrap:wrap;opacity:0;animation:rise 1s 1s forwards}
 @keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(0)}}
 .scroll-cue{
   position:absolute;bottom:38px;left:50%;transform:translateX(-50%);z-index:3;color:rgba(244,240,234,.7);
@@ -189,6 +194,9 @@ section{position:relative}
 .stats{display:flex;justify-content:center;gap:80px;margin-top:80px;flex-wrap:wrap}
 .stat .n{font-family:var(--serif);font-size:3rem;color:var(--ink);line-height:1}
 .stat .l{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--taupe-deep);margin-top:12px}
+@media(min-width:901px){
+  .stats .stat:not(:first-child){border-left:1px solid var(--line);padding-left:80px}
+}
 
 /* marquee divider */
 .marquee{overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:30px 0;background:var(--bone)}
@@ -209,7 +217,7 @@ section{position:relative}
   transition:transform 1.4s var(--ease);
 }
 .split:hover .media-img{transform:scale(1.045)}
-.media-img.m1{background-image:linear-gradient(135deg,rgba(111,99,79,.25),rgba(43,41,38,.45)),url("https://images.unsplash.com/photo-1599447421416-3414500d18a5?auto=format&fit=crop&w=1300&q=80");background-color:#8d8270}
+.media-img.m1{background-image:linear-gradient(135deg,rgba(111,99,79,.12),rgba(43,41,38,.18)),url("/images/dancer.jpg");background-color:#8d8270}
 .media-img.m2{background-image:linear-gradient(135deg,rgba(111,99,79,.2),rgba(43,41,38,.4)),url("https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1300&q=80");background-color:#9a8c78}
 .split-text{padding:90px clamp(40px,7vw,110px);position:relative}
 .split-text .eyebrow{margin-bottom:24px}
@@ -245,9 +253,14 @@ section{position:relative}
 .card .more:hover{color:var(--bone);border-color:var(--sand-deep)}
 
 /* quote */
-.quote{background:var(--sand);text-align:center;padding:140px 0}
+.quote{background:var(--sand);text-align:center;padding:140px 0;overflow:hidden}
+.quote .qmark{
+  position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  font-family:var(--serif);font-style:italic;font-size:15rem;line-height:1;
+  color:rgba(43,41,38,.06);pointer-events:none;user-select:none;
+}
 .quote .rule{width:54px;height:1px;background:var(--taupe);margin:0 auto 44px}
-.quote blockquote{font-family:var(--serif);font-size:clamp(1.8rem,4vw,3rem);font-style:italic;line-height:1.3;max-width:980px;margin:0 auto 34px;color:var(--ink)}
+.quote blockquote{font-family:var(--serif);font-size:clamp(1.8rem,4vw,3rem);font-style:italic;line-height:1.3;max-width:980px;margin:0 auto 34px;color:var(--ink);position:relative}
 .quote cite{font-style:normal;font-size:.78rem;letter-spacing:.24em;text-transform:uppercase;color:var(--taupe-deep)}
 
 /* cta band */
@@ -279,6 +292,7 @@ footer li a:hover{color:var(--ink)}
 .foot-bottom .legal{max-width:560px;text-align:right;opacity:.85;line-height:1.5;letter-spacing:.04em}
 
 @media(max-width:900px){
+  .frame{display:none}
   .burger{display:flex}
   .nav-links{
     position:fixed;top:0;right:0;height:100vh;width:80%;max-width:330px;
@@ -307,16 +321,20 @@ footer li a:hover{color:var(--ink)}
   .wrap{padding:0 24px}
   .pad{padding:90px 0}
   .hero{min-height:560px}
+  .quote .qmark{font-size:9rem}
 }
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
   html{scroll-behavior:auto}
-  .hero .eyebrow,.hero h1 span,.hero p.lede,.hero-actions{opacity:1}
+  .hero .eyebrow,.hero p.lede,.hero-actions{opacity:1}
+  .hero h1 .mask span{transform:none}
   .reveal,.stagger>*{opacity:1!important;transform:none!important}
 }
 </style>
 </head>
 <body>
+
+<div class="frame" aria-hidden="true"></div>
 
 <header class="nav" id="nav">
   <div class="wrap nav-inner">
@@ -338,11 +356,14 @@ footer li a:hover{color:var(--ink)}
   <div class="hero-media">
     <div class="hero-fallback"></div>
     <div class="hero-photo"></div>
-    <!-- Studio footage is injected here when HERO_VIDEO_URL is set (see script below) -->
+    <!-- HOLD: Pilates × Gyrotonic studio reel goes here — set HERO_VIDEO_URL in the script below when the footage is ready -->
   </div>
   <div class="wrap hero-content">
     <span class="eyebrow">Boutique Pilates &amp; Gyrotonic · Los Angeles</span>
-    <h1><span>Move well.</span><span>Live well. Be well.</span></h1>
+    <h1>
+      <span class="mask"><span>Move well.</span></span>
+      <span class="mask"><span>Live well. Be well.</span></span>
+    </h1>
     <p class="lede">A boutique studio for Pilates and Gyrotonic — where every session is built around one body: yours.</p>
     <div class="hero-actions">
       <a href="#book" class="btn btn-fill book-link">Book a Class</a>
@@ -393,6 +414,7 @@ footer li a:hover{color:var(--ink)}
     <p>Long prized by dancers and athletes, it is equally powerful for rehabilitation and for restoring flexibility and range of motion. Using specialized apparatus — the Pulley Tower, Jumping-Stretching Board and <strong>ARCHWAY™</strong> — each sequence is shaped to your body.</p>
     <a href="#sessions" class="btn">Explore Sessions</a>
   </div>
+  <!-- TODO: swap for a real GYROTONIC® Pulley Tower photo from the studio when available -->
   <div class="split-media reveal"><div class="media-img m2"></div></div>
 </section>
 
@@ -427,12 +449,14 @@ footer li a:hover{color:var(--ink)}
 </section>
 
 <section class="quote" id="schedule">
+  <span class="qmark" aria-hidden="true">&ldquo;</span>
   <div class="wrap reveal">
     <div class="rule"></div>
     <blockquote>"In ten sessions you'll feel the difference, in twenty you'll see the difference, and in thirty you'll have a whole new body."</blockquote>
     <cite>— Joseph Pilates</cite>
     <div style="margin-top:46px"><a href="#book" class="btn book-link">View Class Schedule</a></div>
   </div>
+  <!-- HOLD: MindBody (healcode) schedule widget will be embedded here when the script is provided -->
 </section>
 
 <section class="intro pad" id="first-visit">
@@ -489,7 +513,7 @@ footer li a:hover{color:var(--ink)}
 <script>
   // ── Site configuration ────────────────────────────────
   const BOOKING_URL = ""; // TODO: paste MindBody booking URL; swap to in-house system in Phase 2
-  const HERO_VIDEO_URL = ""; // TODO: drop studio footage URL (mp4) to enable the video hero
+  const HERO_VIDEO_URL = ""; // HOLD: Pilates × Gyrotonic studio reel — drop the mp4 URL here when ready
   // HOLD: custom booking system integration goes here
 
   // Booking links fall back to the #book section until BOOKING_URL is set
