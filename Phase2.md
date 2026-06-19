@@ -7,7 +7,7 @@
 ## Decision (locked)
 
 - **Path: B — Build our own.** MindBody runs in parallel during the build, then we cut over.
-- **Hosting:** move from GitHub Pages → **Vercel** (free tier).
+- **Hosting:** **GitHub Pages** (stay; $0 for commercial use). Server-side logic moves to **Supabase Edge Functions**; scheduled jobs run on **GitHub Actions**.
 - **Launch scope:** ship after **Stage 3** — full online booking + payments at first public release (~7 weeks).
 - **Currency:** **USD only** for v1.
 
@@ -35,12 +35,14 @@ A boutique booking experience embedded in Let's Pilates LA's own site:
 
 | Layer | Choice | Why |
 | --- | --- | --- |
-| DB + Auth | **Supabase** (Postgres, Auth, RLS, Edge Functions) | Free to start, row-level security gives us safe direct-from-browser queries, scales to monthly $25 plan |
+| DB + Auth | **Supabase** (Postgres, Auth, RLS) | Free to start, row-level security lets the browser query DB safely, scales to $25/mo plan |
+| Server logic | **Supabase Edge Functions** (Deno) | Stripe webhook target, atomic booking RPCs, email triggers — all server-side secrets live here, never in the repo |
 | Payments | **Stripe** (Checkout + Customer Portal) | Industry standard; 2.9% + $0.30 per charge; subscription support if we ever add memberships |
 | Email | **Resend** + React Email templates | 3000/mo free, clean DX, deliverability good for transactional |
-| Dynamic frontend | **Astro** islands (or Vite + TS) | Keeps the current static landing as-is; adds `/account` and `/booking` as discrete pages |
-| Hosting | **Vercel** (move from GitHub Pages) | Needs to host serverless functions, preview branches, env vars |
-| Admin (interim) | **Supabase Studio** | We can manage instructors, sessions, and refunds directly while we build the custom admin |
+| Frontend | **Astro** (static output) | Keeps current static landing as-is; builds `/account` and `/booking` as pre-rendered pages that talk to Supabase from the browser via `supabase-js` |
+| Hosting | **GitHub Pages** | Free for commercial use, custom domain `letspilatesla.com` already configured |
+| Scheduled jobs | **GitHub Actions** (cron workflows) | 24h reminders, nightly cleanup; free at our scale |
+| Admin (interim) | **Supabase Studio** | Manage instructors, sessions, refunds directly while we build the custom admin |
 | Admin (later) | Custom `/admin` pages | Built into our design when we have time |
 
 -----
@@ -76,12 +78,13 @@ Indexes on `sessions.starts_at`, `bookings.session_id`, `bookings.profile_id`.
 
 ### Stage 1 — Infrastructure + MindBody bridge (1 week)
 
+- Promote `redesign/quiet-luxury.html` to the public landing (replace the old root `index.html`).
 - Create Supabase project, Stripe account, Resend domain (`letspilatesla.com`).
-- Move hosting from GitHub Pages → Vercel. Wire env vars. Preserve current static landing.
+- Reserve an `app/` folder for the Astro project that scaffolds in Stage 2; the GH Actions build workflow lands then.
 - Wrap the existing MindBody (healcode) widget in our design's chrome on a `/schedule` page so revenue continues during the build.
-- Add `BOOKING_URL` to point at the MindBody booking page from all CTA buttons.
+- Set `BOOKING_URL` so all CTA buttons point at the MindBody booking page.
 
-**Deliverable:** site lives on Vercel, scheduling works via MindBody inside our design.
+**Deliverable:** new Quiet Luxury landing live at `letspilatesla.com` via GH Pages, scheduling works via MindBody inside our design.
 
 ### Stage 2 — Read-only class calendar + accounts (2–3 weeks)
 
@@ -124,21 +127,20 @@ Indexes on `sessions.starts_at`, `bookings.session_id`, `bookings.profile_id`.
 ## Stage 1 — Kickoff plan
 
 ### What I (Claude) will do
-1. Add `vercel.json` so the static site deploys cleanly with correct headers / clean URLs.
-2. Promote `redesign/quiet-luxury.html` to the public landing (currently the site root is the old design).
-3. Create an empty `app/` folder reserved for the Astro project (Stages 2+).
-4. Add `.env.example` documenting every env var we'll need (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `BOOKING_URL`).
-5. Wire the existing MindBody healcode widget into a `/schedule` page styled in Quiet Luxury chrome **(once the script is provided)**.
-6. Point all booking CTAs at `BOOKING_URL` via the existing config slot in `quiet-luxury.html`.
+1. **Promote** `redesign/quiet-luxury.html` to the public landing (replace the old root `index.html`; drop the now-empty `redesign/` folder).
+2. **`.env.example`** documenting the env vars: public ones used by the browser build (`PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`, `PUBLIC_STRIPE_PUBLISHABLE_KEY`, `PUBLIC_BOOKING_URL`), and server-only secrets (`SUPABASE_SERVICE_ROLE`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`) which live in Supabase Edge Function secrets — **never** in the repo.
+3. **`app/` placeholder** for the Astro project that scaffolds in Stage 2.
+4. **`/schedule` page** wrapping the MindBody healcode widget in our design **(once the script is provided)**.
+5. **Wire `BOOKING_URL`** through the existing config slot so all CTAs point at the MindBody booking page.
 
 ### What you'll need to do (account provisioning)
-1. **Vercel** — sign up at vercel.com with the GitHub account that owns `letspilates/Live`. Import the repo, deploy. Hand me the project name + production URL. Then connect domain `letspilatesla.com`.
-2. **Supabase** — create a new project (region `us-west-1` Oregon for LA proximity). Send me the project URL + anon key + service-role key (treat the service role like a password).
-3. **Stripe** — create account, get to **test mode** keys (publishable + secret). Live mode comes at end of Stage 3.
-4. **Resend** — sign up, verify sending domain `letspilatesla.com` (I'll provide the DNS records to add).
-5. Paste the **MindBody booking URL** and the healcode `<script>` into chat.
+1. **Supabase** — create a new project (region `us-west-1` Oregon for LA proximity). Send me the project URL + anon key + service-role key (treat the service role like a password).
+2. **Stripe** — create account, get the **test mode** keys (publishable + secret). Live mode comes at end of Stage 3.
+3. **Resend** — sign up, verify sending domain `letspilatesla.com` (I'll hand you the DNS records to add).
+4. Paste the **MindBody booking URL** and the healcode `<script>` into chat.
+5. (Already done) GitHub Pages already serves `letspilatesla.com` from this repo — no change needed.
 
-Once Vercel is connected and accounts exist, Stage 1 closes in a day or two.
+Once the accounts exist and the MindBody script lands, Stage 1 closes in a day or two.
 
 ## Trademark notes
 
