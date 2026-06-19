@@ -4,9 +4,12 @@
 
 -----
 
-## Decision
+## Decision (locked)
 
-**Path: B — Build our own.** MindBody runs in parallel during the build, then we cut over.
+- **Path: B — Build our own.** MindBody runs in parallel during the build, then we cut over.
+- **Hosting:** move from GitHub Pages → **Vercel** (free tier).
+- **Launch scope:** ship after **Stage 3** — full online booking + payments at first public release (~7 weeks).
+- **Currency:** **USD only** for v1.
 
 ## Goal
 
@@ -112,12 +115,30 @@ Indexes on `sessions.starts_at`, `bookings.session_id`, `bookings.profile_id`.
 
 -----
 
-## Open decisions (need user input)
+## Still open (need user input before specific stages)
 
-1. **Hosting move** — GitHub Pages → Vercel. Required for Stage 1. Free tier covers us.
-2. **First launch scope** — ship after Stage 2 (browse + accounts, pay at studio) or after Stage 3 (full online payments)?
-3. **Pricing structure** — drop-in cost, package tiers, validity period. Pull from existing `pricing/` JPGs or fresh?
-4. **Currency** — defaulting to **USD only** (LA studio). Flag if you want KRW too for Korean clients.
+- **Pricing structure** (needed by Stage 3) — drop-in price, package tiers (5/10/20 credits?), credit validity period. We can start from the existing `pricing/` JPGs and refine.
+- **Cancellation window** (needed by Stage 3) — confirming the standard 24h refund window is correct.
+- **MindBody URL + healcode script** (needed by Stage 1) — to embed the schedule widget on `/schedule` as the bridge.
+
+## Stage 1 — Kickoff plan
+
+### What I (Claude) will do
+1. Add `vercel.json` so the static site deploys cleanly with correct headers / clean URLs.
+2. Promote `redesign/quiet-luxury.html` to the public landing (currently the site root is the old design).
+3. Create an empty `app/` folder reserved for the Astro project (Stages 2+).
+4. Add `.env.example` documenting every env var we'll need (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `BOOKING_URL`).
+5. Wire the existing MindBody healcode widget into a `/schedule` page styled in Quiet Luxury chrome **(once the script is provided)**.
+6. Point all booking CTAs at `BOOKING_URL` via the existing config slot in `quiet-luxury.html`.
+
+### What you'll need to do (account provisioning)
+1. **Vercel** — sign up at vercel.com with the GitHub account that owns `letspilates/Live`. Import the repo, deploy. Hand me the project name + production URL. Then connect domain `letspilatesla.com`.
+2. **Supabase** — create a new project (region `us-west-1` Oregon for LA proximity). Send me the project URL + anon key + service-role key (treat the service role like a password).
+3. **Stripe** — create account, get to **test mode** keys (publishable + secret). Live mode comes at end of Stage 3.
+4. **Resend** — sign up, verify sending domain `letspilatesla.com` (I'll provide the DNS records to add).
+5. Paste the **MindBody booking URL** and the healcode `<script>` into chat.
+
+Once Vercel is connected and accounts exist, Stage 1 closes in a day or two.
 
 ## Trademark notes
 
