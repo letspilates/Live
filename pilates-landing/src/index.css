@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Primary brand font.
+   Drop tt-norms-pro-regular.woff2 / tt-norms-pro-semibold.woff2 into /public/fonts.
+   Until those files exist, font-display: swap falls back to Inter / system-ui. */
+@font-face {
+  font-family: 'TT Norms Pro';
+  src: url('/fonts/tt-norms-pro-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'TT Norms Pro';
+  src: url('/fonts/tt-norms-pro-semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+html,
+body {
+  font-family: 'TT Norms Pro', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  background-color: #f5f5f5;
+}
+
+* {
+  font-family: inherit;
+}
