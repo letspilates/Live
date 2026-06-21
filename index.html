@@ -38,6 +38,12 @@
 
     <!--Google Webfonts-->
     <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700,800' rel='stylesheet' type='text/css'>
+
+    <!-- Cinematic Hero + Dark Theme (loaded last to override legacy styles) -->
+    <link rel="stylesheet" href="css/cinematic.css">
+
+    <!-- GSAP for the hero parallax animation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <style>
         /* New Footer Styles */
         #landing-footer {
@@ -114,112 +120,64 @@
 
 <div id="wrapper">
 
-    <header id="banner" class="scrollto clearfix" data-enllax-ratio=".5">
-        <div id="header" class="nav-collapse">
-            <div class="row clearfix">
-                <div class="col-1">
+    <header id="banner" class="cine-hero scrollto clearfix">
 
-                    <!--Logo-->
-                    <div id="logo">
+        <!--Full-screen video / image background-->
+        <div class="cine-video-wrap" id="cineVideoWrap">
+            <video id="cineVideo" autoplay muted loop playsinline preload="auto"
+                   poster="images/banner-images/pilates.jpg">
+                <!-- Pilates background footage. Replace this src with any free
+                     pilates/gyrotonic .mp4 (e.g. a Pexels/Mixkit download link).
+                     If it fails to load, the reformer photo below is shown instead. -->
+                <source src="https://videos.pexels.com/video-files/4327449/4327449-uhd_2560_1440_25fps.mp4" type="video/mp4">
+            </video>
+        </div>
+        <div class="cine-overlay"></div>
 
-                        <!--Logo that is shown on the banner-->
-                        <img src="images/logo.png" id="banner-logo" alt="Landing Page"/>
-                        <!--End of Banner Logo-->
+        <!--Fixed top header-->
+        <div id="header" class="cine-header">
+            <div class="cine-wordmark">Let's Pilates<sup>&trade;</sup></div>
 
-                        <!--The Logo that is shown on the sticky Navigation Bar-->
-                        <img src="images/logo-2.png" id="navigation-logo" alt="Landing Page"/>
-                        <!--End of Navigation Logo-->
+            <!--Main Navigation-->
+            <nav id="nav-main" class="cine-nav liquid-glass">
+                <ul>
+                    <li><a href="#banner">HOME</a></li>
+                    <li><a href="#about">METHOD</a></li>
+                    <li><a href="#schedule">SCHEDULE</a></li>
+                    <li><a href="#services">STUDIO</a></li>
+                </ul>
+            </nav>
+            <!--End of Main Navigation-->
 
-                    </div>
-                    <!--End of Logo-->
+            <a href="#schedule" class="cine-cta liquid-glass">BOOK A SESSION</a>
 
-                    <aside>
+            <div id="nav-trigger"><span></span></div>
+            <nav id="nav-mobile"></nav>
+        </div>
+        <!--End of Header-->
 
-                        <!--Social Icons in Header
-                        <ul class="social-icons">
-                            <li>
-                                <a target="_blank" title="Facebook" href="https://www.facebook.com/username">
-                                    <i class="fa fa-facebook fa-1x"></i><span>Facebook</span>
-                                </a>
-                            </li>
-                            <li>
-                                <a target="_blank" title="Google+" href="http://google.com/+username">
-                                    <i class="fa fa-google-plus fa-1x"></i><span>Google+</span>
-                                </a>
-                            </li>
-                            <li>
-                                <a target="_blank" title="Twitter" href="http://www.twitter.com/username">
-                                    <i class="fa fa-twitter fa-1x"></i><span>Twitter</span>
-                                </a>
-                            </li>
-                            <li>
-                                <a target="_blank" title="Instagram" href="http://www.instagram.com/username">
-                                    <i class="fa fa-instagram fa-1x"></i><span>Instagram</span>
-                                </a>
-                            </li>
-                            <li>
-                                <a target="_blank" title="behance" href="http://www.behance.net">
-                                    <i class="fa fa-behance fa-1x"></i><span>Behance</span>
-                                </a>
-                            </li>
-                        </ul>
-                        End of Social Icons in Header-->
+        <!--Hero headline-->
+        <div class="cine-headline cine-reveal">
+            <div class="line1">Move with intention.</div>
+            <div class="line2">Strengthen from within.</div>
+        </div>
 
-                    </aside>
+        <!--Bottom block-->
+        <div class="cine-bottom cine-reveal delay">
+            <p class="cine-sub">Our sessions shape around you — your body, your rhythm, your goals.<span> Every class is precise, mindful, and wholly yours.</span></p>
 
-                    <!--Main Navigation-->
-                    <nav id="nav-main">
-                        <ul>
-                            <li>
-                                <a href="#banner">Home</a>
-                            </li>
-                            <li>
-                                <a href="#about">About</a>
-                            </li>
-                            <li>
-                                <a href="#schedule">Schedule</a>
-                            </li>
-                            <li>
-                                <a href="#services">Services</a>
-                            </li>
-                            <!--
-                            <li>
-                                <a href="#gallery">Gallery</a>
-                            </li>
-                        -->
-                           <!--
-                            <li>
-                                <a href="#pricing">Pricing</a>
-                            </li> -->
-                        
-                        </ul>
-                    </nav>
-                    <!--End of Main Navigation-->
+            <a href="#schedule" class="cine-btn">Reserve your spot today</a>
 
-                    <div id="nav-trigger"><span></span></div>
-                    <nav id="nav-mobile"></nav>
-
-                </div>
+            <div class="cine-secure">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <span>SECURE ONLINE BOOKING &middot; PRIVATE &amp; GROUP CLASSES</span>
             </div>
-        </div><!--End of Header-->
+        </div>
 
-        <!--Banner Content-->
-        <div id="banner-content" class="row clearfix">
-
-            <div class="col-38">
-
-                <div class="section-heading">
-                    <h1>MOVE WELL, LIVE WELL, BE WELL.</h1>
-                    <h2></h2>
-                </div>
-
-                <!--Call to Action
-                <a href="#" class="button">SIGN UP TODAY</a>
-                End Call to Action-->
-
-            </div>
-
-        </div><!--End of Row-->
     </header>
 
     <!--Main Content Area-->
@@ -313,7 +271,7 @@
         
           
                    <h2 class="section-title">Let's Pilates Class Schedule</h2>
-        <div class="row clearfix"><script src="https://widgets.mindbodyonline.com/javascripts/healcode.js" type="text/javascript"></script>
+        <div class="row clearfix schedule-card"><script src="https://widgets.mindbodyonline.com/javascripts/healcode.js" type="text/javascript"></script>
 <healcode-widget data-type="schedules" data-widget-partner="object" data-widget-id="ed201547cc85" data-widget-version="1" ></healcode-widget>
 </div>
 </div>
@@ -511,7 +469,61 @@
 <script src="js/lightbox.min.js"></script>
 <script src="js/site.js"></script>
 
+<!-- Cinematic hero: video playback, graceful fallback, and GSAP mouse parallax -->
+<script>
+(function () {
+    var hero = document.getElementById('banner');
+    var wrap = document.getElementById('cineVideoWrap');
+    var video = document.getElementById('cineVideo');
 
+    /* Trigger the headline / bottom-block fade-in on mount */
+    requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+            if (hero) hero.classList.add('loaded');
+        });
+    });
+
+    if (video) {
+        /* Speed the footage up slightly, like the original spec */
+        video.addEventListener('loadedmetadata', function () {
+            try { video.playbackRate = 1.25; } catch (e) {}
+        });
+        /* Only reveal the video once it can actually play; otherwise the
+           reformer photo behind it remains visible. */
+        function showVideo() { if (wrap) wrap.classList.add('video-ready'); }
+        video.addEventListener('loadeddata', showVideo);
+        video.addEventListener('canplay', showVideo);
+        /* On any error keep the photo fallback */
+        video.addEventListener('error', function () {
+            if (wrap) wrap.classList.remove('video-ready');
+        });
+        var src = video.querySelector('source');
+        if (src) src.addEventListener('error', function () {
+            if (wrap) wrap.classList.remove('video-ready');
+        });
+    }
+
+    /* GSAP mouse parallax on the background */
+    if (wrap && window.gsap) {
+        var targetX = 0, targetY = 0, currentX = 0, currentY = 0;
+
+        window.addEventListener('mousemove', function (e) {
+            var cx = window.innerWidth / 2;
+            var cy = window.innerHeight / 2;
+            targetX = ((e.clientX - cx) / cx) * 20;
+            targetY = ((e.clientY - cy) / cy) * 20;
+        });
+
+        function loop() {
+            currentX += (targetX - currentX) * 0.06;
+            currentY += (targetY - currentY) * 0.06;
+            gsap.set(wrap, { x: currentX, y: currentY, scale: 1.08, transformOrigin: 'center' });
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+    }
+})();
+</script>
 
 </body>
 </html>
