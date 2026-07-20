@@ -11,7 +11,7 @@ const en = {
       { label: 'About', href: '#about' },
       { label: 'Programs', href: '#programs' },
       { label: 'Training', href: '#approach' },
-      { label: 'Coaches', href: '#instructors' },
+      { label: 'Instructors', href: '#instructors' },
       { label: 'Schedule', href: '#schedule' },
     ],
     cta: 'Book a trial',
@@ -106,7 +106,7 @@ const en = {
     },
   },
   instructors: {
-    eyebrow: 'Coaches',
+    eyebrow: 'Instructors',
     title: ['Four internationally', 'certified', 'dedicated coaches'],
     titleAccentIndex: 1,
     body: 'Every coach is certified through the international GYROTONIC® and STOTT PILATES® programs. The coach who runs your first assessment stays with you to the end.',
