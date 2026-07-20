@@ -191,7 +191,7 @@ const en = {
     cols: {
       programs: {
         title: 'Programs',
-        links: ['Reformer Pilates', 'Gyrotonic', 'Gyrokinesis Mat', 'Private & Recovery'],
+        links: ['Private', 'Duet', 'Gyrotonic® Group', 'Pilates Group'],
       },
       studio: {
         title: 'Studio',
@@ -395,7 +395,7 @@ const ko: Content = {
     cols: {
       programs: {
         title: '프로그램',
-        links: ['리포머 필라테스', '자이로토닉', '자이로키네시스 매트', '프라이빗 & 회복'],
+        links: ['프라이빗', '듀엣', 'Gyrotonic® 그룹', '필라테스 그룹'],
       },
       studio: {
         title: '스튜디오',
