@@ -118,16 +118,16 @@ const en = {
       },
       eunice: {
         name: 'Eunice Choi',
-        role: 'STOTT PILATES® Certified Instructor',
+        role: 'Instructor',
         certs: ['GYROTONIC® Level 1', 'Gyrokinesis', 'Archway', 'Jumping Stretching Board'],
       },
       soo: {
-        name: 'Soo Kyoung Yi',
-        role: 'STOTT PILATES® Certified Instructor',
-        certs: ['GYROTONIC® Level 1', 'Gyrokinesis', 'Archway', 'Jumping Stretching Board'],
+        name: 'Su Kyung Yi',
+        role: 'Instructor',
+        certs: ['GYROTONIC® Level 1', 'Jumping Stretching Board'],
       },
       haley: {
-        name: 'Haley Kim',
+        name: 'Haley Han',
         role: 'GYROTONIC® Instructor',
         certs: ['GYROTONIC® Level 1', 'Jumping Stretching Board'],
       },
@@ -226,9 +226,9 @@ const ko: Content = {
   },
   hero: {
     eyebrow: '필라테스 · 자이로토닉 스튜디오',
-    title: ['당신에게 맞춰', '짓는 움직임'],
-    titleAccentIndex: 1,
-    body: '로스앤젤레스의 저희 스튜디오는 STOTT PILATES®와 GYROTONIC®을 원래의 방식 그대로 가르칩니다. 한 사람에게 한 명의 강사가 온전히 집중하는 1:1 수업. 그렇게 얻은 힘과 유연함, 그리고 편안함은 수업이 끝난 뒤 일상까지 이어집니다.',
+    title: ['당신만을 위한', '움직임'],
+    titleAccentIndex: 0,
+    body: 'Let’s Pilates LA는 STOTT PILATES®와 GYROTONIC®의 공식 교육 방식에 따라 수업을 진행합니다. 모든 수업은 한 명의 강사가 회원 한 분에게 집중하는 1:1 개인 레슨으로 진행됩니다. 몸의 균형과 움직임을 개선하고, 그 변화가 일상까지 이어질 수 있도록 함께합니다.',
     primaryCta: '첫 체험 수업 예약하기',
     secondaryCta: '프로그램 살펴보기',
     stats: [
@@ -240,17 +240,17 @@ const ko: Content = {
     chipBottom: '평일 07:00 – 22:00',
   },
   about: {
-    eyebrow: '우리의 방식',
-    title: ['더 많은 운동이 아니라,', '정확히', '맞는 운동'],
+    eyebrow: '수업 방식',
+    title: ['많이 하는 운동보다,', '내 몸에 맞는 운동'],
     titleAccentIndex: 1,
-    body: '모든 것은 평가에서 시작됩니다. 기구를 잡기 전에, 먼저 척추의 가동 범위와 호흡 패턴, 좌우 불균형부터 꼼꼼히 살핍니다. 리포머의 저항과 자이로토닉의 나선형 움직임은 방식은 달라도 향하는 곳은 하나입니다 — 더 자유롭게 움직이는 몸.',
+    body: '모든 수업은 몸의 움직임을 이해하는 것에서 시작합니다. 수업을 시작하기 전 척추의 움직임, 호흡 패턴, 관절의 가동 범위와 좌우 균형을 세심하게 확인합니다.\n\n리포머와 GYROTONIC®은 접근 방식은 다르지만 목표는 같습니다. 몸을 더욱 편안하고 자유롭게 움직일 수 있도록 돕는 것입니다.',
     caption: '로스앤젤레스 스튜디오',
   },
   programs: {
     eyebrow: '프로그램',
-    title: ['모두를 위한,', '정성껏', '빚어낸 움직임'],
+    title: ['당신의 몸에 맞춰', '설계된 프로그램'],
     titleAccentIndex: 1,
-    body: '레벨에 상관없이 누구나. 필라테스와 자이로토닉®을 STOTT PILATES®·GYROTONIC® 국제 자격을 갖춘 강사진이 함께합니다.',
+    body: '운동 경험과 현재 몸의 상태에 맞춰 STOTT PILATES®와 GYROTONIC® 국제 공인 강사진이 개인별 프로그램을 제공합니다.',
     items: {
       private: {
         badge: 'Pilates · Gyrotonic®',
@@ -315,9 +315,9 @@ const ko: Content = {
   },
   instructors: {
     eyebrow: '강사진',
-    title: ['국제 자격을 갖춘 네 명의', '전담', '강사'],
+    title: ['국제 공인 자격을 갖춘', '전문 강사진'],
     titleAccentIndex: 1,
-    body: '모든 강사는 GYROTONIC®과 STOTT PILATES® 국제 프로그램의 정식 자격을 갖추고 있습니다. 첫 평가를 함께한 강사가 마지막까지 곁을 지킵니다.',
+    body: '모든 강사는 STOTT PILATES®와 GYROTONIC®의 국제 공인 자격을 보유하고 있습니다. 첫 상담부터 이후의 수업까지 담당 강사가 회원님의 변화를 꾸준히 함께합니다.',
     people: {
       sunnie: {
         name: 'Sunnie Lee',
@@ -326,16 +326,16 @@ const ko: Content = {
       },
       eunice: {
         name: 'Eunice Choi',
-        role: 'STOTT PILATES® 공인 강사',
+        role: '강사',
         certs: ['GYROTONIC® Level 1', 'Gyrokinesis', 'Archway', 'Jumping Stretching Board'],
       },
       soo: {
-        name: 'Soo Kyoung Yi',
-        role: 'STOTT PILATES® 공인 강사',
-        certs: ['GYROTONIC® Level 1', 'Gyrokinesis', 'Archway', 'Jumping Stretching Board'],
+        name: 'Su Kyung Yi',
+        role: '강사',
+        certs: ['GYROTONIC® Level 1', 'Jumping Stretching Board'],
       },
       haley: {
-        name: 'Haley Kim',
+        name: 'Haley Han',
         role: 'GYROTONIC® 강사',
         certs: ['GYROTONIC® Level 1', 'Jumping Stretching Board'],
       },
@@ -375,16 +375,16 @@ const ko: Content = {
     },
   },
   schedule: {
-    eyebrow: '수업 일정',
-    title: ['시간만 고르세요,', '자리는 잡아둘게요'],
+    eyebrow: '수업 예약',
+    title: ['원하는 시간에', '바로 예약하세요'],
     titleAccentIndex: 1,
-    body: '아래 일정표는 마인드바디 예약 시스템과 실시간으로 연결돼 있어요. 지금 보이는 자리가 바로 지금 예약할 수 있는 자리입니다. 원하는 수업을 골라 예약하면 끝!',
+    body: '아래 일정은 Mindbody 예약 시스템과 실시간으로 연동됩니다. 표시되는 수업은 현재 예약 가능한 일정입니다. 원하는 수업과 시간을 선택해 간편하게 예약하세요.',
     note: '모든 시간은 미국 서부 시간(PT) 기준입니다.',
   },
   cta: {
     eyebrow: '첫 걸음',
-    title: ['오늘부터, 다시', '자유롭게 움직여요'],
-    body: '평가 한 번이면 충분합니다. 어디서 시작하면 좋을지, 무엇이 달라질 수 있을지 직접 확인해 보세요.',
+    title: ['오늘,', '내 몸의 변화를 시작하세요'],
+    body: '한 번의 상담과 움직임 평가로 시작할 수 있습니다. 현재 몸의 상태를 확인하고, 나에게 가장 잘 맞는 프로그램을 직접 경험해 보세요.',
     primary: '체험 수업 예약하기',
     secondary: '강사진 만나보기',
   },

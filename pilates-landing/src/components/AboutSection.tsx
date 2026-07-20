@@ -45,9 +45,16 @@ export default function AboutSection() {
           <h2 className="mt-6 max-w-[20ch] break-keep font-display text-4xl font-semibold leading-[1.12] tracking-tightest text-ink md:text-5xl">
             <Heading parts={a.title} accent={a.titleAccentIndex} />
           </h2>
-          <p className="mt-7 max-w-[58ch] break-keep text-base leading-relaxed text-mute md:text-lg">
-            {a.body}
-          </p>
+          {a.body.split('\n\n').map((para, i) => (
+            <p
+              key={i}
+              className={`max-w-[58ch] break-keep text-base leading-relaxed text-mute md:text-lg ${
+                i === 0 ? 'mt-7' : 'mt-4'
+              }`}
+            >
+              {para}
+            </p>
+          ))}
         </div>
 
         <div className="reveal lg:col-span-5" style={{ ['--reveal-delay' as string]: '120ms' }}>
