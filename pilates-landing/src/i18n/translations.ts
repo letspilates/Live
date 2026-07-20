@@ -191,7 +191,7 @@ const en = {
     items: [
       {
         q: 'Where is Let’s Pilates LA located?',
-        a: 'We’re in Los Angeles at 672 S La Fayette Park Pl, Ste 674, by Lafayette Park — an easy reach from Koreatown, Westlake, and Downtown LA.',
+        a: 'We’re in Los Angeles at 672 S La Fayette Park Pl, Ste 674 — an easy reach from Koreatown, Westlake, and Downtown LA.',
       },
       {
         q: 'What’s the difference between Pilates and Gyrotonic?',
@@ -220,6 +220,14 @@ const en = {
       {
         q: 'What should I wear to my first session?',
         a: 'Comfortable athletic wear you can move in; grip socks are recommended. All equipment is provided — just bring water and yourself.',
+      },
+      {
+        q: 'Do you offer GYROTONIC® teacher training?',
+        a: 'Yes — we host the GYROTONIC® Level 1 certification pathway in-studio, led by a GYROTONIC® Master Trainer together with our Certified Pre-Trainer.',
+      },
+      {
+        q: 'What courses make up the GYROTONIC® certification?',
+        a: 'The Level 1 pathway has four stages: the Pre-Training Course (6 days on the fundamentals), the Foundation Course (12 days on the full Level 1 syllabus), an Apprenticeship (up to a year of practice teaching plus a supervised 6-day Apprentice Review Course), and the Final Certificate Course (a 3-day evaluation). Full details at gyrotonic.com/teacher-training.',
       },
     ],
   },
@@ -434,7 +442,7 @@ const ko: Content = {
     items: [
       {
         q: 'Let’s Pilates LA는 어디에 있나요?',
-        a: '로스앤젤레스 672 S La Fayette Park Pl, Ste 674, 라파예트 공원 근처에 있습니다. 코리아타운·웨스트레이크·다운타운 LA에서 가깝습니다.',
+        a: '로스앤젤레스 672 S La Fayette Park Pl, Ste 674에 있습니다. 코리아타운·웨스트레이크·다운타운 LA에서 가깝습니다.',
       },
       {
         q: '필라테스와 자이로토닉은 어떻게 다른가요?',
@@ -463,6 +471,14 @@ const ko: Content = {
       {
         q: '첫 수업에 무엇을 입고 가야 하나요?',
         a: '움직이기 편한 운동복이면 됩니다. 그립 양말을 권장하고, 기구는 모두 준비되어 있으니 물과 몸만 오시면 됩니다.',
+      },
+      {
+        q: '자이로토닉 지도자 과정도 운영하나요?',
+        a: '네 — GYROTONIC® 레벨 1 자격 과정을 스튜디오에서 진행합니다. GYROTONIC® 마스터 트레이너와 저희 공인 프리트레이너가 함께 이끕니다.',
+      },
+      {
+        q: 'GYROTONIC® 자격 과정은 어떤 코스로 구성되나요?',
+        a: '레벨 1 과정은 네 단계입니다. 프리트레이닝 코스(6일, 기본 원리), 파운데이션 코스(12일, 레벨 1 전체 커리큘럼), 어프렌티스십(최대 1년 티칭 실습과 감독하 6일 어프렌티스 리뷰 코스), 파이널 서티피케이트 코스(3일 평가). 자세한 내용은 gyrotonic.com/teacher-training에서 확인하세요.',
       },
     ],
   },
