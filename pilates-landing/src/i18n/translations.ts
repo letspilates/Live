@@ -25,7 +25,7 @@ const en = {
     secondaryCta: 'Explore the programs',
     stats: [
       { value: 'Est. 2015', label: 'Los Angeles studio' },
-      { value: '1:1', label: 'Private-first coaching' },
+      { value: '1:1', label: 'Private-first instruction' },
       { value: 'STOTT PILATES® · GYROTONIC®', label: 'Fully certified team' },
     ],
     chipTop: 'Open this week',
@@ -107,9 +107,9 @@ const en = {
   },
   instructors: {
     eyebrow: 'Instructors',
-    title: ['Four internationally', 'certified', 'dedicated coaches'],
+    title: ['Four internationally', 'certified', 'dedicated instructors'],
     titleAccentIndex: 1,
-    body: 'Every coach is certified through the international GYROTONIC® and STOTT PILATES® programs. The coach who runs your first assessment stays with you to the end.',
+    body: 'Every instructor is certified through the international GYROTONIC® and STOTT PILATES® programs. The instructor who runs your first assessment stays with you to the end.',
     people: {
       sunnie: {
         name: 'Sunnie Lee',
@@ -152,13 +152,13 @@ const en = {
       },
       r3: {
         quote:
-          'Coach Siwoo rebuilt my postpartum core step by step. Seeing recovery in numbers keeps me motivated.',
+          'My instructor rebuilt my postpartum core step by step. Seeing recovery in numbers keeps me motivated.',
         name: 'Garam Han',
         meta: 'Pre/Postnatal private / 5 months',
       },
       r4: {
         quote:
-          "Three years in. My coach hasn't changed and knows my whole body history — that's the real value.",
+          "Three years in. My instructor hasn't changed and knows my whole body history — that's the real value.",
         name: 'Minjae Oh',
         meta: 'Reformer 1:2 / 3 years',
       },
@@ -182,7 +182,7 @@ const en = {
     title: ['Today, let your body', 'move again'],
     body: "One assessment is enough. See for yourself where to start and what could change.",
     primary: 'Book a trial class',
-    secondary: 'Meet the coaches',
+    secondary: 'Meet the instructors',
   },
   footer: {
     description:
@@ -195,7 +195,7 @@ const en = {
       },
       studio: {
         title: 'Studio',
-        links: ['About', 'Coaches', 'Schedule', 'Find us'],
+        links: ['About', 'Instructors', 'Schedule', 'Find us'],
       },
       contact: {
         title: 'Contact',
