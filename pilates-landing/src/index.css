@@ -4,6 +4,13 @@
 
 html {
   scroll-behavior: smooth;
+  /* Anchor jumps land below the fixed navbar so each section shows from its top */
+  scroll-padding-top: 5.5rem;
+}
+
+/* Fallback per-section offset (older engines that ignore scroll-padding-top) */
+section[id] {
+  scroll-margin-top: 5.5rem;
 }
 
 html,
