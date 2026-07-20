@@ -119,17 +119,17 @@ const en = {
       eunice: {
         name: 'Eunice Choi',
         role: 'Instructor',
-        certs: ['GYROTONIC® Level 1', 'Gyrokinesis', 'Archway', 'Jumping Stretching Board'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Gyrokinesis', 'Archway', 'Jumping Stretching Board'],
       },
       soo: {
         name: 'Su Kyung Yi',
         role: 'Instructor',
-        certs: ['GYROTONIC® Level 1', 'Jumping Stretching Board'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jumping Stretching Board'],
       },
       haley: {
         name: 'Haley Han',
-        role: 'GYROTONIC® Instructor',
-        certs: ['GYROTONIC® Level 1', 'Jumping Stretching Board'],
+        role: 'Instructor',
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jumping Stretching Board'],
       },
     },
   },
@@ -327,17 +327,17 @@ const ko: Content = {
       eunice: {
         name: 'Eunice Choi',
         role: '강사',
-        certs: ['GYROTONIC® Level 1', 'Gyrokinesis', 'Archway', 'Jumping Stretching Board'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Gyrokinesis', 'Archway', 'Jumping Stretching Board'],
       },
       soo: {
         name: 'Su Kyung Yi',
         role: '강사',
-        certs: ['GYROTONIC® Level 1', 'Jumping Stretching Board'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jumping Stretching Board'],
       },
       haley: {
         name: 'Haley Han',
-        role: 'GYROTONIC® 강사',
-        certs: ['GYROTONIC® Level 1', 'Jumping Stretching Board'],
+        role: '강사',
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jumping Stretching Board'],
       },
     },
   },
