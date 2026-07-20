@@ -184,6 +184,45 @@ const en = {
     primary: 'Book a trial class',
     secondary: 'Meet the instructors',
   },
+  faq: {
+    eyebrow: 'FAQ',
+    title: ['Questions,', 'answered'],
+    titleAccentIndex: 1,
+    items: [
+      {
+        q: 'Where is Let’s Pilates LA located?',
+        a: 'We’re in Los Angeles at 672 S La Fayette Park Pl, Ste 674, by Lafayette Park — an easy reach from Koreatown, Westlake, and Downtown LA.',
+      },
+      {
+        q: 'What’s the difference between Pilates and Gyrotonic?',
+        a: 'Pilates builds core strength, control, and alignment — often on the Reformer. The GYROTONIC® Method uses circular, spiraling movement to mobilize the joints and lengthen the spine. Many members combine both.',
+      },
+      {
+        q: 'I’m a complete beginner — where do I start?',
+        a: 'Every journey begins with a movement assessment, followed by a private 1:1 session built around your body. No prior experience needed.',
+      },
+      {
+        q: 'Do you only offer private sessions, or groups too?',
+        a: 'Both. Private (1:1), Duet (1:2), GYROTONIC® Group, and Pilates Group (up to five people).',
+      },
+      {
+        q: 'How do I book a class?',
+        a: 'Use the live schedule on this page — it’s connected to our Mindbody system in real time, so what you see is what’s open right now. Pick a time and book.',
+      },
+      {
+        q: 'Are your instructors certified?',
+        a: 'Yes. Every instructor holds international STOTT PILATES® and GYROTONIC® certifications, led by our Certified GYROTONIC® Pre-Trainer.',
+      },
+      {
+        q: 'Do you teach in Korean?',
+        a: 'Yes — our instructors teach in both English and Korean.',
+      },
+      {
+        q: 'What should I wear to my first session?',
+        a: 'Comfortable athletic wear you can move in; grip socks are recommended. All equipment is provided — just bring water and yourself.',
+      },
+    ],
+  },
   footer: {
     description:
       'Movement, completed through Reformer Pilates and Gyrotonic — a Los Angeles studio designing the exercise that fits your body.',
@@ -387,6 +426,45 @@ const ko: Content = {
     body: '한 번의 상담과 움직임 평가로 시작할 수 있습니다. 현재 몸의 상태를 확인하고, 나에게 가장 잘 맞는 프로그램을 직접 경험해 보세요.',
     primary: '체험 수업 예약하기',
     secondary: '강사진 만나보기',
+  },
+  faq: {
+    eyebrow: '자주 묻는 질문',
+    title: ['궁금한 점,', '먼저 정리했어요'],
+    titleAccentIndex: 1,
+    items: [
+      {
+        q: 'Let’s Pilates LA는 어디에 있나요?',
+        a: '로스앤젤레스 672 S La Fayette Park Pl, Ste 674, 라파예트 공원 근처에 있습니다. 코리아타운·웨스트레이크·다운타운 LA에서 가깝습니다.',
+      },
+      {
+        q: '필라테스와 자이로토닉은 어떻게 다른가요?',
+        a: '필라테스는 주로 리포머 위에서 코어 근력과 컨트롤, 정렬을 다집니다. GYROTONIC®은 원을 그리는 나선형 움직임으로 관절을 풀고 척추를 길게 늘입니다. 두 가지를 함께 하시는 회원도 많습니다.',
+      },
+      {
+        q: '완전 초보인데 무엇부터 시작하나요?',
+        a: '모든 시작은 움직임 평가에서 출발합니다. 이후 몸에 맞춘 1:1 프라이빗 수업으로 이어지니, 경험이 없어도 괜찮습니다.',
+      },
+      {
+        q: '프라이빗만 있나요, 그룹 수업도 있나요?',
+        a: '둘 다 있습니다. 프라이빗(1:1), 듀엣(1:2), GYROTONIC® 그룹, 그리고 정원 다섯 명의 필라테스 그룹.',
+      },
+      {
+        q: '예약은 어떻게 하나요?',
+        a: '이 페이지의 실시간 일정표를 이용하세요. 마인드바디 시스템과 실시간으로 연동되어, 보이는 자리가 지금 예약 가능한 자리입니다. 원하는 시간을 골라 예약하시면 됩니다.',
+      },
+      {
+        q: '강사진은 공인 자격이 있나요?',
+        a: '네. 모든 강사가 STOTT PILATES®와 GYROTONIC® 국제 공인 자격을 보유하고 있으며, GYROTONIC® 공인 프리트레이너가 이끕니다.',
+      },
+      {
+        q: '한국어 수업도 가능한가요?',
+        a: '네 — 강사진이 영어와 한국어 모두로 수업을 진행합니다.',
+      },
+      {
+        q: '첫 수업에 무엇을 입고 가야 하나요?',
+        a: '움직이기 편한 운동복이면 됩니다. 그립 양말을 권장하고, 기구는 모두 준비되어 있으니 물과 몸만 오시면 됩니다.',
+      },
+    ],
   },
   footer: {
     description:

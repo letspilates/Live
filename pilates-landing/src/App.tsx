@@ -5,6 +5,7 @@ import ProgramsSection from './components/ProgramsSection';
 import ApproachSection from './components/ApproachSection';
 import InstructorsSection from './components/InstructorsSection';
 import ScheduleSection from './components/ScheduleSection';
+import FaqSection from './components/FaqSection';
 import CtaSection from './components/CtaSection';
 import Footer from './components/Footer';
 import useReveal from './hooks/useReveal';
@@ -23,6 +24,7 @@ export default function App() {
         <InstructorsSection />
         {/* Member stories temporarily hidden — re-add <TestimonialsSection /> to restore */}
         <ScheduleSection />
+        <FaqSection />
         <CtaSection />
       </main>
       <Footer />
