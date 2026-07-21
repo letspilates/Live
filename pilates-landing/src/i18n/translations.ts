@@ -326,7 +326,7 @@ const ko: Content = {
   },
   approach: {
     eyebrow: '지도자 과정',
-    title: ['GYROTONIC® Level 1', '지도자 양성', '과정'],
+    title: ['GYROTONIC® Level 1', '지도자 양성 과정'],
     titleAccentIndex: 1,
     metricValue: 'Level 1',
     metricLabel: '국제 공인 GYROTONIC® 자격',
