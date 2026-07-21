@@ -233,7 +233,7 @@ const en = {
   },
   footer: {
     description:
-      'Movement, completed through Reformer Pilates and Gyrotonic — a Los Angeles studio designing the exercise that fits your body.',
+      'Movement, completed through STOTT PILATES® and Gyrotonic — a Los Angeles studio designing the exercise that fits your body.',
     address: ['672 S La Fayette Park Pl, STE 674, Los Angeles, CA 90057', 'Class times — see the live schedule above'],
     cols: {
       programs: {
@@ -484,7 +484,7 @@ const ko: Content = {
   },
   footer: {
     description:
-      '리포머 필라테스와 자이로토닉으로 완성하는 움직임. 당신의 몸에 꼭 맞는 운동을 설계하는 로스앤젤레스의 스튜디오입니다.',
+      'STOTT PILATES®와 자이로토닉으로 완성하는 움직임. 당신의 몸에 꼭 맞는 운동을 설계하는 로스앤젤레스의 스튜디오입니다.',
     address: ['672 S La Fayette Park Pl, STE 674, Los Angeles, CA 90057', '수업 시간은 위 실시간 일정표에서 확인하세요'],
     cols: {
       programs: {

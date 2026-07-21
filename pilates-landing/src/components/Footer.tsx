@@ -1,4 +1,3 @@
-import LogoIcon from './LogoIcon';
 import { IMG } from '../media';
 import { useLang } from '../i18n/LanguageContext';
 
@@ -13,8 +12,7 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
           <div className="lg:col-span-5">
-            <div className="flex items-center gap-2.5">
-              <LogoIcon className="h-7 w-7 text-sage-soft" />
+            <div className="flex items-center">
               <span className="font-display text-xl font-semibold tracking-tightest">
                 Let&rsquo;s Pilates LA
               </span>
