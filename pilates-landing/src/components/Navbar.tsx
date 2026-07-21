@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import LogoIcon from './LogoIcon';
 import { useLang } from '../i18n/LanguageContext';
 
 export default function Navbar() {
@@ -25,8 +24,7 @@ export default function Navbar() {
             : 'border border-transparent bg-transparent'
         }`}
       >
-        <a href="#top" className="flex items-center gap-2.5 pl-2">
-          <LogoIcon className={`h-7 w-7 ${dark ? 'text-sage-soft' : 'text-sage'}`} />
+        <a href="#top" className="flex items-center pl-2">
           <span
             className={`font-display text-lg font-semibold tracking-tightest sm:text-xl ${
               dark ? 'text-cream' : 'text-ink'
