@@ -71,7 +71,7 @@ const en = {
   },
   approach: {
     eyebrow: 'Teacher training',
-    title: ['GYROTONIC®', 'certified trainer', 'pathway'],
+    title: ['GYROTONIC® Level 1', 'Instructor Training Program', 'pathway'],
     titleAccentIndex: 1,
     metricValue: 'Level 1',
     metricLabel: 'Internationally recognized GYROTONIC® certification',
@@ -326,7 +326,7 @@ const ko: Content = {
   },
   approach: {
     eyebrow: '지도자 과정',
-    title: ['GYROTONIC®', '공인 트레이너가', '되는 길'],
+    title: ['GYROTONIC® Level 1', '지도자 양성', '과정'],
     titleAccentIndex: 1,
     metricValue: 'Level 1',
     metricLabel: '국제 공인 GYROTONIC® 자격',

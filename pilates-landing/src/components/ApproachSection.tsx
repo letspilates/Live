@@ -91,7 +91,9 @@ export default function ApproachSection() {
 
           <div className="flex flex-col items-start gap-3 md:items-end">
             <a
-              href="#contact"
+              href="https://www.gyrotonic.com/teacher-training/gyrotonic-level-1/"
+              target="_blank"
+              rel="noopener noreferrer"
               className="group flex items-center gap-3 rounded-full bg-cream py-2.5 pl-6 pr-2.5 text-sm font-medium text-ink transition-transform duration-500 ease-smooth hover:scale-[1.03]"
             >
               {a.note.cta}
