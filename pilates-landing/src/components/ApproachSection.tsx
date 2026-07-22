@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { IMG } from '../media';
 import Eyebrow from './Eyebrow';
 import Heading from './Heading';
+import TrainingForm from './TrainingForm';
 import { useLang } from '../i18n/LanguageContext';
 
 export default function ApproachSection() {
   const { t } = useLang();
   const a = t.approach;
+  const [formOpen, setFormOpen] = useState(false);
 
   return (
     <section id="approach" className="bg-cream py-24 md:py-32 lg:py-40">
@@ -90,17 +93,21 @@ export default function ApproachSection() {
           </div>
 
           <div className="flex flex-col items-start gap-3 md:items-end">
-            <a
-              href="https://www.gyrotonic.com/teacher-training/gyrotonic-level-1/"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => setFormOpen((v) => !v)}
+              aria-expanded={formOpen}
               className="group flex items-center gap-3 rounded-full bg-cream py-2.5 pl-6 pr-2.5 text-sm font-medium text-ink transition-transform duration-500 ease-smooth hover:scale-[1.03]"
             >
               {a.note.cta}
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-cream transition-transform duration-500 ease-smooth group-hover:translate-x-0.5">
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-full bg-ink text-cream transition-transform duration-500 ease-smooth ${
+                  formOpen ? 'rotate-90' : 'group-hover:translate-x-0.5'
+                }`}
+              >
                 →
               </span>
-            </a>
+            </button>
             <a
               href="https://www.gyrotonic.com/teacher-training/"
               target="_blank"
@@ -112,6 +119,9 @@ export default function ApproachSection() {
           </div>
         </div>
       </div>
+
+      {/* Registration form — expands below the banner when the CTA is clicked */}
+      <TrainingForm open={formOpen} onClose={() => setFormOpen(false)} />
       </div>
     </section>
   );
