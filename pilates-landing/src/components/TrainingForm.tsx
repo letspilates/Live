@@ -24,6 +24,8 @@ interface RemoteCourse {
   dates: string;
   tag_en: string;
   tag_kr: string;
+  capacity?: number | null;
+  taken?: number;
 }
 
 const COURSES_CACHE_KEY = 'lp-courses-v1';
@@ -114,13 +116,26 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
   }, []);
 
   const displayCourses = remoteCourses
-    ? remoteCourses.map((c) => ({
+    ? remoteCourses.map((c) => {
+        const capacity = typeof c.capacity === 'number' && c.capacity > 0 ? c.capacity : null;
+        const remaining = capacity === null ? null : Math.max(0, capacity - (c.taken ?? 0));
+        return {
+          id: c.id,
+          name: lang === 'ko' ? c.name_kr || c.name_en : c.name_en,
+          meta: c.dates || f.courseMeta,
+          tag: lang === 'ko' ? c.tag_kr || c.tag_en : c.tag_en,
+          remaining,
+          full: remaining !== null && remaining <= 0,
+        };
+      })
+    : f.courses.map((c) => ({
         id: c.id,
-        name: lang === 'ko' ? c.name_kr || c.name_en : c.name_en,
-        meta: c.dates || f.courseMeta,
-        tag: lang === 'ko' ? c.tag_kr || c.tag_en : c.tag_en,
-      }))
-    : f.courses.map((c) => ({ id: c.id, name: c.name, meta: f.courseMeta, tag: c.tag }));
+        name: c.name,
+        meta: f.courseMeta,
+        tag: c.tag,
+        remaining: null as number | null,
+        full: false,
+      }));
 
   const courseValue = (id: string) => {
     const rc = remoteCourses?.find((c) => c.id === id);
@@ -347,11 +362,14 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                         <button
                           key={c.id}
                           type="button"
+                          disabled={c.full}
                           onClick={() => toggleCourse(c.id)}
                           className={`flex items-center gap-4 rounded-2xl border p-4 text-left transition-all duration-300 ease-smooth sm:p-5 ${
-                            selected
-                              ? 'border-sage bg-sage/5 ring-1 ring-sage'
-                              : 'border-ink/10 hover:border-sage/40 hover:bg-cream/60'
+                            c.full
+                              ? 'cursor-not-allowed border-ink/10 opacity-55'
+                              : selected
+                                ? 'border-sage bg-sage/5 ring-1 ring-sage'
+                                : 'border-ink/10 hover:border-sage/40 hover:bg-cream/60'
                           }`}
                         >
                           <span
@@ -365,16 +383,30 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                             <span className="block break-keep text-[15px] font-medium leading-snug text-ink">
                               {c.name}
                             </span>
-                            <span className="mt-0.5 block text-xs text-mute">{c.meta}</span>
-                          </span>
-                          {c.tag && (
-                            <span
-                              className={`hidden flex-shrink-0 rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-wide sm:block ${
-                                selected ? 'bg-sage text-cream' : 'bg-cream text-mute'
-                              }`}
-                            >
-                              {c.tag}
+                            <span className="mt-0.5 block text-xs text-mute">
+                              {c.meta}
+                              {c.remaining !== null && !c.full && (
+                                <span className="font-medium text-sage">
+                                  {' · '}
+                                  {f.seatsLeft.replace('{n}', String(c.remaining))}
+                                </span>
+                              )}
                             </span>
+                          </span>
+                          {c.full ? (
+                            <span className="flex-shrink-0 rounded-full bg-clay/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-clay">
+                              {f.seatsFull}
+                            </span>
+                          ) : (
+                            c.tag && (
+                              <span
+                                className={`hidden flex-shrink-0 rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-wide sm:block ${
+                                  selected ? 'bg-sage text-cream' : 'bg-cream text-mute'
+                                }`}
+                              >
+                                {c.tag}
+                              </span>
+                            )
                           )}
                         </button>
                       );
