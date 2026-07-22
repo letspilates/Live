@@ -1,10 +1,14 @@
-name: Deploy site to GitHub Pages
+name: Deploy site (production + staging)
 
-# Builds the Vite app in pilates-landing/ and publishes dist/ to GitHub Pages.
-# Runs on pushes to main (production → letspilatesla.com) and can be run manually.
+# Publishes BOTH environments into one GitHub Pages artifact:
+#   - production  (from `main`)    → https://letspilatesla.com/
+#   - staging     (from `Staging`) → https://letspilatesla.com/staging/
+# Triggered by pushes to either branch, so:
+#   push to Staging → /staging updates (production untouched)
+#   merge to main   → production updates
 on:
   push:
-    branches: [main]
+    branches: [main, Staging]
   workflow_dispatch:
 
 permissions:
@@ -12,7 +16,7 @@ permissions:
   pages: write
   id-token: write
 
-# Only one live deploy at a time; let a newer one supersede an in-progress one.
+# One live deploy at a time; a newer run supersedes an in-progress one.
 concurrency:
   group: pages
   cancel-in-progress: true
@@ -20,21 +24,48 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: pilates-landing
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: pilates-landing/package-lock.json
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+
+      # ---------- Production (main) → site root ----------
+      - name: Checkout main (production)
+        uses: actions/checkout@v4
         with:
-          path: pilates-landing/dist
+          ref: main
+          path: prod
+      - name: Build production
+        working-directory: prod/pilates-landing
+        run: |
+          npm ci
+          npm run build
+      - name: Assemble production at root
+        run: |
+          mkdir -p _site
+          cp -r prod/pilates-landing/dist/. _site/
+
+      # ---------- Staging (Staging branch) → /staging ----------
+      - name: Checkout Staging
+        uses: actions/checkout@v4
+        with:
+          ref: Staging
+          path: stg
+      - name: Build staging (base=/staging/)
+        working-directory: stg/pilates-landing
+        run: |
+          npm ci
+          npm run build -- --base=/staging/
+      - name: Assemble staging under /staging
+        run: |
+          mkdir -p _site/staging
+          cp -r stg/pilates-landing/dist/. _site/staging/
+          rm -f _site/staging/CNAME   # keep a single CNAME at the root only
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
 
   deploy:
     needs: build
