@@ -7,25 +7,24 @@
 
 ---
 
-## 1단계 — 스프레드시트에 "Courses" 탭 만들기
+## 1단계 — Apps Script 코드 교체
 
-등록 신청이 쌓이는 **기존 스프레드시트**를 엽니다.
-(폼 제출이 기록되던 그 시트입니다)
+등록 신청이 쌓이는 **기존 "Registration" 스프레드시트**를 엽니다.
 
-1. 하단의 **+ (시트 추가)** 를 눌러 새 탭을 만들고, 탭 이름을 정확히 **`Courses`** 로 바꿉니다. (대소문자 그대로)
-2. 아래 표를 그대로 복사해서 A1 셀에 붙여넣습니다:
+1. 메뉴 **확장 프로그램 → Apps Script** 를 엽니다.
+2. 편집기에 있는 기존 코드를 **전부 지우고**, 이 폴더의 `google-apps-script.js` 파일 내용을 **전체 복사해서 붙여넣습니다.**
+3. 💾 저장 (Ctrl+S / Cmd+S)
 
-```
-id	name_en	name_kr	dates	tag_en	tag_kr	active
-A	GYROTONIC® Level 1 Foundation Course	GYROTONIC® Level 1 기초 과정 (Foundation Course)		12 days	12일	TRUE
-B	GYROTONIC® Level 2 Program 1 — Pre-Training	GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)		3 days	3일	TRUE
-C	Jumping Stretching Board Course	점핑 스트레칭 보드 과정 (Jumping Stretching Board)		7 days	7일	TRUE
-D	GYROTONIC® Level 1 Apprentice Review Course	GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)		6 days	6일	TRUE
-E	GYROTONIC® Level 2 Program 1 — Foundation Course	GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)		4 days	4일	TRUE
-```
+## 2단계 — Courses 탭 자동 생성 (클릭 한 번)
 
-3. **dates 열(D열) 전체를 선택** → 메뉴 **서식 → 숫자 → 일반 텍스트** 로 설정합니다.
-   (이걸 안 하면 "4/10" 같은 입력이 날짜로 자동 변환되어 이상하게 보일 수 있습니다)
+수동으로 표를 붙여넣을 필요 없습니다. 스크립트가 대신 만들어 줍니다:
+
+1. Apps Script 편집기 **상단 툴바의 함수 선택 드롭다운** (▶ 실행 버튼 옆)에서 **`setupCoursesTab`** 을 선택합니다.
+2. **▶ 실행** 버튼을 클릭합니다.
+3. 처음이면 권한 요청 창이 뜹니다 → **권한 검토 → 계정 선택 → 고급 → (안전하지 않음) 이동 → 허용**
+   (본인 계정의 본인 스크립트라 안전합니다. 구글이 미검증 스크립트에 항상 띄우는 경고입니다.)
+4. 실행이 끝나면 스프레드시트로 돌아가 보세요 — **"Courses" 탭이 기본 코스 5개와 함께 생성**되어 있습니다.
+   (dates 열 텍스트 서식, 헤더 굵게, 행 고정까지 자동으로 되어 있습니다)
 
 ### 각 열의 의미
 
@@ -40,12 +39,6 @@ E	GYROTONIC® Level 2 Program 1 — Foundation Course	GYROTONIC® Level 2 Progra
 | `active` | TRUE = 사이트에 표시, FALSE = 숨김 | TRUE |
 
 ---
-
-## 2단계 — Apps Script 코드 교체
-
-1. 같은 스프레드시트에서 메뉴 **확장 프로그램 → Apps Script** 를 엽니다.
-2. 편집기에 있는 기존 코드를 **전부 지우고**, 이 폴더의 `google-apps-script.js` 파일 내용을 **전체 복사해서 붙여넣습니다.**
-3. 💾 저장 (Ctrl+S / Cmd+S)
 
 ## 3단계 — 재배포 (⚠️ 가장 중요 — "새 배포" 아님!)
 

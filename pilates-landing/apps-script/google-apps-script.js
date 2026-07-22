@@ -98,3 +98,38 @@ function cellToString_(v) {
   }
   return String(v).trim();
 }
+
+/**
+ * ★ 최초 1회 실행용 — "Courses" 탭을 자동으로 만들어 기본 코스 5개를 채운다.
+ * Apps Script 편집기 상단의 함수 드롭다운에서 `setupCoursesTab`을 선택하고
+ * ▶ 실행 버튼을 누르면 된다. 이미 Courses 탭이 있으면 아무것도 덮어쓰지 않는다.
+ */
+function setupCoursesTab() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (ss.getSheetByName('Courses')) {
+    SpreadsheetApp.getUi
+      ? Logger.log('Courses 탭이 이미 있습니다. 아무것도 변경하지 않았습니다.')
+      : null;
+    return;
+  }
+
+  var sheet = ss.insertSheet('Courses');
+  var rows = [
+    ['id', 'name_en', 'name_kr', 'dates', 'tag_en', 'tag_kr', 'active'],
+    ['A', 'GYROTONIC® Level 1 Foundation Course', 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', '', '12 days', '12일', 'TRUE'],
+    ['B', 'GYROTONIC® Level 2 Program 1 — Pre-Training', 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', '', '3 days', '3일', 'TRUE'],
+    ['C', 'Jumping Stretching Board Course', '점핑 스트레칭 보드 과정 (Jumping Stretching Board)', '', '7 days', '7일', 'TRUE'],
+    ['D', 'GYROTONIC® Level 1 Apprentice Review Course', 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', '', '6 days', '6일', 'TRUE'],
+    ['E', 'GYROTONIC® Level 2 Program 1 — Foundation Course', 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', '', '4 days', '4일', 'TRUE'],
+  ];
+  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+
+  // dates 열(D)은 "4/10" 입력이 날짜로 자동 변환되지 않도록 일반 텍스트로 고정
+  sheet.getRange('D:D').setNumberFormat('@');
+  // 헤더 행 굵게 + 열 너비 자동
+  sheet.getRange(1, 1, 1, rows[0].length).setFontWeight('bold');
+  sheet.autoResizeColumns(1, rows[0].length);
+  sheet.setFrozenRows(1);
+
+  Logger.log('Courses 탭 생성 완료!');
+}
