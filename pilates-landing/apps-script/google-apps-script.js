@@ -226,6 +226,45 @@ function upgradeCoursesTab() {
 }
 
 /**
+ * ★ 접수 시트(첫 탭)에 컬럼 헤더를 만든다 — 함수 드롭다운에서 선택 후 ▶ 실행.
+ * 1행이 헤더가 아니면(기존 신청 데이터가 있으면) 위에 새 행을 넣어 헤더를 추가하므로
+ * 이미 접수된 신청은 그대로 보존된다. 실행해도 여러 번 중복 생성되지 않는다.
+ */
+function setupSubmissionHeaders() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheets()[0];
+  var headers = [
+    '제출시각',
+    '신청 과정',
+    '이름',
+    '이메일',
+    '전화번호',
+    '자격 상태',
+    '소속 스튜디오',
+    '지역',
+    '질문/요청',
+    '교육 단계',
+    '선수요건 충족',
+    '일정 참석',
+    '기타',
+  ];
+
+  var a1 = String(sheet.getRange('A1').getValue()).trim().toLowerCase();
+  var isHeader = a1 === '제출시각' || a1 === 'timestamp';
+  if (!isHeader) {
+    sheet.insertRowBefore(1);
+  }
+  sheet
+    .getRange(1, 1, 1, headers.length)
+    .setValues([headers])
+    .setFontWeight('bold')
+    .setBackground('#F2EBDD');
+  sheet.setFrozenRows(1);
+
+  Logger.log('접수 시트 헤더 설정 완료!');
+}
+
+/**
  * ★ 이메일 알림 테스트 — 함수 드롭다운에서 선택 후 ▶ 실행하면 테스트 메일이 발송된다.
  * (처음 실행할 때 이메일 발송 권한 승인 창이 뜬다 — 반드시 한 번 실행해서 승인해야
  *  실제 신청이 들어왔을 때 알림이 발송된다)
