@@ -13,6 +13,31 @@ const COURSE_VALUES: Record<string, string> = {
   D: 'D - Gyrotonic® Level 1 Apprentice Review Course',
   E: 'E - Gyrotonic® Level 2 Program 1 – Foundation Course',
 };
+
+// Course list managed in the "Courses" tab of the registration spreadsheet
+// (see pilates-landing/apps-script/). Fetched at page load; falls back to the
+// bundled list in translations.ts whenever the endpoint is unreachable.
+interface RemoteCourse {
+  id: string;
+  name_en: string;
+  name_kr: string;
+  dates: string;
+  tag_en: string;
+  tag_kr: string;
+}
+
+const COURSES_CACHE_KEY = 'lp-courses-v1';
+
+function readCachedCourses(): RemoteCourse[] | null {
+  try {
+    const raw = window.localStorage.getItem(COURSES_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as RemoteCourse[];
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 const STAGE_VALUES = [
   'New Student',
   'Level 1 Trainee',
@@ -53,12 +78,54 @@ function Chip({
 }
 
 export default function TrainingForm({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const f = t.trainingForm;
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const [step, setStep] = useState(1);
   const [courses, setCourses] = useState<string[]>([]);
+  const [remoteCourses, setRemoteCourses] = useState<RemoteCourse[] | null>(readCachedCourses);
+
+  // Prefetch the live course list at page load so it is already there when the
+  // form opens; cache the last good response so outages never blank the form.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), 8000);
+    fetch(SHEETS_URL, { signal: ctrl.signal })
+      .then((r) => r.json())
+      .then((j: { result?: string; courses?: RemoteCourse[] }) => {
+        if (j?.result === 'success' && Array.isArray(j.courses) && j.courses.length > 0) {
+          setRemoteCourses(j.courses);
+          try {
+            window.localStorage.setItem(COURSES_CACHE_KEY, JSON.stringify(j.courses));
+          } catch {
+            /* storage full/blocked — live data still in state */
+          }
+        }
+      })
+      .catch(() => {
+        /* unreachable endpoint — cached or bundled list stays in place */
+      })
+      .finally(() => window.clearTimeout(timer));
+    return () => {
+      ctrl.abort();
+      window.clearTimeout(timer);
+    };
+  }, []);
+
+  const displayCourses = remoteCourses
+    ? remoteCourses.map((c) => ({
+        id: c.id,
+        name: lang === 'ko' ? c.name_kr || c.name_en : c.name_en,
+        meta: c.dates || f.courseMeta,
+        tag: lang === 'ko' ? c.tag_kr || c.tag_en : c.tag_en,
+      }))
+    : f.courses.map((c) => ({ id: c.id, name: c.name, meta: f.courseMeta, tag: c.tag }));
+
+  const courseValue = (id: string) => {
+    const rc = remoteCourses?.find((c) => c.id === id);
+    return rc ? `${rc.id} - ${rc.name_en}` : (COURSE_VALUES[id] ?? id);
+  };
   const [fields, setFields] = useState({
     fullName: '',
     email: '',
@@ -131,7 +198,7 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
     setSubmitting(true);
     const data = {
       timestamp: new Date().toISOString(),
-      courses: courses.map((id) => COURSE_VALUES[id]).join(', '),
+      courses: courses.map(courseValue).join(', '),
       fullName: fields.fullName.trim(),
       email: fields.email.trim(),
       phone: fields.phone.trim(),
@@ -274,7 +341,7 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                   </h4>
                   <p className="mt-1.5 text-sm text-mute">{f.s1Subtitle}</p>
                   <div className="mt-6 flex flex-col gap-3">
-                    {f.courses.map((c) => {
+                    {displayCourses.map((c) => {
                       const selected = courses.includes(c.id);
                       return (
                         <button
@@ -298,15 +365,17 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                             <span className="block break-keep text-[15px] font-medium leading-snug text-ink">
                               {c.name}
                             </span>
-                            <span className="mt-0.5 block text-xs text-mute">{f.courseMeta}</span>
+                            <span className="mt-0.5 block text-xs text-mute">{c.meta}</span>
                           </span>
-                          <span
-                            className={`hidden flex-shrink-0 rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-wide sm:block ${
-                              selected ? 'bg-sage text-cream' : 'bg-cream text-mute'
-                            }`}
-                          >
-                            {c.tag}
-                          </span>
+                          {c.tag && (
+                            <span
+                              className={`hidden flex-shrink-0 rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-wide sm:block ${
+                                selected ? 'bg-sage text-cream' : 'bg-cream text-mute'
+                              }`}
+                            >
+                              {c.tag}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
