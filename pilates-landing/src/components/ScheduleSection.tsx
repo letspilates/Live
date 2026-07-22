@@ -1,23 +1,40 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Eyebrow from './Eyebrow';
 import Heading from './Heading';
 import { useLang } from '../i18n/LanguageContext';
 
 const HEALCODE_SRC = 'https://widgets.mindbodyonline.com/javascripts/healcode.js';
+const WIDGET_HTML =
+  '<healcode-widget data-type="schedules" data-widget-partner="object" data-widget-id="ed201547cc85" data-widget-version="1"></healcode-widget>';
 
 /**
- * Live Mindbody class schedule, replacing the old static pricing section.
- * The healcode script is injected once on mount; it then upgrades the
- * <healcode-widget> element below into the interactive schedule.
+ * Live Mindbody (Healcode) class schedule.
+ *
+ * The healcode script rewrites the <healcode-widget> element into an iframe —
+ * outside React's knowledge. To stop React reconciliation (e.g. on language
+ * toggle) from wiping that iframe, the widget is injected imperatively into a
+ * ref container that React never renders children into. The script is then
+ * (re)appended so it scans and upgrades the freshly-inserted element.
  */
 export default function ScheduleSection() {
   const { t } = useLang();
   const s = t.schedule;
+  const holderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Guard against double-append (StrictMode remounts, language re-renders).
-    if (document.querySelector(`script[src="${HEALCODE_SRC}"]`)) return;
+    const holder = holderRef.current;
+    if (!holder) return;
+
+    // Insert the widget element imperatively (only if not already present).
+    if (!holder.querySelector('healcode-widget, iframe')) {
+      holder.innerHTML = WIDGET_HTML;
+    }
+
+    // (Re)load the healcode script so it re-scans and upgrades the widget.
+    const existing = document.getElementById('healcode-js');
+    if (existing) existing.remove();
     const script = document.createElement('script');
+    script.id = 'healcode-js';
     script.src = HEALCODE_SRC;
     script.async = true;
     document.body.appendChild(script);
@@ -35,23 +52,14 @@ export default function ScheduleSection() {
         </div>
 
         {/* Widget shell — double-bezel card so the third-party UI sits on-brand */}
-        <div
-          className="reveal mx-auto mt-14 max-w-5xl rounded-[2rem] bg-paper/60 p-1.5 ring-1 ring-ink/10 shadow-[0_30px_60px_-25px_rgba(28,26,22,0.25)]"
-          style={{ ['--reveal-delay' as string]: '120ms' }}
-        >
+        <div className="mx-auto mt-14 max-w-5xl rounded-[2rem] bg-paper/60 p-1.5 ring-1 ring-ink/10 shadow-[0_30px_60px_-25px_rgba(28,26,22,0.25)]">
           <div className="min-h-[34rem] overflow-hidden rounded-[1.6rem] bg-paper p-3 sm:p-6">
-            <healcode-widget
-              data-type="schedules"
-              data-widget-partner="object"
-              data-widget-id="ed201547cc85"
-              data-widget-version="1"
-            />
+            {/* React manages only this empty container; healcode fills it. */}
+            <div ref={holderRef} />
           </div>
         </div>
 
-        <p className="reveal mt-6 text-center text-xs text-mute" style={{ ['--reveal-delay' as string]: '200ms' }}>
-          {s.note}
-        </p>
+        <p className="mt-6 text-center text-xs text-mute">{s.note}</p>
       </div>
     </section>
   );
