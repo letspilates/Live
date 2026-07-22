@@ -383,30 +383,20 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                             <span className="block break-keep text-[15px] font-medium leading-snug text-ink">
                               {c.name}
                             </span>
-                            <span className="mt-0.5 block text-xs text-mute">
+                            <span className="mt-1 block text-[13px] text-mute">
                               {c.meta}
-                              {c.remaining !== null && !c.full && (
-                                <span className="font-medium text-sage">
-                                  {' · '}
-                                  {f.seatsLeft.replace('{n}', String(c.remaining))}
-                                </span>
-                              )}
+                              {c.tag && ` · ${c.tag}`}
                             </span>
+                            {c.remaining !== null && !c.full && (
+                              <span className="mt-1 block text-xs font-medium text-sage">
+                                {f.seatsLeft.replace('{n}', String(c.remaining))}
+                              </span>
+                            )}
                           </span>
-                          {c.full ? (
+                          {c.full && (
                             <span className="flex-shrink-0 rounded-full bg-clay/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-clay">
                               {f.seatsFull}
                             </span>
-                          ) : (
-                            c.tag && (
-                              <span
-                                className={`hidden flex-shrink-0 rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-wide sm:block ${
-                                  selected ? 'bg-sage text-cream' : 'bg-cream text-mute'
-                                }`}
-                              >
-                                {c.tag}
-                              </span>
-                            )
                           )}
                         </button>
                       );
