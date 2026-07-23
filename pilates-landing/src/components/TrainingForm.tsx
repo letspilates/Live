@@ -101,12 +101,14 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
   const [courses, setCourses] = useState<string[]>([]);
   const [remoteCourses, setRemoteCourses] = useState<RemoteCourse[] | null>(readCachedCourses);
 
-  // Prefetch the live course list at page load so it is already there when the
-  // form opens; cache the last good response so outages never blank the form.
+  // Fetch the live course list at page load AND every time the form opens, so
+  // seats/prices are always current; cache the last good response so outages
+  // never blank the form. The t= param bypasses any intermediate HTTP caches.
   useEffect(() => {
+    if (!open && remoteCourses !== null) return; // 페이지 로드 시 1회 + 폼 열 때마다
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => ctrl.abort(), 8000);
-    fetch(SHEETS_URL, { signal: ctrl.signal })
+    fetch(`${SHEETS_URL}?t=${Date.now()}`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((j: { result?: string; courses?: RemoteCourse[] }) => {
         if (j?.result === 'success' && Array.isArray(j.courses) && j.courses.length > 0) {
@@ -126,7 +128,8 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
       ctrl.abort();
       window.clearTimeout(timer);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const displayCourses = remoteCourses
     ? remoteCourses.map((c) => {
