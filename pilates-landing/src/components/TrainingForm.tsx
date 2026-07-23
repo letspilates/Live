@@ -9,7 +9,7 @@ const SHEETS_URL =
 const COURSE_VALUES: Record<string, string> = {
   A: 'A - Gyrotonic® Level 1 Foundation Course',
   B: 'B - Gyrotonic® Level 2 Program 1 – Pre-Training',
-  C: 'C - Jump Stretch Board Course',
+  C: 'C - GYROTONIC® Jumping Stretching Board Course',
   D: 'D - Gyrotonic® Level 1 Apprentice Review Course',
   E: 'E - Gyrotonic® Level 2 Program 1 – Foundation Course',
 };
@@ -117,7 +117,9 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
 
   const displayCourses = remoteCourses
     ? remoteCourses.map((c) => {
-        const capacity = typeof c.capacity === 'number' && c.capacity > 0 ? c.capacity : null;
+        // capacity 미입력(null) = 무제한 표시 없음 / capacity 0 = 즉시 마감 처리
+        const capacity =
+          typeof c.capacity === 'number' && !Number.isNaN(c.capacity) ? c.capacity : null;
         const remaining = capacity === null ? null : Math.max(0, capacity - (c.taken ?? 0));
         return {
           id: c.id,
@@ -390,6 +392,11 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                             {c.remaining !== null && !c.full && (
                               <span className="mt-1 block text-xs font-medium text-sage">
                                 {f.seatsLeft.replace('{n}', String(c.remaining))}
+                              </span>
+                            )}
+                            {c.full && (
+                              <span className="mt-1 block text-xs font-medium text-clay">
+                                {f.seatsFullNote}
                               </span>
                             )}
                           </span>

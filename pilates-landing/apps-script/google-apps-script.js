@@ -16,10 +16,21 @@
  */
 var NOTIFY_EMAIL = '';
 
-/** 등록 폼 제출 → 첫 번째 시트에 한 줄 추가 (레거시 폼과 동일한 컬럼) */
+/**
+ * 접수(등록)가 기록되는 탭 이름. 이 이름의 탭이 없으면 첫 번째 탭을 사용한다.
+ * 탭 이름을 바꾸면 이 값도 같이 바꿔야 한다.
+ */
+var SUBMISSIONS_SHEET_NAME = 'Sheet3';
+
+/** 접수 탭을 이름으로 찾고, 없으면 첫 번째 탭으로 대체 */
+function getSubmissionsSheet_(ss) {
+  return ss.getSheetByName(SUBMISSIONS_SHEET_NAME) || ss.getSheets()[0];
+}
+
+/** 등록 폼 제출 → 접수 탭(Sheet3)에 한 줄 추가 */
 function doPost(e) {
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+    var sheet = getSubmissionsSheet_(SpreadsheetApp.getActiveSpreadsheet());
     var data;
 
     if (e.postData && e.postData.type === 'application/json') {
@@ -143,14 +154,20 @@ function doGet(e) {
   }
 }
 
-/** 접수 시트(첫 탭)의 Courses 열에서 "A - ..." 형태의 코스 id별 신청 수를 센다. */
+/**
+ * 접수 탭(Sheet3)의 신청 과정 열에서 "A - ..." 형태의 코스 id별 신청 수를 센다.
+ * 이메일 열(D)에 @가 있는 행만 실제 신청으로 인정 — 헤더/메모/불완전 행은 집계에서 제외.
+ * 한 사람이 여러 과정을 선택한 행("A - ..., C - ...")은 각 과정에 1명씩 집계된다.
+ */
 function countRegistrations_(ss) {
   var counts = {};
-  var sub = ss.getSheets()[0];
+  var sub = getSubmissionsSheet_(ss);
   if (!sub) return counts;
   var values = sub.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
-    var cell = String(values[i][1] || ''); // B열 = Courses
+  for (var i = 0; i < values.length; i++) {
+    var email = String(values[i][3] || ''); // D열 = 이메일
+    if (email.indexOf('@') === -1) continue; // 실제 신청 행만 집계
+    var cell = String(values[i][1] || ''); // B열 = 신청 과정
     if (!cell) continue;
     var parts = cell.split(', ');
     for (var j = 0; j < parts.length; j++) {
@@ -190,7 +207,7 @@ function setupCoursesTab() {
     ['id', 'name_en', 'name_kr', 'dates', 'tag_en', 'tag_kr', 'active', 'capacity'],
     ['A', 'GYROTONIC® Level 1 Foundation Course', 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', '', '12 days', '12일', 'TRUE', ''],
     ['B', 'GYROTONIC® Level 2 Program 1 — Pre-Training', 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', '', '3 days', '3일', 'TRUE', ''],
-    ['C', 'Jump Stretch Board Course', '점프 스트레치 보드 과정 (Jump Stretch Board)', '', '7 days', '7일', 'TRUE', ''],
+    ['C', 'GYROTONIC® Jumping Stretching Board Course', 'GYROTONIC® 점핑 스트레칭 보드 과정 (Jumping Stretching Board)', '', '7 days', '7일', 'TRUE', ''],
     ['D', 'GYROTONIC® Level 1 Apprentice Review Course', 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', '', '6 days', '6일', 'TRUE', ''],
     ['E', 'GYROTONIC® Level 2 Program 1 — Foundation Course', 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', '', '4 days', '4일', 'TRUE', ''],
   ];
@@ -226,13 +243,13 @@ function upgradeCoursesTab() {
 }
 
 /**
- * ★ 접수 시트(첫 탭)에 컬럼 헤더를 만든다 — 함수 드롭다운에서 선택 후 ▶ 실행.
+ * ★ 접수 탭(Sheet3)에 컬럼 헤더를 만든다 — 함수 드롭다운에서 선택 후 ▶ 실행.
  * 1행이 헤더가 아니면(기존 신청 데이터가 있으면) 위에 새 행을 넣어 헤더를 추가하므로
  * 이미 접수된 신청은 그대로 보존된다. 실행해도 여러 번 중복 생성되지 않는다.
  */
 function setupSubmissionHeaders() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheets()[0];
+  var sheet = getSubmissionsSheet_(ss);
   var headers = [
     '제출시각',
     '신청 과정',
