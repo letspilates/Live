@@ -17,10 +17,25 @@
 var NOTIFY_EMAIL = '';
 
 /**
+ * ★ 관리자 페이지(letspilatesla.com/admin/) 비밀번호.
+ * 따옴표 안에 원하는 비밀번호를 입력해야 관리자 저장 기능이 켜진다.
+ * 예: var ADMIN_KEY = 'lets2026!';
+ * 비워두면('') 관리자 페이지에서 저장이 거부된다 (안전 기본값).
+ */
+var ADMIN_KEY = '';
+
+/**
  * 접수(등록)가 기록되는 탭 이름. 이 이름의 탭이 없으면 첫 번째 탭을 사용한다.
  * 탭 이름을 바꾸면 이 값도 같이 바꿔야 한다.
  */
 var SUBMISSIONS_SHEET_NAME = 'Sheet3';
+
+/** JSON 응답 헬퍼 */
+function jsonOut_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
+    ContentService.MimeType.JSON
+  );
+}
 
 /** 접수 탭을 이름으로 찾고, 없으면 첫 번째 탭으로 대체 */
 function getSubmissionsSheet_(ss) {
@@ -39,6 +54,11 @@ function doPost(e) {
       data = e.parameter;
     } else {
       data = JSON.parse(e.postData.contents);
+    }
+
+    // 관리자 페이지의 코스 저장 요청은 별도 처리 (접수 기록/이메일 알림 없음)
+    if (data.action === 'updateCourses') {
+      return handleUpdateCourses_(data);
     }
 
     sheet.appendRow([
@@ -114,7 +134,10 @@ function doGet(e) {
     var sheet = ss.getSheetByName('Courses');
     var courses = [];
 
-    // 접수 시트(첫 탭)에서 코스 id별 신청 수 집계
+    // ?all=1 이면 비활성(active=FALSE) 코스도 포함 — 관리자 페이지용
+    var showAll = e && e.parameter && e.parameter.all === '1';
+
+    // 접수 탭(Sheet3)에서 코스 id별 신청 수 집계
     var counts = countRegistrations_(ss);
 
     if (sheet) {
@@ -124,7 +147,8 @@ function doGet(e) {
         if (!r[0]) continue; // id 없는 행은 무시
 
         var active = String(r[6]).trim().toLowerCase();
-        if (active === 'false' || active === 'no' || active === '') continue;
+        var isActive = !(active === 'false' || active === 'no' || active === '');
+        if (!isActive && !showAll) continue;
 
         var id = cellToString_(r[0]);
         var capRaw = r.length > 7 ? r[7] : '';
@@ -140,17 +164,60 @@ function doGet(e) {
           tag_kr: cellToString_(r[5]),
           capacity: capacity,
           taken: counts[id] || 0,
+          active: isActive,
         });
       }
     }
 
-    return ContentService.createTextOutput(
-      JSON.stringify({ result: 'success', courses: courses })
-    ).setMimeType(ContentService.MimeType.JSON);
+    return jsonOut_({ result: 'success', courses: courses });
   } catch (error) {
-    return ContentService.createTextOutput(
-      JSON.stringify({ result: 'error', message: error.toString() })
-    ).setMimeType(ContentService.MimeType.JSON);
+    return jsonOut_({ result: 'error', message: error.toString() });
+  }
+}
+
+/**
+ * 관리자 페이지에서 보낸 코스 목록으로 Courses 탭 전체를 교체한다.
+ * ADMIN_KEY가 설정되어 있고 요청의 key와 일치할 때만 동작한다.
+ */
+function handleUpdateCourses_(data) {
+  try {
+    if (!ADMIN_KEY || String(data.key || '') !== ADMIN_KEY) {
+      return jsonOut_({ result: 'error', message: 'unauthorized' });
+    }
+
+    var courses = JSON.parse(data.courses || '[]');
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Courses');
+    if (!sheet) {
+      setupCoursesTab();
+      sheet = ss.getSheetByName('Courses');
+    }
+
+    var last = sheet.getLastRow();
+    if (last > 1) sheet.getRange(2, 1, last - 1, 8).clearContent();
+
+    var rows = [];
+    for (var i = 0; i < courses.length; i++) {
+      var c = courses[i];
+      if (!String(c.id || '').trim()) continue;
+      rows.push([
+        String(c.id).trim(),
+        String(c.name_en || ''),
+        String(c.name_kr || ''),
+        String(c.dates || ''),
+        String(c.tag_en || ''),
+        String(c.tag_kr || ''),
+        c.active ? 'TRUE' : 'FALSE',
+        c.capacity === '' || c.capacity === null || c.capacity === undefined || isNaN(Number(c.capacity))
+          ? ''
+          : Number(c.capacity),
+      ]);
+    }
+    if (rows.length) sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+
+    return jsonOut_({ result: 'success', saved: rows.length });
+  } catch (error) {
+    return jsonOut_({ result: 'error', message: error.toString() });
   }
 }
 
