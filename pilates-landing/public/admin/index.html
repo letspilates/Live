@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>코스 관리 — Let's Pilates LA</title>
+  <title>관리자 — Let's Pilates LA</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -98,30 +98,129 @@
       background: #F2EBDD; border-radius: 12px; padding: 12px 16px;
     }
     .loading { padding: 48px 16px; text-align: center; color: #6E6A60; }
+
+    /* ── 로그인 화면 ── */
+    body.locked .wrap, body.locked .savebar { display: none; }
+    .login-screen { display: none; }
+    body.locked .login-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: calc(100vh - 120px); padding: 24px 16px;
+    }
+    .login-card {
+      width: 100%; max-width: 360px; background: #fff;
+      border: 1px solid rgba(28,26,22,0.1); border-radius: 18px;
+      padding: 28px 24px; text-align: center;
+    }
+    .login-card h1 { font-size: 20px; }
+    .login-card .sub { margin-top: 8px; }
+    .login-card input { width: 100%; margin-top: 18px; text-align: center; }
+    .btn-login {
+      width: 100%; margin-top: 12px; background: #5E6B4F; color: #FBF8F2;
+      padding: 12px 0; border-radius: 999px; font-size: 15px;
+    }
+    .btn-login:active { background: #434D38; }
+    .btn-login:disabled { opacity: 0.5; }
+    .login-err { margin-top: 12px; font-size: 13px; color: #C0392B; line-height: 1.6; min-height: 20px; }
+    .btn-logout {
+      background: transparent; color: #6E6A60; font-size: 12px; font-weight: 600;
+      padding: 6px 12px; border: 1px solid rgba(28,26,22,0.15); border-radius: 999px;
+    }
+
+    /* ── 탭 ── */
+    .tabs {
+      display: flex; gap: 6px; margin-top: 18px;
+      background: #F2EBDD; border-radius: 999px; padding: 4px;
+    }
+    .tab {
+      flex: 1; text-align: center; padding: 10px 0; border-radius: 999px;
+      background: transparent; color: #6E6A60; font-size: 14px;
+    }
+    .tab.active { background: #5E6B4F; color: #FBF8F2; }
+
+    /* ── 등록자 탭 ── */
+    .regbar { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
+    .regbar select {
+      flex: 1; font: inherit; font-size: 14px; border: 1px solid rgba(28,26,22,0.15);
+      border-radius: 10px; padding: 10px 12px; background: #fff; color: #1C1A16;
+    }
+    .btn-refresh { background: #F2EBDD; color: #1C1A16; border-radius: 999px; padding: 10px 16px; white-space: nowrap; }
+    .rcard {
+      background: #fff; border: 1px solid rgba(28,26,22,0.1); border-radius: 16px;
+      padding: 14px 16px; cursor: pointer;
+    }
+    .rhead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .rname { font-size: 16px; font-weight: 700; }
+    .rtime { font-size: 11px; color: #6E6A60; white-space: nowrap; }
+    .rchips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .rchips .chip { font-size: 11px; padding: 4px 10px; }
+    .rcontact { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .rcontact a {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 13px; color: #5E6B4F; text-decoration: none;
+      background: rgba(94,107,79,0.08); border-radius: 999px; padding: 6px 12px;
+    }
+    .rdetail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(28,26,22,0.07); }
+    .rcard.open .rdetail { display: block; }
+    .rrow { display: flex; gap: 10px; padding: 3px 0; font-size: 13px; }
+    .rrow b { color: #6E6A60; font-weight: 600; min-width: 88px; flex-shrink: 0; }
+    .rrow span { color: #1C1A16; word-break: break-word; }
+    .rmore { margin-top: 10px; font-size: 11px; color: #B0ADA6; text-align: center; }
+    .rcard.open .rmore { display: none; }
   </style>
 </head>
-<body>
+<body class="locked">
+  <!-- ── 로그인 화면 ── -->
+  <div class="login-screen">
+    <div class="login-card">
+      <h1>관리자 로그인</h1>
+      <p class="sub">Let's Pilates LA</p>
+      <input type="password" id="loginPw" placeholder="비밀번호" autocomplete="current-password" />
+      <button class="btn-login" id="loginBtn" onclick="submitLogin()">들어가기</button>
+      <p class="login-err" id="loginErr"></p>
+    </div>
+  </div>
+
   <div class="wrap">
-    <h1>코스 관리</h1>
+    <h1 style="display:flex;align-items:center;justify-content:space-between;gap:10px">관리자
+      <button class="btn-logout" onclick="logout()">로그아웃</button>
+    </h1>
     <p class="sub">
-      저장하면 구글 시트에 바로 기록되고 사이트 등록 폼에 즉시 반영됩니다.
-      신청 수·남은 자리는 자동 집계입니다.
+      코스 관리: 저장하면 구글 시트에 기록되고 사이트에 즉시 반영 ·
+      등록자: 접수된 신청 내역 확인
     </p>
 
-    <div class="bar">
-      <input type="password" id="adminKey" placeholder="관리자 비밀번호" autocomplete="current-password" />
-      <button class="btn-add" onclick="addRow()">+ 코스 추가</button>
+    <div class="tabs">
+      <button class="tab active" id="tabCourses" onclick="switchTab('courses')">코스 관리</button>
+      <button class="tab" id="tabRegs" onclick="switchTab('regs')">등록자 <span id="regCount"></span></button>
     </div>
 
-    <div class="cards" id="cards"></div>
-    <div class="loading" id="loading">코스 목록을 불러오는 중...</div>
+    <!-- ── 코스 관리 탭 ── -->
+    <div id="secCourses">
+      <div class="bar">
+        <span style="flex:1"></span>
+        <button class="btn-add" onclick="addRow()">+ 코스 추가</button>
+      </div>
 
-    <p class="hint">
-      · <b>정원</b>을 비우면 자리 표시 없이 항상 신청 가능, <b>0</b>을 넣으면 즉시 "마감" 처리됩니다.<br />
-      · <b>사이트에 표시</b>를 끄면 그 코스가 사이트에서 숨겨집니다 (삭제 없이).<br />
-      · <b>일정</b>은 자유 텍스트: <code>7/24 - 7/26</code>, <code>8/7 - 8/9, 8/13 - 8/16</code><br />
-      · 저장 후 확인: <a href="../#register">등록 폼 열어보기</a>
-    </p>
+      <div class="cards" id="cards"></div>
+      <div class="loading" id="loading">코스 목록을 불러오는 중...</div>
+
+      <p class="hint">
+        · <b>정원</b>을 비우면 자리 표시 없이 항상 신청 가능, <b>0</b>을 넣으면 즉시 "마감" 처리됩니다.<br />
+        · <b>사이트에 표시</b>를 끄면 그 코스가 사이트에서 숨겨집니다 (삭제 없이).<br />
+        · <b>일정</b>은 자유 텍스트: <code>7/24 - 7/26</code>, <code>8/7 - 8/9, 8/13 - 8/16</code><br />
+        · 저장 후 확인: <a href="../#register">등록 폼 열어보기</a>
+      </p>
+    </div>
+
+    <!-- ── 등록자 탭 ── -->
+    <div id="secRegs" style="display:none">
+      <div class="regbar">
+        <select id="regFilter" onchange="renderRegs()"><option value="">전체 코스</option></select>
+        <button class="btn-refresh" onclick="loadRegs(true)">↻ 새로고침</button>
+      </div>
+      <div class="cards" id="regCards"></div>
+      <div class="loading" id="regLoading" style="display:none">등록자 목록을 불러오는 중...</div>
+    </div>
   </div>
 
   <div class="savebar">
@@ -132,16 +231,86 @@
   </div>
 
   <script>
-    const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyTr-4dV5Q-dweH7QAB4i6UeFkt2eh97kHMgrNEpF2n7mGCfC3y2c6J2zWuPpGoJcAS/exec';
-    const KEY_STORE = 'lp-admin-key';
+    const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxGzSZjRnZybJX-kqwsiPAp9UTOLmc4fxx2JKUxIWZgXnJ96c_YRYdMN3M2dgKxWUM4zQ/exec';
 
     const cardsEl = document.getElementById('cards');
     const statusEl = document.getElementById('status');
-    const keyEl = document.getElementById('adminKey');
-    keyEl.value = localStorage.getItem(KEY_STORE) || '';
+
+    /* ═══════════ 로그인 ═══════════ */
+    // 비밀번호는 Apps Script의 ADMIN_KEY와 서버에서 대조된다 (이 파일에는 저장되지 않음).
+    let KEY = sessionStorage.getItem('lp_admin_key') || '';
+
+    async function verifyKey(k) {
+      const res = await fetch(`${ENDPOINT}?auth=1&key=${encodeURIComponent(k)}&t=${Date.now()}`);
+      const j = await res.json();
+      if (j.result === 'success' && j.auth === true) return { ok: true };
+      if (j.courses) {
+        // 구버전 배포에는 auth 엔드포인트가 없어 코스 목록이 돌아온다
+        return { ok: false, message: 'Apps Script가 구버전입니다. 최신 코드로 재배포하고 ADMIN_KEY를 설정하세요.' };
+      }
+      return { ok: false, message: j.message || '로그인에 실패했습니다.' };
+    }
+
+    async function submitLogin() {
+      const pw = document.getElementById('loginPw').value;
+      const btn = document.getElementById('loginBtn');
+      const errEl = document.getElementById('loginErr');
+      if (!pw) { errEl.textContent = '비밀번호를 입력하세요.'; return; }
+      btn.disabled = true;
+      errEl.textContent = '확인 중...';
+      try {
+        const r = await verifyKey(pw);
+        if (r.ok) {
+          KEY = pw;
+          sessionStorage.setItem('lp_admin_key', pw);
+          errEl.textContent = '';
+          unlock();
+        } else {
+          errEl.textContent = r.message;
+        }
+      } catch (e) {
+        errEl.textContent = '서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요. (' + e.message + ')';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function unlock() {
+      document.body.classList.remove('locked');
+      load();
+    }
+
+    function logout() {
+      sessionStorage.removeItem('lp_admin_key');
+      location.reload();
+    }
+
+    document.getElementById('loginPw').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitLogin();
+    });
+
+    // 세션에 저장된 키가 있으면 자동 재로그인 시도 (탭을 닫으면 세션이 사라진다)
+    (async () => {
+      if (!KEY) { document.getElementById('loginPw').focus(); return; }
+      document.getElementById('loginErr').textContent = '자동 로그인 중...';
+      try {
+        const r = await verifyKey(KEY);
+        if (r.ok) { document.getElementById('loginErr').textContent = ''; unlock(); return; }
+      } catch { /* 네트워크 오류 → 수동 로그인 */ }
+      KEY = '';
+      sessionStorage.removeItem('lp_admin_key');
+      document.getElementById('loginErr').textContent = '';
+      document.getElementById('loginPw').focus();
+    })();
 
     function esc(s) {
       return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    // 기존 tag_kr("3일") 또는 tag_en("3 days")에서 일수 숫자만 추출
+    function daysOf(c) {
+      const m = String(c.tag_kr || c.tag_en || '').match(/\d+/);
+      return m ? m[0] : '';
     }
 
     function statChips(c) {
@@ -169,10 +338,22 @@
         <div class="field"><label>코스명 (한글)</label><input type="text" data-f="name_kr" value="${esc(c.name_kr)}" /></div>
         <div class="field"><label>일정</label><input type="text" data-f="dates" value="${esc(c.dates)}" placeholder="비우면 '일정 추후 공지'로 표시" /></div>
         <div class="field grid-3" style="margin-top:12px">
-          <div><label>기간 (영문)</label><input type="text" data-f="tag_en" value="${esc(c.tag_en)}" placeholder="3 days" /></div>
-          <div><label>기간 (한글)</label><input type="text" data-f="tag_kr" value="${esc(c.tag_kr)}" placeholder="3일" /></div>
+          <div><label>기간 (일수)</label><input type="number" min="1" inputmode="numeric" data-f="days" value="${esc(daysOf(c))}" placeholder="3" /></div>
           <div><label>정원</label><input type="number" min="0" inputmode="numeric" data-f="capacity" value="${esc(cap)}" placeholder="없음" /></div>
+          <div><label>시간</label><input type="text" data-f="time" value="${esc(c.time)}" placeholder="9:00 AM - 5:00 PM" /></div>
         </div>
+        <div class="field grid-2" style="margin-top:12px">
+          <div><label>코스 가격 (Course Cost)</label><input type="text" data-f="price" value="${esc(c.price)}" placeholder="$1,050" /></div>
+          <div><label>스튜디오 Fee</label><input type="text" data-f="fee" value="${esc(c.fee)}" placeholder="$350" /></div>
+        </div>
+        <div class="field"><label>진행 (Conducted by)</label>
+          <select data-f="conducted_by" style="width:100%;font:inherit;font-size:15px;border:1px solid rgba(28,26,22,0.15);border-radius:10px;padding:10px 12px;background:#fff;color:#1C1A16;">
+            <option value="" ${!c.conducted_by ? 'selected' : ''}>— 선택 안 함 —</option>
+            <option value="Master Trainer Rich O'Connor" ${c.conducted_by === "Master Trainer Rich O'Connor" ? 'selected' : ''}>Master Trainer Rich O'Connor</option>
+            <option value="Pre-Trainer Sunnie Lee" ${c.conducted_by === 'Pre-Trainer Sunnie Lee' ? 'selected' : ''}>Pre-Trainer Sunnie Lee</option>
+          </select>
+        </div>
+        <div class="field"><label>설명 (이메일용 · 영어)</label><input type="text" data-f="desc_en" value="${esc(c.desc_en)}" placeholder="Course description shown in the welcome email" /></div>
         <div class="toggle-row">
           <input type="checkbox" id="act-${esc(c.id) || Math.random().toString(36).slice(2)}" data-f="active" ${isActive ? 'checked' : ''} onchange="this.closest('.card').classList.toggle('hidden-course', !this.checked)" />
           <span>사이트에 표시</span>
@@ -190,14 +371,24 @@
     function readRows() {
       return [...cardsEl.querySelectorAll('.card')].map((card) => {
         const get = (f) => card.querySelector(`[data-f="${f}"]`);
+        // 일수 숫자 하나로 영문/한글 기간 표기를 자동 생성
+        const days = get('days').value.trim();
+        const n = parseInt(days, 10);
+        const tag_en = days && !isNaN(n) ? `${n} ${n === 1 ? 'day' : 'days'}` : '';
+        const tag_kr = days && !isNaN(n) ? `${n}일` : '';
         return {
           id: get('id').value.trim(),
           name_en: get('name_en').value.trim(),
           name_kr: get('name_kr').value.trim(),
           dates: get('dates').value.trim(),
-          tag_en: get('tag_en').value.trim(),
-          tag_kr: get('tag_kr').value.trim(),
+          tag_en,
+          tag_kr,
           capacity: get('capacity').value.trim(),
+          time: get('time').value.trim(),
+          price: get('price').value.trim(),
+          fee: get('fee').value.trim(),
+          conducted_by: get('conducted_by').value,
+          desc_en: get('desc_en').value.trim(),
           active: get('active').checked,
         };
       }).filter((c) => c.id);
@@ -216,7 +407,7 @@
 
     async function load() {
       try {
-        const res = await fetch(ENDPOINT + '?all=1');
+        const res = await fetch(`${ENDPOINT}?all=1&key=${encodeURIComponent(KEY)}&t=${Date.now()}`);
         const j = await res.json();
         if (j.result !== 'success') throw new Error(j.message || 'load failed');
         cardsEl.innerHTML = j.courses.map(cardHtml).join('');
@@ -228,10 +419,6 @@
     }
 
     async function save() {
-      const key = keyEl.value.trim();
-      if (!key) { setStatus('비밀번호를 입력하세요', false); keyEl.focus(); return; }
-      localStorage.setItem(KEY_STORE, key);
-
       const btn = document.getElementById('saveBtn');
       btn.disabled = true;
       setStatus('저장 중...', true);
@@ -239,7 +426,7 @@
       try {
         const body = new URLSearchParams({
           action: 'updateCourses',
-          key,
+          key: KEY,
           courses: JSON.stringify(readRows()),
         });
         const res = await fetch(ENDPOINT, {
@@ -250,7 +437,7 @@
         let j = null;
         try { j = await res.json(); } catch { /* 응답을 못 읽는 브라우저 환경 대비 */ }
         if (j && j.result === 'error') {
-          throw new Error(j.message === 'unauthorized' ? '비밀번호가 틀렸습니다' : j.message);
+          throw new Error(j.message);
         }
         // 시트에서 다시 읽어와 실제 반영을 확인 (진짜 저장 여부의 기준)
         await load();
@@ -262,7 +449,94 @@
       }
     }
 
-    load();
+    /* ═══════════ 등록자 탭 ═══════════ */
+    let regs = null; // 마지막으로 불러온 등록자 목록
+
+    function switchTab(tab) {
+      const isRegs = tab === 'regs';
+      document.getElementById('tabCourses').classList.toggle('active', !isRegs);
+      document.getElementById('tabRegs').classList.toggle('active', isRegs);
+      document.getElementById('secCourses').style.display = isRegs ? 'none' : '';
+      document.getElementById('secRegs').style.display = isRegs ? '' : 'none';
+      document.querySelector('.savebar').style.display = isRegs ? 'none' : '';
+      if (isRegs && regs === null) loadRegs();
+    }
+
+    // "A - Gyrotonic® ..." 목록 → id 배열
+    function courseIds(coursesStr) {
+      return String(coursesStr || '')
+        .split(', ')
+        .map((p) => (p.match(/^(\S+) - /) || [])[1])
+        .filter(Boolean);
+    }
+
+    function regCardHtml(r, i) {
+      const ids = courseIds(r.courses);
+      const chips = ids.map((id) => `<span class="chip sage">${esc(id)}</span>`).join('');
+      const tel = r.phone ? `<a href="tel:${esc(r.phone.replace(/[^\\d+]/g, ''))}">📞 ${esc(r.phone)}</a>` : '';
+      const mail = r.email ? `<a href="mailto:${esc(r.email)}">✉️ ${esc(r.email)}</a>` : '';
+      const row = (label, v) => (v ? `<div class="rrow"><b>${label}</b><span>${esc(v)}</span></div>` : '');
+      return `<div class="rcard" data-i="${i}" onclick="this.classList.toggle('open')">
+        <div class="rhead"><span class="rname">${esc(r.fullName) || '(이름 없음)'}</span><span class="rtime">${esc(r.timestamp)}</span></div>
+        <div class="rchips">${chips}</div>
+        <div class="rcontact" onclick="event.stopPropagation()">${tel}${mail}</div>
+        <div class="rdetail">
+          ${row('신청 과정', r.courses)}
+          ${row('자격 상태', r.certification)}
+          ${row('소속 스튜디오', r.studio)}
+          ${row('지역', r.cityState)}
+          ${row('교육 단계', r.stage)}
+          ${row('선수요건', r.prereq)}
+          ${row('일정 참석', r.availability)}
+          ${row('질문/요청', r.questions)}
+          ${row('기타', r.anythingElse)}
+        </div>
+        <div class="rmore">▾ 탭하면 상세 정보</div>
+      </div>`;
+    }
+
+    function renderRegs() {
+      if (regs === null) return;
+      const filter = document.getElementById('regFilter').value;
+      const list = filter ? regs.filter((r) => courseIds(r.courses).includes(filter)) : regs;
+      const el = document.getElementById('regCards');
+      el.innerHTML = list.length
+        ? list.map(regCardHtml).join('')
+        : '<div class="loading">등록자가 없습니다.</div>';
+      document.getElementById('regCount').textContent = `(${regs.length})`;
+    }
+
+    function buildRegFilter() {
+      const sel = document.getElementById('regFilter');
+      const current = sel.value;
+      const ids = [...new Set(regs.flatMap((r) => courseIds(r.courses)))].sort();
+      sel.innerHTML =
+        '<option value="">전체 코스</option>' +
+        ids.map((id) => {
+          const n = regs.filter((r) => courseIds(r.courses).includes(id)).length;
+          return `<option value="${esc(id)}">${esc(id)} 코스 (${n}명)</option>`;
+        }).join('');
+      sel.value = current && ids.includes(current) ? current : '';
+    }
+
+    async function loadRegs(force) {
+      const loadingEl = document.getElementById('regLoading');
+      loadingEl.style.display = '';
+      if (force) document.getElementById('regCards').innerHTML = '';
+      try {
+        const res = await fetch(`${ENDPOINT}?registrations=1&key=${encodeURIComponent(KEY)}&t=${Date.now()}`);
+        const j = await res.json();
+        if (j.result !== 'success') throw new Error(j.message || 'load failed');
+        regs = j.registrations || [];
+        buildRegFilter();
+        renderRegs();
+      } catch (e) {
+        document.getElementById('regCards').innerHTML =
+          `<div class="loading">등록자 목록을 불러오지 못했습니다. (${esc(e.message)})<br />Apps Script가 최신 코드로 재배포되었는지 확인하세요.</div>`;
+      } finally {
+        loadingEl.style.display = 'none';
+      }
+    }
   </script>
 </body>
 </html>

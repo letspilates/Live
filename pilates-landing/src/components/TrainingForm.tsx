@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLang } from '../i18n/LanguageContext';
 
 const SHEETS_URL =
-  'https://script.google.com/macros/s/AKfycbyTr-4dV5Q-dweH7QAB4i6UeFkt2eh97kHMgrNEpF2n7mGCfC3y2c6J2zWuPpGoJcAS/exec';
+  'https://script.google.com/macros/s/AKfycbxGzSZjRnZybJX-kqwsiPAp9UTOLmc4fxx2JKUxIWZgXnJ96c_YRYdMN3M2dgKxWUM4zQ/exec';
 
 // Values recorded in the Google Sheet stay in English regardless of UI language,
 // matching the columns the legacy form already wrote.
@@ -26,9 +26,22 @@ interface RemoteCourse {
   tag_kr: string;
   capacity?: number | null;
   taken?: number;
+  price?: string;
+  fee?: string;
+  conducted_by?: string;
 }
 
 const COURSES_CACHE_KEY = 'lp-courses-v1';
+
+// "1225" / "$1,050" / "1050.5" 등 어떤 형태로 입력돼도 "$1,225" 형식으로 표시.
+// 숫자로 해석 안 되는 값(예: "TBD")은 입력 그대로 보여준다.
+function formatMoney(v: string): string {
+  const s = (v || '').trim();
+  if (!s) return '';
+  const n = Number(s.replace(/[$,\s]/g, ''));
+  if (Number.isNaN(n)) return s;
+  return '$' + n.toLocaleString('en-US');
+}
 
 function readCachedCourses(): RemoteCourse[] | null {
   try {
@@ -88,12 +101,14 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
   const [courses, setCourses] = useState<string[]>([]);
   const [remoteCourses, setRemoteCourses] = useState<RemoteCourse[] | null>(readCachedCourses);
 
-  // Prefetch the live course list at page load so it is already there when the
-  // form opens; cache the last good response so outages never blank the form.
+  // Fetch the live course list at page load AND every time the form opens, so
+  // seats/prices are always current; cache the last good response so outages
+  // never blank the form. The t= param bypasses any intermediate HTTP caches.
   useEffect(() => {
+    if (!open && remoteCourses !== null) return; // 페이지 로드 시 1회 + 폼 열 때마다
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => ctrl.abort(), 8000);
-    fetch(SHEETS_URL, { signal: ctrl.signal })
+    fetch(`${SHEETS_URL}?t=${Date.now()}`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((j: { result?: string; courses?: RemoteCourse[] }) => {
         if (j?.result === 'success' && Array.isArray(j.courses) && j.courses.length > 0) {
@@ -113,7 +128,8 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
       ctrl.abort();
       window.clearTimeout(timer);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const displayCourses = remoteCourses
     ? remoteCourses.map((c) => {
@@ -128,6 +144,9 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
           tag: lang === 'ko' ? c.tag_kr || c.tag_en : c.tag_en,
           remaining,
           full: remaining !== null && remaining <= 0,
+          price: c.price || '',
+          fee: c.fee || '',
+          conductedBy: c.conducted_by || '',
         };
       })
     : f.courses.map((c) => ({
@@ -137,6 +156,9 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
         tag: c.tag,
         remaining: null as number | null,
         full: false,
+        price: '',
+        fee: '',
+        conductedBy: '',
       }));
 
   const courseValue = (id: string) => {
@@ -389,6 +411,19 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                               {c.meta}
                               {c.tag && ` · ${c.tag}`}
                             </span>
+                            {c.conductedBy && (
+                              <span className="mt-1 block text-[13px] text-mute">
+                                {f.conductedBy}
+                                <span className="block text-ink">{c.conductedBy}</span>
+                              </span>
+                            )}
+                            {(c.price || c.fee) && (
+                              <span className="mt-1 block text-[13px] font-medium text-ink">
+                                {c.price && `${f.courseCost} ${formatMoney(c.price)}`}
+                                {c.price && c.fee && '  |  '}
+                                {c.fee && `${f.studioFee} ${formatMoney(c.fee)}`}
+                              </span>
+                            )}
                             {c.remaining !== null && !c.full && (
                               <span className="mt-1 block text-xs font-medium text-sage">
                                 {f.seatsLeft.replace('{n}', String(c.remaining))}

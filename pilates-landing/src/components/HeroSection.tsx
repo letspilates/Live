@@ -62,6 +62,21 @@ export default function HeroSection() {
             >
               {h.secondaryCta}
             </a>
+            <a
+              href="#register"
+              onClick={(e) => {
+                // 같은 해시를 다시 눌러도 폼이 열리도록 hashchange를 보장
+                e.preventDefault();
+                if (window.location.hash !== '#register') {
+                  window.location.hash = 'register';
+                } else {
+                  window.dispatchEvent(new HashChangeEvent('hashchange'));
+                }
+              }}
+              className="rounded-full border border-cream/30 px-7 py-3 text-base font-medium text-cream transition-colors duration-300 ease-smooth hover:bg-cream/10"
+            >
+              {h.registerCta}
+            </a>
           </div>
 
           <dl
