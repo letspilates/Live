@@ -99,6 +99,33 @@
     }
     .loading { padding: 48px 16px; text-align: center; color: #6E6A60; }
 
+    /* ── 로그인 화면 ── */
+    body.locked .wrap, body.locked .savebar { display: none; }
+    .login-screen { display: none; }
+    body.locked .login-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: calc(100vh - 120px); padding: 24px 16px;
+    }
+    .login-card {
+      width: 100%; max-width: 360px; background: #fff;
+      border: 1px solid rgba(28,26,22,0.1); border-radius: 18px;
+      padding: 28px 24px; text-align: center;
+    }
+    .login-card h1 { font-size: 20px; }
+    .login-card .sub { margin-top: 8px; }
+    .login-card input { width: 100%; margin-top: 18px; text-align: center; }
+    .btn-login {
+      width: 100%; margin-top: 12px; background: #5E6B4F; color: #FBF8F2;
+      padding: 12px 0; border-radius: 999px; font-size: 15px;
+    }
+    .btn-login:active { background: #434D38; }
+    .btn-login:disabled { opacity: 0.5; }
+    .login-err { margin-top: 12px; font-size: 13px; color: #C0392B; line-height: 1.6; min-height: 20px; }
+    .btn-logout {
+      background: transparent; color: #6E6A60; font-size: 12px; font-weight: 600;
+      padding: 6px 12px; border: 1px solid rgba(28,26,22,0.15); border-radius: 999px;
+    }
+
     /* ── 탭 ── */
     .tabs {
       display: flex; gap: 6px; margin-top: 18px;
@@ -141,9 +168,22 @@
     .rcard.open .rmore { display: none; }
   </style>
 </head>
-<body>
+<body class="locked">
+  <!-- ── 로그인 화면 ── -->
+  <div class="login-screen">
+    <div class="login-card">
+      <h1>관리자 로그인</h1>
+      <p class="sub">Let's Pilates LA</p>
+      <input type="password" id="loginPw" placeholder="비밀번호" autocomplete="current-password" />
+      <button class="btn-login" id="loginBtn" onclick="submitLogin()">들어가기</button>
+      <p class="login-err" id="loginErr"></p>
+    </div>
+  </div>
+
   <div class="wrap">
-    <h1>관리자</h1>
+    <h1 style="display:flex;align-items:center;justify-content:space-between;gap:10px">관리자
+      <button class="btn-logout" onclick="logout()">로그아웃</button>
+    </h1>
     <p class="sub">
       코스 관리: 저장하면 구글 시트에 기록되고 사이트에 즉시 반영 ·
       등록자: 접수된 신청 내역 확인
@@ -195,6 +235,73 @@
 
     const cardsEl = document.getElementById('cards');
     const statusEl = document.getElementById('status');
+
+    /* ═══════════ 로그인 ═══════════ */
+    // 비밀번호는 Apps Script의 ADMIN_KEY와 서버에서 대조된다 (이 파일에는 저장되지 않음).
+    let KEY = sessionStorage.getItem('lp_admin_key') || '';
+
+    async function verifyKey(k) {
+      const res = await fetch(`${ENDPOINT}?auth=1&key=${encodeURIComponent(k)}&t=${Date.now()}`);
+      const j = await res.json();
+      if (j.result === 'success' && j.auth === true) return { ok: true };
+      if (j.courses) {
+        // 구버전 배포에는 auth 엔드포인트가 없어 코스 목록이 돌아온다
+        return { ok: false, message: 'Apps Script가 구버전입니다. 최신 코드로 재배포하고 ADMIN_KEY를 설정하세요.' };
+      }
+      return { ok: false, message: j.message || '로그인에 실패했습니다.' };
+    }
+
+    async function submitLogin() {
+      const pw = document.getElementById('loginPw').value;
+      const btn = document.getElementById('loginBtn');
+      const errEl = document.getElementById('loginErr');
+      if (!pw) { errEl.textContent = '비밀번호를 입력하세요.'; return; }
+      btn.disabled = true;
+      errEl.textContent = '확인 중...';
+      try {
+        const r = await verifyKey(pw);
+        if (r.ok) {
+          KEY = pw;
+          sessionStorage.setItem('lp_admin_key', pw);
+          errEl.textContent = '';
+          unlock();
+        } else {
+          errEl.textContent = r.message;
+        }
+      } catch (e) {
+        errEl.textContent = '서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요. (' + e.message + ')';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function unlock() {
+      document.body.classList.remove('locked');
+      load();
+    }
+
+    function logout() {
+      sessionStorage.removeItem('lp_admin_key');
+      location.reload();
+    }
+
+    document.getElementById('loginPw').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitLogin();
+    });
+
+    // 세션에 저장된 키가 있으면 자동 재로그인 시도 (탭을 닫으면 세션이 사라진다)
+    (async () => {
+      if (!KEY) { document.getElementById('loginPw').focus(); return; }
+      document.getElementById('loginErr').textContent = '자동 로그인 중...';
+      try {
+        const r = await verifyKey(KEY);
+        if (r.ok) { document.getElementById('loginErr').textContent = ''; unlock(); return; }
+      } catch { /* 네트워크 오류 → 수동 로그인 */ }
+      KEY = '';
+      sessionStorage.removeItem('lp_admin_key');
+      document.getElementById('loginErr').textContent = '';
+      document.getElementById('loginPw').focus();
+    })();
 
     function esc(s) {
       return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -300,7 +407,7 @@
 
     async function load() {
       try {
-        const res = await fetch(ENDPOINT + '?all=1');
+        const res = await fetch(`${ENDPOINT}?all=1&key=${encodeURIComponent(KEY)}&t=${Date.now()}`);
         const j = await res.json();
         if (j.result !== 'success') throw new Error(j.message || 'load failed');
         cardsEl.innerHTML = j.courses.map(cardHtml).join('');
@@ -319,6 +426,7 @@
       try {
         const body = new URLSearchParams({
           action: 'updateCourses',
+          key: KEY,
           courses: JSON.stringify(readRows()),
         });
         const res = await fetch(ENDPOINT, {
@@ -340,8 +448,6 @@
         btn.disabled = false;
       }
     }
-
-    load();
 
     /* ═══════════ 등록자 탭 ═══════════ */
     let regs = null; // 마지막으로 불러온 등록자 목록
@@ -418,7 +524,7 @@
       loadingEl.style.display = '';
       if (force) document.getElementById('regCards').innerHTML = '';
       try {
-        const res = await fetch(`${ENDPOINT}?registrations=1&t=${Date.now()}`);
+        const res = await fetch(`${ENDPOINT}?registrations=1&key=${encodeURIComponent(KEY)}&t=${Date.now()}`);
         const j = await res.json();
         if (j.result !== 'success') throw new Error(j.message || 'load failed');
         regs = j.registrations || [];

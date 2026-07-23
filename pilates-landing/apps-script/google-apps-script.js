@@ -33,9 +33,11 @@ var SENDER_ALIAS = '';
 var REPLY_TO = '';
 
 /**
- * 관리자 페이지(letspilatesla.com/admin/) 비밀번호 (선택사항).
- * 비워두면('') 비밀번호 없이 저장할 수 있다.
- * 따옴표 안에 값을 넣으면 그 비밀번호를 아는 사람만 저장할 수 있다.
+ * ★★★ 관리자 페이지(letspilatesla.com/admin/) 로그인 비밀번호 — 반드시 설정하세요! ★★★
+ * 관리자 페이지는 이 비밀번호로 로그인해야 들어갈 수 있다.
+ * 비워두면('') 로그인 자체가 거부된다 (관리자 페이지 사용 불가).
+ * 예: var ADMIN_KEY = 'MySecret123!';
+ * (수정 후 저장 + "배포 관리 → 연필 → 새 버전" 재배포를 해야 적용됩니다)
  */
 var ADMIN_KEY = '';
 
@@ -396,9 +398,23 @@ function doGet(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // ?registrations=1 → 접수(등록자) 목록 반환 — 관리자 페이지 등록자 탭용
+    // ?auth=1&key=... → 관리자 로그인 검증 — 관리자 페이지 로그인 화면용
+    if (e && e.parameter && e.parameter.auth === '1') {
+      if (!ADMIN_KEY) {
+        return jsonOut_({
+          result: 'error',
+          message: 'ADMIN_KEY가 설정되지 않았습니다. Apps Script에서 ADMIN_KEY를 설정하고 재배포하세요.',
+        });
+      }
+      if (String(e.parameter.key || '') !== ADMIN_KEY) {
+        return jsonOut_({ result: 'error', message: '비밀번호가 올바르지 않습니다.' });
+      }
+      return jsonOut_({ result: 'success', auth: true });
+    }
+
+    // ?registrations=1 → 접수(등록자) 목록 반환 — 관리자 페이지 등록자 탭용 (비밀번호 필수)
     if (e && e.parameter && e.parameter.registrations === '1') {
-      if (ADMIN_KEY && String(e.parameter.key || '') !== ADMIN_KEY) {
+      if (!ADMIN_KEY || String(e.parameter.key || '') !== ADMIN_KEY) {
         return jsonOut_({ result: 'error', message: 'unauthorized' });
       }
       return jsonOut_({ result: 'success', registrations: getRegistrations_(ss) });
@@ -407,8 +423,11 @@ function doGet(e) {
     var sheet = ss.getSheetByName('Courses');
     var courses = [];
 
-    // ?all=1 이면 비활성(active=FALSE) 코스도 포함 — 관리자 페이지용
+    // ?all=1 이면 비활성(active=FALSE) 코스도 포함 — 관리자 페이지용 (비밀번호 필수)
     var showAll = e && e.parameter && e.parameter.all === '1';
+    if (showAll && ADMIN_KEY && String(e.parameter.key || '') !== ADMIN_KEY) {
+      return jsonOut_({ result: 'error', message: 'unauthorized' });
+    }
 
     // 접수 탭(Sheet3)에서 코스 id별 신청 수 집계
     var counts = countRegistrations_(ss);
@@ -457,10 +476,11 @@ function doGet(e) {
 /**
  * 관리자 페이지에서 보낸 코스 목록으로 Courses 탭 전체를 교체한다.
  * ADMIN_KEY가 설정되어 있고 요청의 key와 일치할 때만 동작한다.
+ * (ADMIN_KEY가 비어 있으면 저장을 거부한다 — 보안상 fail-closed)
  */
 function handleUpdateCourses_(data) {
   try {
-    if (ADMIN_KEY && String(data.key || '') !== ADMIN_KEY) {
+    if (!ADMIN_KEY || String(data.key || '') !== ADMIN_KEY) {
       return jsonOut_({ result: 'error', message: 'unauthorized' });
     }
 
