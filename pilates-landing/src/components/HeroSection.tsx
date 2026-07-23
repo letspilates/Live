@@ -14,7 +14,7 @@ export default function HeroSection() {
       <div ref={mediaRef} className="absolute inset-0 will-change-transform">
         <img
           src={IMG.hero}
-          alt="A cinematic montage of Gyrotonic tower work and a Reformer side-stretch silhouette, backlit against sheer curtains"
+          alt="A cinematic montage of Gyrotonic® tower work and a Reformer side-stretch silhouette, backlit against sheer curtains"
           className="absolute left-0 top-[-20%] h-[140%] w-full object-cover object-[90%_30%] md:object-center"
           loading="eager"
           fetchPriority="high"

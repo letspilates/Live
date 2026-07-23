@@ -17,7 +17,7 @@ const en = {
     cta: 'Book a trial',
   },
   hero: {
-    eyebrow: 'Pilates · Gyrotonic studio',
+    eyebrow: 'Pilates · Gyrotonic® studio',
     title: ['Movement,', 'made to measure'],
     titleAccentIndex: 1,
     body: 'In our Los Angeles studio, STOTT PILATES® and the GYROTONIC® Method are taught the way they were meant to be — one body, one instructor, full attention. Strength, length, and ease that follow you out the door.',
@@ -35,7 +35,7 @@ const en = {
     eyebrow: 'How we work',
     title: ['Not more exercise —', 'exactly', 'the right exercise'],
     titleAccentIndex: 1,
-    body: 'Every journey begins with an assessment. We map your spinal range, breathing pattern, and left-right asymmetry before you ever touch the equipment. The resistance of the Reformer and the spiraling work of Gyrotonic speak different languages toward the same goal — a body that moves more freely.',
+    body: 'Every journey begins with an assessment. We map your spinal range, breathing pattern, and left-right asymmetry before you ever touch the equipment. The resistance of the Reformer and the spiraling work of Gyrotonic® speak different languages toward the same goal — a body that moves more freely.',
     caption: 'Los Angeles · the studio',
   },
   programs: {
@@ -115,7 +115,7 @@ const en = {
     courses: [
       { id: 'A', name: 'GYROTONIC® Level 1 Foundation Course', tag: '12 days' },
       { id: 'B', name: 'GYROTONIC® Level 2 Program 1 — Pre-Training', tag: '3 days' },
-      { id: 'C', name: 'Jumping Stretching Board Course', tag: '7 days' },
+      { id: 'C', name: 'Jump Stretch Board Course', tag: '7 days' },
       { id: 'D', name: 'GYROTONIC® Level 1 Apprentice Review Course', tag: '6 days' },
       { id: 'E', name: 'GYROTONIC® Level 2 Program 1 — Foundation Course', tag: '4 days' },
     ],
@@ -182,17 +182,17 @@ const en = {
       eunice: {
         name: 'Eunice Choi',
         role: 'Instructor',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Gyrokinesis', 'Archway', 'Jumping Stretching Board'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Gyrokinesis®', 'Archway', 'Jump Stretch Board'],
       },
       soo: {
         name: 'Su Kyung Yi',
         role: 'Instructor',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jumping Stretching Board'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jump Stretch Board'],
       },
       haley: {
         name: 'Haley Han',
         role: 'Instructor',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jumping Stretching Board'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jump Stretch Board'],
       },
     },
   },
@@ -209,9 +209,9 @@ const en = {
       },
       r2: {
         quote:
-          'Gyrotonic was new to me, and the way my stiff shoulders open up feels different every session.',
+          'Gyrotonic® was new to me, and the way my stiff shoulders open up feels different every session.',
         name: 'Yeonwoo Seo',
-        meta: 'Gyrotonic / 7 months',
+        meta: 'Gyrotonic® / 7 months',
       },
       r3: {
         quote:
@@ -229,7 +229,7 @@ const en = {
         quote:
           'The 7am class made my whole day lighter. The space is quiet and full of natural light.',
         name: 'Sua Bae',
-        meta: 'Gyrokinesis mat / 1 year',
+        meta: 'Gyrokinesis® mat / 1 year',
       },
     },
   },
@@ -257,7 +257,7 @@ const en = {
         a: 'We’re in Los Angeles at 672 S La Fayette Park Pl, Ste 674 — an easy reach from Koreatown, Westlake, and Downtown LA.',
       },
       {
-        q: 'What’s the difference between Pilates and Gyrotonic?',
+        q: 'What’s the difference between Pilates and Gyrotonic®?',
         a: 'Pilates builds core strength, control, and alignment — often on the Reformer. The GYROTONIC® Method uses circular, spiraling movement to mobilize the joints and lengthen the spine. Many members combine both.',
       },
       {
@@ -296,7 +296,7 @@ const en = {
   },
   footer: {
     description:
-      'Movement, completed through STOTT PILATES® and Gyrotonic — a Los Angeles studio designing the exercise that fits your body.',
+      'Movement, completed through STOTT PILATES® and Gyrotonic® — a Los Angeles studio designing the exercise that fits your body.',
     address: ['672 S La Fayette Park Pl, STE 674, Los Angeles, CA 90057', 'Class times — see the live schedule above'],
     cols: {
       programs: {
@@ -335,7 +335,7 @@ const ko: Content = {
     cta: '체험 예약',
   },
   hero: {
-    eyebrow: '필라테스 · 자이로토닉 스튜디오',
+    eyebrow: '필라테스 · 자이로토닉® 스튜디오',
     title: ['당신만을 위한', '움직임'],
     titleAccentIndex: 0,
     body: 'Let’s Pilates LA는 STOTT PILATES®와 GYROTONIC®의 공식 교육 방식에 따라 수업을 진행합니다. 모든 수업은 한 명의 강사가 회원 한 분에게 집중하는 1:1 개인 레슨으로 진행됩니다. 몸의 균형과 움직임을 개선하고, 그 변화가 일상까지 이어질 수 있도록 함께합니다.',
@@ -433,7 +433,7 @@ const ko: Content = {
     courses: [
       { id: 'A', name: 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', tag: '12일' },
       { id: 'B', name: 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', tag: '3일' },
-      { id: 'C', name: '점핑 스트레칭 보드 과정 (Jumping Stretching Board)', tag: '7일' },
+      { id: 'C', name: '점프 스트레치 보드 과정 (Jump Stretch Board)', tag: '7일' },
       { id: 'D', name: 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', tag: '6일' },
       { id: 'E', name: 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', tag: '4일' },
     ],
@@ -499,17 +499,17 @@ const ko: Content = {
       eunice: {
         name: 'Eunice Choi',
         role: '강사',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Gyrokinesis', 'Archway', 'Jumping Stretching Board'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Gyrokinesis®', 'Archway', 'Jump Stretch Board'],
       },
       soo: {
         name: 'Su Kyung Yi',
         role: '강사',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jumping Stretching Board'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jump Stretch Board'],
       },
       haley: {
         name: 'Haley Han',
         role: '강사',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jumping Stretching Board'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Jump Stretch Board'],
       },
     },
   },
@@ -525,9 +525,9 @@ const ko: Content = {
         meta: '리포머 · 재활 / 11개월째',
       },
       r2: {
-        quote: '자이로토닉은 처음이었는데, 굳어 있던 어깨가 풀리는 느낌이 회차마다 달라요.',
+        quote: '자이로토닉®은 처음이었는데, 굳어 있던 어깨가 풀리는 느낌이 회차마다 달라요.',
         name: '서연우',
-        meta: '자이로토닉 / 7개월째',
+        meta: '자이로토닉® / 7개월째',
       },
       r3: {
         quote: '출산 후 무너진 코어를 담당 선생님이 단계별로 잡아주셨어요. 숫자로 회복을 보여주니 동기부여가 됩니다.',
@@ -542,7 +542,7 @@ const ko: Content = {
       r5: {
         quote: '아침 7시 클래스 덕분에 하루가 가벼워졌어요. 공간도 조용하고 햇빛이 좋아요.',
         name: '배수아',
-        meta: '자이로키네시스 매트 / 1년째',
+        meta: '자이로키네시스® 매트 / 1년째',
       },
     },
   },
@@ -570,7 +570,7 @@ const ko: Content = {
         a: '로스앤젤레스 672 S La Fayette Park Pl, Ste 674에 있습니다. 코리아타운·웨스트레이크·다운타운 LA에서 가깝습니다.',
       },
       {
-        q: '필라테스와 자이로토닉은 어떻게 다른가요?',
+        q: '필라테스와 자이로토닉®은 어떻게 다른가요?',
         a: '필라테스는 주로 리포머 위에서 코어 근력과 컨트롤, 정렬을 다집니다. GYROTONIC®은 원을 그리는 나선형 움직임으로 관절을 풀고 척추를 길게 늘입니다. 두 가지를 함께 하시는 회원도 많습니다.',
       },
       {
@@ -598,7 +598,7 @@ const ko: Content = {
         a: '움직이기 편한 운동복이면 됩니다. 그립 양말을 권장하고, 기구는 모두 준비되어 있으니 물과 몸만 오시면 됩니다.',
       },
       {
-        q: '자이로토닉 지도자 과정도 운영하나요?',
+        q: '자이로토닉® 지도자 과정도 운영하나요?',
         a: '네 — GYROTONIC® 레벨 1 자격 과정을 스튜디오에서 진행합니다. GYROTONIC® 마스터 트레이너와 저희 공인 프리트레이너가 함께 이끕니다.',
       },
       {
@@ -609,7 +609,7 @@ const ko: Content = {
   },
   footer: {
     description:
-      'STOTT PILATES®와 자이로토닉으로 완성하는 움직임. 당신의 몸에 꼭 맞는 운동을 설계하는 로스앤젤레스의 스튜디오입니다.',
+      'STOTT PILATES®와 자이로토닉®으로 완성하는 움직임. 당신의 몸에 꼭 맞는 운동을 설계하는 로스앤젤레스의 스튜디오입니다.',
     address: ['672 S La Fayette Park Pl, STE 674, Los Angeles, CA 90057', '수업 시간은 위 실시간 일정표에서 확인하세요'],
     cols: {
       programs: {

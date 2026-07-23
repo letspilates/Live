@@ -21,7 +21,7 @@ export default function ApproachSection() {
             <figure className="relative overflow-hidden rounded-[2rem] ring-1 ring-ink/10">
               <img
                 src={IMG.approach}
-                alt="A group training session at the Gyrotonic pulley towers, kneeling in unison"
+                alt="A group training session at the Gyrotonic® pulley towers, kneeling in unison"
                 className="aspect-[4/5] w-full object-cover"
                 loading="lazy"
               />

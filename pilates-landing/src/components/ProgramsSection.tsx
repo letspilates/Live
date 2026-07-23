@@ -95,7 +95,7 @@ export default function ProgramsSection() {
             <div className="grid grid-cols-1 md:grid-cols-2">
               <img
                 src={IMG.gyrotonic}
-                alt="A member rotating the Gyrotonic tower handles, working the spine in spirals"
+                alt="A member rotating the Gyrotonic® tower handles, working the spine in spirals"
                 className="h-56 w-full object-cover transition-transform duration-700 ease-smooth group-hover:scale-[1.04] md:h-full"
                 loading="lazy"
               />
