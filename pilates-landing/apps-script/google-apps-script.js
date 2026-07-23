@@ -63,15 +63,15 @@ var STUDIO = {
 
   // 결제 안내
   payment:
-    'Enrollment is confirmed in order of completed payment. Our team will contact you individually with payment methods and details. Questions: 310-995-0046 / KakaoTalk sunnie0210',
+    'Course fees must be paid directly to the Master Trainer on the first day of the course. Studio fees must be paid separately via Venmo or Zelle using the payment information below. Please include your full name and course name in the payment memo.\n\nVenmo: @Sunnie-Lee-2\nZelle: 310-995-0046',
 
   // 주차 안내
   parking:
-    'Parking details (building and nearby options) will be provided upon enrollment confirmation. Please arrive with time to spare on training days.',
+    'Complimentary parking is available. Upon arrival, please contact us from the front gate, and a staff member will open the gate for you. We recommend arriving a few minutes early to allow enough time for entry and parking.',
 
   // 취소/변경 정책
   cancel:
-    'Cancellation policy: full refund for cancellations made at least 14 days before the course start date; fees may apply afterward. Please contact us as early as possible for any changes.',
+    'All course fees and studio fees are non-refundable. Please review your schedule carefully before registering. If you have any questions or need to request a schedule change, please contact us as early as possible.',
 };
 
 /** JSON 응답 헬퍼 */
@@ -325,8 +325,8 @@ function sendWelcomeEmail_(data) {
     t.yourCourses +
     '</h3>' +
     courseBlocks +
-    // 결제
-    section(t.payment, escHtml_(STUDIO.payment)) +
+    // 결제 (문구의 줄바꿈 \n → <br /> 로 표시)
+    section(t.payment, escHtml_(STUDIO.payment).replace(/\n/g, '<br />')) +
     // 위치 & 주차
     section(
       t.location,
