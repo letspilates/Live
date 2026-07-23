@@ -109,7 +109,7 @@
     </p>
 
     <div class="bar">
-      <input type="password" id="adminKey" placeholder="관리자 비밀번호" autocomplete="current-password" />
+      <span style="flex:1"></span>
       <button class="btn-add" onclick="addRow()">+ 코스 추가</button>
     </div>
 
@@ -133,15 +133,18 @@
 
   <script>
     const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyTr-4dV5Q-dweH7QAB4i6UeFkt2eh97kHMgrNEpF2n7mGCfC3y2c6J2zWuPpGoJcAS/exec';
-    const KEY_STORE = 'lp-admin-key';
 
     const cardsEl = document.getElementById('cards');
     const statusEl = document.getElementById('status');
-    const keyEl = document.getElementById('adminKey');
-    keyEl.value = localStorage.getItem(KEY_STORE) || '';
 
     function esc(s) {
       return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    // 기존 tag_kr("3일") 또는 tag_en("3 days")에서 일수 숫자만 추출
+    function daysOf(c) {
+      const m = String(c.tag_kr || c.tag_en || '').match(/\d+/);
+      return m ? m[0] : '';
     }
 
     function statChips(c) {
@@ -169,13 +172,20 @@
         <div class="field"><label>코스명 (한글)</label><input type="text" data-f="name_kr" value="${esc(c.name_kr)}" /></div>
         <div class="field"><label>일정</label><input type="text" data-f="dates" value="${esc(c.dates)}" placeholder="비우면 '일정 추후 공지'로 표시" /></div>
         <div class="field grid-3" style="margin-top:12px">
-          <div><label>기간 (영문)</label><input type="text" data-f="tag_en" value="${esc(c.tag_en)}" placeholder="3 days" /></div>
-          <div><label>기간 (한글)</label><input type="text" data-f="tag_kr" value="${esc(c.tag_kr)}" placeholder="3일" /></div>
+          <div><label>기간 (일수)</label><input type="number" min="1" inputmode="numeric" data-f="days" value="${esc(daysOf(c))}" placeholder="3" /></div>
           <div><label>정원</label><input type="number" min="0" inputmode="numeric" data-f="capacity" value="${esc(cap)}" placeholder="없음" /></div>
+          <div><label>시간</label><input type="text" data-f="time" value="${esc(c.time)}" placeholder="9:00 AM - 5:00 PM" /></div>
         </div>
         <div class="field grid-2" style="margin-top:12px">
-          <div><label>시간 (이메일용)</label><input type="text" data-f="time" value="${esc(c.time)}" placeholder="9:00 AM - 5:00 PM" /></div>
-          <div><label>가격 (이메일용)</label><input type="text" data-f="price" value="${esc(c.price)}" placeholder="$1,200" /></div>
+          <div><label>코스 가격 (Course Cost)</label><input type="text" data-f="price" value="${esc(c.price)}" placeholder="$1,050" /></div>
+          <div><label>스튜디오 Fee</label><input type="text" data-f="fee" value="${esc(c.fee)}" placeholder="$350" /></div>
+        </div>
+        <div class="field"><label>진행 (Conducted by)</label>
+          <select data-f="conducted_by" style="width:100%;font:inherit;font-size:15px;border:1px solid rgba(28,26,22,0.15);border-radius:10px;padding:10px 12px;background:#fff;color:#1C1A16;">
+            <option value="" ${!c.conducted_by ? 'selected' : ''}>— 선택 안 함 —</option>
+            <option value="Master Trainer Rich O'Connor" ${c.conducted_by === "Master Trainer Rich O'Connor" ? 'selected' : ''}>Master Trainer Rich O'Connor</option>
+            <option value="Pre-Trainer Sunnie Lee" ${c.conducted_by === 'Pre-Trainer Sunnie Lee' ? 'selected' : ''}>Pre-Trainer Sunnie Lee</option>
+          </select>
         </div>
         <div class="field"><label>설명 (이메일용 · 영어)</label><input type="text" data-f="desc_en" value="${esc(c.desc_en)}" placeholder="Course description shown in the welcome email" /></div>
         <div class="toggle-row">
@@ -195,16 +205,23 @@
     function readRows() {
       return [...cardsEl.querySelectorAll('.card')].map((card) => {
         const get = (f) => card.querySelector(`[data-f="${f}"]`);
+        // 일수 숫자 하나로 영문/한글 기간 표기를 자동 생성
+        const days = get('days').value.trim();
+        const n = parseInt(days, 10);
+        const tag_en = days && !isNaN(n) ? `${n} ${n === 1 ? 'day' : 'days'}` : '';
+        const tag_kr = days && !isNaN(n) ? `${n}일` : '';
         return {
           id: get('id').value.trim(),
           name_en: get('name_en').value.trim(),
           name_kr: get('name_kr').value.trim(),
           dates: get('dates').value.trim(),
-          tag_en: get('tag_en').value.trim(),
-          tag_kr: get('tag_kr').value.trim(),
+          tag_en,
+          tag_kr,
           capacity: get('capacity').value.trim(),
           time: get('time').value.trim(),
           price: get('price').value.trim(),
+          fee: get('fee').value.trim(),
+          conducted_by: get('conducted_by').value,
           desc_en: get('desc_en').value.trim(),
           active: get('active').checked,
         };
@@ -236,10 +253,6 @@
     }
 
     async function save() {
-      const key = keyEl.value.trim();
-      if (!key) { setStatus('비밀번호를 입력하세요', false); keyEl.focus(); return; }
-      localStorage.setItem(KEY_STORE, key);
-
       const btn = document.getElementById('saveBtn');
       btn.disabled = true;
       setStatus('저장 중...', true);
@@ -247,7 +260,6 @@
       try {
         const body = new URLSearchParams({
           action: 'updateCourses',
-          key,
           courses: JSON.stringify(readRows()),
         });
         const res = await fetch(ENDPOINT, {
@@ -258,7 +270,7 @@
         let j = null;
         try { j = await res.json(); } catch { /* 응답을 못 읽는 브라우저 환경 대비 */ }
         if (j && j.result === 'error') {
-          throw new Error(j.message === 'unauthorized' ? '비밀번호가 틀렸습니다' : j.message);
+          throw new Error(j.message);
         }
         // 시트에서 다시 읽어와 실제 반영을 확인 (진짜 저장 여부의 기준)
         await load();

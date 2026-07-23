@@ -26,6 +26,9 @@ interface RemoteCourse {
   tag_kr: string;
   capacity?: number | null;
   taken?: number;
+  price?: string;
+  fee?: string;
+  conducted_by?: string;
 }
 
 const COURSES_CACHE_KEY = 'lp-courses-v1';
@@ -128,6 +131,9 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
           tag: lang === 'ko' ? c.tag_kr || c.tag_en : c.tag_en,
           remaining,
           full: remaining !== null && remaining <= 0,
+          price: c.price || '',
+          fee: c.fee || '',
+          conductedBy: c.conducted_by || '',
         };
       })
     : f.courses.map((c) => ({
@@ -137,6 +143,9 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
         tag: c.tag,
         remaining: null as number | null,
         full: false,
+        price: '',
+        fee: '',
+        conductedBy: '',
       }));
 
   const courseValue = (id: string) => {
@@ -389,6 +398,18 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                               {c.meta}
                               {c.tag && ` · ${c.tag}`}
                             </span>
+                            {c.conductedBy && (
+                              <span className="mt-1 block text-[13px] text-mute">
+                                {f.conductedBy} <span className="text-ink">{c.conductedBy}</span>
+                              </span>
+                            )}
+                            {(c.price || c.fee) && (
+                              <span className="mt-1 block text-[13px] font-medium text-ink">
+                                {c.price && `${f.courseCost} ${c.price}`}
+                                {c.price && c.fee && '  |  '}
+                                {c.fee && `${f.studioFee} ${c.fee}`}
+                              </span>
+                            )}
                             {c.remaining !== null && !c.full && (
                               <span className="mt-1 block text-xs font-medium text-sage">
                                 {f.seatsLeft.replace('{n}', String(c.remaining))}

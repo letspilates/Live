@@ -17,10 +17,9 @@
 var NOTIFY_EMAIL = '';
 
 /**
- * ★ 관리자 페이지(letspilatesla.com/admin/) 비밀번호.
- * 따옴표 안에 원하는 비밀번호를 입력해야 관리자 저장 기능이 켜진다.
- * 예: var ADMIN_KEY = 'lets2026!';
- * 비워두면('') 관리자 페이지에서 저장이 거부된다 (안전 기본값).
+ * 관리자 페이지(letspilatesla.com/admin/) 비밀번호 (선택사항).
+ * 비워두면('') 비밀번호 없이 저장할 수 있다.
+ * 따옴표 안에 값을 넣으면 그 비밀번호를 아는 사람만 저장할 수 있다.
  */
 var ADMIN_KEY = '';
 
@@ -176,6 +175,8 @@ function getCourseMap_() {
       price: r.length > 9 ? cellToString_(r[9]) : '',
       desc_en: r.length > 10 ? cellToString_(r[10]) : '',
       desc_kr: r.length > 11 ? cellToString_(r[11]) : '',
+      fee: r.length > 12 ? cellToString_(r[12]) : '',
+      conducted_by: r.length > 13 ? cellToString_(r[13]) : '',
     };
   }
   return map;
@@ -212,7 +213,9 @@ function sendWelcomeEmail_(data) {
     dates: 'Dates',
     time: 'Time',
     duration: 'Duration',
-    price: 'Tuition',
+    price: 'Course Cost',
+    fee: 'Studio Fee',
+    conductedBy: 'Conducted by',
     tba: 'To be announced',
     payment: 'Payment',
     location: 'Location & Parking',
@@ -241,7 +244,9 @@ function sendWelcomeEmail_(data) {
       rows += row(t.dates, c.dates || t.tba);
       rows += row(t.time, c.time);
       rows += row(t.duration, c.tag_en || c.tag_kr);
+      rows += row(t.conductedBy, c.conducted_by);
       rows += row(t.price, c.price);
+      rows += row(t.fee, c.fee);
       var desc = c.desc_en;
       var descHtml = desc
         ? '<p style="margin:10px 0 0;color:#6E6A60;font-size:13px;line-height:1.7;">' +
@@ -380,6 +385,8 @@ function doGet(e) {
           price: r.length > 9 ? cellToString_(r[9]) : '',
           desc_en: r.length > 10 ? cellToString_(r[10]) : '',
           desc_kr: r.length > 11 ? cellToString_(r[11]) : '',
+          fee: r.length > 12 ? cellToString_(r[12]) : '',
+          conducted_by: r.length > 13 ? cellToString_(r[13]) : '',
         });
       }
     }
@@ -396,7 +403,7 @@ function doGet(e) {
  */
 function handleUpdateCourses_(data) {
   try {
-    if (!ADMIN_KEY || String(data.key || '') !== ADMIN_KEY) {
+    if (ADMIN_KEY && String(data.key || '') !== ADMIN_KEY) {
       return jsonOut_({ result: 'error', message: 'unauthorized' });
     }
 
@@ -409,7 +416,7 @@ function handleUpdateCourses_(data) {
     }
 
     var last = sheet.getLastRow();
-    if (last > 1) sheet.getRange(2, 1, last - 1, 12).clearContent();
+    if (last > 1) sheet.getRange(2, 1, last - 1, 14).clearContent();
 
     var rows = [];
     for (var i = 0; i < courses.length; i++) {
@@ -430,9 +437,11 @@ function handleUpdateCourses_(data) {
         String(c.price || ''),
         String(c.desc_en || ''),
         String(c.desc_kr || ''),
+        String(c.fee || ''),
+        String(c.conducted_by || ''),
       ]);
     }
-    if (rows.length) sheet.getRange(2, 1, rows.length, 12).setValues(rows);
+    if (rows.length) sheet.getRange(2, 1, rows.length, 14).setValues(rows);
 
     return jsonOut_({ result: 'success', saved: rows.length });
   } catch (error) {
@@ -490,12 +499,12 @@ function setupCoursesTab() {
 
   var sheet = ss.insertSheet('Courses');
   var rows = [
-    ['id', 'name_en', 'name_kr', 'dates', 'tag_en', 'tag_kr', 'active', 'capacity', 'time', 'price', 'desc_en', 'desc_kr'],
-    ['A', 'GYROTONIC® Level 1 Foundation Course', 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', '', '12 days', '12일', 'TRUE', '', '', '', '', ''],
-    ['B', 'GYROTONIC® Level 2 Program 1 — Pre-Training', 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', '', '3 days', '3일', 'TRUE', '', '', '', '', ''],
-    ['C', 'GYROTONIC® Jumping Stretching Board Course', 'GYROTONIC® 점핑 스트레칭 보드 과정 (Jumping Stretching Board)', '', '7 days', '7일', 'TRUE', '', '', '', '', ''],
-    ['D', 'GYROTONIC® Level 1 Apprentice Review Course', 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', '', '6 days', '6일', 'TRUE', '', '', '', '', ''],
-    ['E', 'GYROTONIC® Level 2 Program 1 — Foundation Course', 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', '', '4 days', '4일', 'TRUE', '', '', '', '', ''],
+    ['id', 'name_en', 'name_kr', 'dates', 'tag_en', 'tag_kr', 'active', 'capacity', 'time', 'price', 'desc_en', 'desc_kr', 'fee', 'conducted_by'],
+    ['A', 'GYROTONIC® Level 1 Foundation Course', 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', '', '12 days', '12일', 'TRUE', '', '', '', '', '', '', ''],
+    ['B', 'GYROTONIC® Level 2 Program 1 — Pre-Training', 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', '', '3 days', '3일', 'TRUE', '', '', '', '', '', '', ''],
+    ['C', 'GYROTONIC® Jumping Stretching Board Course', 'GYROTONIC® 점핑 스트레칭 보드 과정 (Jumping Stretching Board)', '', '7 days', '7일', 'TRUE', '', '', '', '', '', '', ''],
+    ['D', 'GYROTONIC® Level 1 Apprentice Review Course', 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', '', '6 days', '6일', 'TRUE', '', '', '', '', '', '', ''],
+    ['E', 'GYROTONIC® Level 2 Program 1 — Foundation Course', 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', '', '4 days', '4일', 'TRUE', '', '', '', '', '', '', ''],
   ];
   sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
 
@@ -520,13 +529,13 @@ function upgradeCoursesTab() {
     return;
   }
   // 누락된 열 헤더 보충 (H: capacity, I: time, J: price, K: desc_en, L: desc_kr)
-  var wanted = { H1: 'capacity', I1: 'time', J1: 'price', K1: 'desc_en', L1: 'desc_kr' };
+  var wanted = { H1: 'capacity', I1: 'time', J1: 'price', K1: 'desc_en', L1: 'desc_kr', M1: 'fee', N1: 'conducted_by' };
   for (var cell in wanted) {
     if (String(sheet.getRange(cell).getValue()).trim() !== wanted[cell]) {
       sheet.getRange(cell).setValue(wanted[cell]).setFontWeight('bold');
     }
   }
-  Logger.log('Courses 탭 열 확인/보충 완료 (capacity, time, price, desc_en, desc_kr).');
+  Logger.log('Courses 탭 열 확인/보충 완료 (capacity, time, price, desc, fee, conducted_by).');
 }
 
 /**
