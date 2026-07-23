@@ -6,9 +6,9 @@ import { useLang } from '../i18n/LanguageContext';
 const marks = [
   'REFORMER',
   '·',
-  'GYROTONIC',
+  'GYROTONIC®',
   '·',
-  'GYROKINESIS',
+  'GYROKINESIS®',
   '·',
   'MAT',
   '·',
@@ -61,7 +61,7 @@ export default function AboutSection() {
           <figure className="relative overflow-hidden rounded-[1.8rem] ring-1 ring-ink/10">
             <img
               src={IMG.space}
-              alt="A member training on the Gyrotonic tower in a brick-and-wood studio"
+              alt="A member training on the Gyrotonic® tower in a brick-and-wood studio"
               className="aspect-[16/11] w-full object-cover"
               loading="lazy"
             />

@@ -9,7 +9,7 @@ const SHEETS_URL =
 const COURSE_VALUES: Record<string, string> = {
   A: 'A - Gyrotonic® Level 1 Foundation Course',
   B: 'B - Gyrotonic® Level 2 Program 1 – Pre-Training',
-  C: 'C - Jumping Stretching Board Course',
+  C: 'C - Jump Stretch Board Course',
   D: 'D - Gyrotonic® Level 1 Apprentice Review Course',
   E: 'E - Gyrotonic® Level 2 Program 1 – Foundation Course',
 };
