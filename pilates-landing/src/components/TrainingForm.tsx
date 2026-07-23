@@ -215,7 +215,6 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
     setSubmitting(true);
     const data = {
       timestamp: new Date().toISOString(),
-      lang, // 웰컴 이메일 언어 선택용 (시트에는 기록되지 않음)
       courses: courses.map(courseValue).join(', '),
       fullName: fields.fullName.trim(),
       email: fields.email.trim(),

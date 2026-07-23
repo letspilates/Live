@@ -32,7 +32,8 @@ var SUBMISSIONS_SHEET_NAME = 'Sheet3';
 
 /**
  * ★★★ 웰컴 이메일에 들어가는 스튜디오 정보 — 반드시 실제 내용으로 수정하세요! ★★★
- * (특히 payment / parking / cancel 부분. _kr은 한국어 이메일, _en은 영어 이메일에 사용)
+ * 이메일은 영어로만 발송됩니다. 아래 payment / parking / cancel 문구를 실제 정책으로 바꾸세요.
+ * (여기를 수정한 뒤에는 저장 + "배포 관리 → 연필 → 새 버전" 재배포를 해야 적용됩니다)
  */
 var STUDIO = {
   name: "Let's Pilates LA",
@@ -43,19 +44,16 @@ var STUDIO = {
   instagram: '@Letspilates_la',
   site: 'https://letspilatesla.com',
 
-  payment_kr:
-    '등록 확정은 결제 완료 순으로 진행됩니다. 결제 방법(Zelle/카드/현금 등)과 계좌 정보는 담당자가 개별 연락으로 안내드립니다. 문의: 310-995-0046 / 카카오톡 sunnie0210',
-  payment_en:
+  // 결제 안내
+  payment:
     'Enrollment is confirmed in order of completed payment. Our team will contact you individually with payment methods and details. Questions: 310-995-0046 / KakaoTalk sunnie0210',
 
-  parking_kr:
-    '건물 주차 및 인근 주차 안내는 등록 확정 시 상세히 안내드립니다. 수업 당일 여유 있게 도착해 주세요.',
-  parking_en:
+  // 주차 안내
+  parking:
     'Parking details (building and nearby options) will be provided upon enrollment confirmation. Please arrive with time to spare on training days.',
 
-  cancel_kr:
-    '취소/변경 정책: 코스 시작 14일 전까지 취소 시 전액 환불, 이후에는 수수료가 발생할 수 있습니다. 자세한 내용은 담당자에게 문의해 주세요. 일정 변경이 필요한 경우 최대한 빨리 연락 주시기 바랍니다.',
-  cancel_en:
+  // 취소/변경 정책
+  cancel:
     'Cancellation policy: full refund for cancellations made at least 14 days before the course start date; fees may apply afterward. Please contact us as early as possible for any changes.',
 };
 
@@ -191,9 +189,8 @@ function escHtml_(s) {
     .replace(/>/g, '&gt;');
 }
 
-/** 신청자에게 사이트 테마의 HTML 웰컴 이메일을 발송한다 */
+/** 신청자에게 사이트 테마의 HTML 웰컴 이메일을 발송한다 (영어) */
 function sendWelcomeEmail_(data) {
-  var ko = String(data.lang || 'ko') !== 'en';
   var courseMap = getCourseMap_();
 
   // "A - ..., C - ..." → 선택한 코스 id 목록
@@ -206,50 +203,30 @@ function sendWelcomeEmail_(data) {
     });
 
   var name = escHtml_(data.fullName || '');
-  var t = ko
-    ? {
-        subject: "[Let's Pilates LA] 등록 신청이 접수되었습니다",
-        hello: name + '님, 안녕하세요!',
-        intro:
-          "Let's Pilates LA 지도자 과정에 관심을 가져주셔서 감사합니다. 아래 내용으로 등록 신청이 접수되었으며, 저희 팀이 검토 후 곧 연락드리겠습니다.",
-        yourCourses: '신청하신 프로그램',
-        dates: '일정',
-        time: '시간',
-        duration: '기간',
-        price: '수강료',
-        tba: '추후 공지',
-        payment: '결제 안내',
-        location: '위치 & 주차',
-        parking: '주차 안내',
-        cancel: '취소 / 변경 정책',
-        questions: '궁금한 점이 있으시면 언제든 연락 주세요.',
-        map: '지도 보기',
-      }
-    : {
-        subject: "[Let's Pilates LA] Your registration has been received",
-        hello: 'Hello ' + name + ',',
-        intro:
-          "Thank you for your interest in our teacher training courses at Let's Pilates LA. We have received your registration below, and our team will review it and contact you shortly.",
-        yourCourses: 'Your selected program(s)',
-        dates: 'Dates',
-        time: 'Time',
-        duration: 'Duration',
-        price: 'Tuition',
-        tba: 'To be announced',
-        payment: 'Payment',
-        location: 'Location & Parking',
-        parking: 'Parking',
-        cancel: 'Cancellation Policy',
-        questions: 'If you have any questions, feel free to reach out anytime.',
-        map: 'View map',
-      };
+  var t = {
+    subject: "[Let's Pilates LA] Your registration has been received",
+    hello: 'Hello ' + name + ',',
+    intro:
+      "Thank you for your interest in our teacher training courses at Let's Pilates LA. We have received your registration below, and our team will review it and contact you shortly.",
+    yourCourses: 'Your selected program(s)',
+    dates: 'Dates',
+    time: 'Time',
+    duration: 'Duration',
+    price: 'Tuition',
+    tba: 'To be announced',
+    payment: 'Payment',
+    location: 'Location & Parking',
+    cancel: 'Cancellation Policy',
+    questions: 'If you have any questions, feel free to reach out anytime.',
+    map: 'View map',
+  };
 
   // 코스 카드 블록
   var courseBlocks = ids
     .map(function (id) {
       var c = courseMap[id];
       if (!c) return '';
-      var cname = escHtml_(ko ? c.name_kr || c.name_en : c.name_en);
+      var cname = escHtml_(c.name_en || c.name_kr);
       var rows = '';
       function row(label, value) {
         if (!value) return '';
@@ -263,9 +240,9 @@ function sendWelcomeEmail_(data) {
       }
       rows += row(t.dates, c.dates || t.tba);
       rows += row(t.time, c.time);
-      rows += row(t.duration, ko ? c.tag_kr || c.tag_en : c.tag_en);
+      rows += row(t.duration, c.tag_en || c.tag_kr);
       rows += row(t.price, c.price);
-      var desc = ko ? c.desc_kr || c.desc_en : c.desc_en;
+      var desc = c.desc_en;
       var descHtml = desc
         ? '<p style="margin:10px 0 0;color:#6E6A60;font-size:13px;line-height:1.7;">' +
           escHtml_(desc) +
@@ -310,17 +287,17 @@ function sendWelcomeEmail_(data) {
     '</h3>' +
     courseBlocks +
     // 결제
-    section(t.payment, escHtml_(ko ? STUDIO.payment_kr : STUDIO.payment_en)) +
+    section(t.payment, escHtml_(STUDIO.payment)) +
     // 위치 & 주차
     section(
       t.location,
       escHtml_(STUDIO.address) +
         ' &nbsp;·&nbsp; <a href="' + STUDIO.mapUrl + '" style="color:#5E6B4F;">' + t.map + '</a>' +
         '<br />' +
-        escHtml_(ko ? STUDIO.parking_kr : STUDIO.parking_en)
+        escHtml_(STUDIO.parking)
     ) +
     // 취소 정책
-    section(t.cancel, escHtml_(ko ? STUDIO.cancel_kr : STUDIO.cancel_en)) +
+    section(t.cancel, escHtml_(STUDIO.cancel)) +
     // 푸터
     '<hr style="border:none;border-top:1px solid rgba(28,26,22,0.1);margin:28px 0 20px;" />' +
     '<p style="margin:0;color:#6E6A60;font-size:13px;line-height:1.9;">' +
@@ -351,9 +328,8 @@ function sendTestWelcomeEmail() {
     email: NOTIFY_EMAIL || Session.getEffectiveUser().getEmail(),
     fullName: '테스트 신청자',
     courses: firstId + ' - ' + (map[firstId] ? map[firstId].name_en : 'Test Course'),
-    lang: 'ko',
   });
-  Logger.log('테스트 웰컴 이메일(한국어)을 발송했습니다. 받은편지함을 확인하세요.');
+  Logger.log('테스트 웰컴 이메일을 발송했습니다. 받은편지함을 확인하세요.');
 }
 
 /**
