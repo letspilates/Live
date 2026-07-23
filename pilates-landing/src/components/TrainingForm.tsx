@@ -33,6 +33,16 @@ interface RemoteCourse {
 
 const COURSES_CACHE_KEY = 'lp-courses-v1';
 
+// "1225" / "$1,050" / "1050.5" 등 어떤 형태로 입력돼도 "$1,225" 형식으로 표시.
+// 숫자로 해석 안 되는 값(예: "TBD")은 입력 그대로 보여준다.
+function formatMoney(v: string): string {
+  const s = (v || '').trim();
+  if (!s) return '';
+  const n = Number(s.replace(/[$,\s]/g, ''));
+  if (Number.isNaN(n)) return s;
+  return '$' + n.toLocaleString('en-US');
+}
+
 function readCachedCourses(): RemoteCourse[] | null {
   try {
     const raw = window.localStorage.getItem(COURSES_CACHE_KEY);
@@ -400,14 +410,15 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                             </span>
                             {c.conductedBy && (
                               <span className="mt-1 block text-[13px] text-mute">
-                                {f.conductedBy} <span className="text-ink">{c.conductedBy}</span>
+                                {f.conductedBy}
+                                <span className="block text-ink">{c.conductedBy}</span>
                               </span>
                             )}
                             {(c.price || c.fee) && (
                               <span className="mt-1 block text-[13px] font-medium text-ink">
-                                {c.price && `${f.courseCost} ${c.price}`}
+                                {c.price && `${f.courseCost} ${formatMoney(c.price)}`}
                                 {c.price && c.fee && '  |  '}
-                                {c.fee && `${f.studioFee} ${c.fee}`}
+                                {c.fee && `${f.studioFee} ${formatMoney(c.fee)}`}
                               </span>
                             )}
                             {c.remaining !== null && !c.full && (

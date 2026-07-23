@@ -182,6 +182,15 @@ function getCourseMap_() {
   return map;
 }
 
+/** "1225" / "$1,050" 등 어떤 입력도 "$1,225" 형식으로 통일. 숫자가 아니면 그대로. */
+function money_(v) {
+  var s = String(v || '').trim();
+  if (!s) return '';
+  var n = Number(s.replace(/[$,\s]/g, ''));
+  if (isNaN(n)) return s;
+  return '$' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
 /** HTML 이스케이프 */
 function escHtml_(s) {
   return String(s || '')
@@ -245,8 +254,8 @@ function sendWelcomeEmail_(data) {
       rows += row(t.time, c.time);
       rows += row(t.duration, c.tag_en || c.tag_kr);
       rows += row(t.conductedBy, c.conducted_by);
-      rows += row(t.price, c.price);
-      rows += row(t.fee, c.fee);
+      rows += row(t.price, money_(c.price));
+      rows += row(t.fee, money_(c.fee));
       var desc = c.desc_en;
       var descHtml = desc
         ? '<p style="margin:10px 0 0;color:#6E6A60;font-size:13px;line-height:1.7;">' +
