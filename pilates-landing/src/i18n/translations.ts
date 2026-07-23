@@ -23,6 +23,7 @@ const en = {
     body: 'In our Los Angeles studio, STOTT PILATES® and the GYROTONIC® Method are taught the way they were meant to be — one body, one instructor, full attention. Strength, length, and ease that follow you out the door.',
     primaryCta: 'Book your first trial class',
     secondaryCta: 'Explore the programs',
+    registerCta: 'Register for teacher training',
     stats: [
       { value: 'Est. 2015', label: 'Los Angeles studio' },
       { value: '1:1', label: 'Private-first instruction' },
@@ -345,6 +346,7 @@ const ko: Content = {
     body: 'Let’s Pilates LA는 STOTT PILATES®와 GYROTONIC®의 공식 교육 방식에 따라 수업을 진행합니다. 모든 수업은 한 명의 강사가 회원 한 분에게 집중하는 1:1 개인 레슨으로 진행됩니다. 몸의 균형과 움직임을 개선하고, 그 변화가 일상까지 이어질 수 있도록 함께합니다.',
     primaryCta: '첫 체험 수업 예약하기',
     secondaryCta: '프로그램 살펴보기',
+    registerCta: '지도자 과정 등록하기',
     stats: [
       { value: 'Est. 2015', label: '로스앤젤레스 스튜디오' },
       { value: '1:1', label: '1:1 중심 수업' },
