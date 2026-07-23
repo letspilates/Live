@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { IMG } from '../media';
 import Eyebrow from './Eyebrow';
 import Heading from './Heading';
@@ -9,6 +9,17 @@ export default function ApproachSection() {
   const { t } = useLang();
   const a = t.approach;
   const [formOpen, setFormOpen] = useState(false);
+
+  // Deep link: letspilatesla.com/#register opens the form directly
+  // (shareable from Instagram bio/DM). Also reacts to in-page hash changes.
+  useEffect(() => {
+    const openFromHash = () => {
+      if (window.location.hash === '#register') setFormOpen(true);
+    };
+    openFromHash();
+    window.addEventListener('hashchange', openFromHash);
+    return () => window.removeEventListener('hashchange', openFromHash);
+  }, []);
 
   return (
     <section id="approach" className="bg-cream py-24 md:py-32 lg:py-40">
