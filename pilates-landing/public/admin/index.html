@@ -173,6 +173,12 @@
           <div><label>기간 (한글)</label><input type="text" data-f="tag_kr" value="${esc(c.tag_kr)}" placeholder="3일" /></div>
           <div><label>정원</label><input type="number" min="0" inputmode="numeric" data-f="capacity" value="${esc(cap)}" placeholder="없음" /></div>
         </div>
+        <div class="field grid-2" style="margin-top:12px">
+          <div><label>시간 (이메일용)</label><input type="text" data-f="time" value="${esc(c.time)}" placeholder="9:00 AM - 5:00 PM" /></div>
+          <div><label>가격 (이메일용)</label><input type="text" data-f="price" value="${esc(c.price)}" placeholder="$1,200" /></div>
+        </div>
+        <div class="field"><label>설명 영문 (이메일용)</label><input type="text" data-f="desc_en" value="${esc(c.desc_en)}" placeholder="Course description shown in the welcome email" /></div>
+        <div class="field"><label>설명 한글 (이메일용)</label><input type="text" data-f="desc_kr" value="${esc(c.desc_kr)}" placeholder="웰컴 이메일에 들어갈 과정 설명" /></div>
         <div class="toggle-row">
           <input type="checkbox" id="act-${esc(c.id) || Math.random().toString(36).slice(2)}" data-f="active" ${isActive ? 'checked' : ''} onchange="this.closest('.card').classList.toggle('hidden-course', !this.checked)" />
           <span>사이트에 표시</span>
@@ -198,6 +204,10 @@
           tag_en: get('tag_en').value.trim(),
           tag_kr: get('tag_kr').value.trim(),
           capacity: get('capacity').value.trim(),
+          time: get('time').value.trim(),
+          price: get('price').value.trim(),
+          desc_en: get('desc_en').value.trim(),
+          desc_kr: get('desc_kr').value.trim(),
           active: get('active').checked,
         };
       }).filter((c) => c.id);

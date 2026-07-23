@@ -30,6 +30,35 @@ var ADMIN_KEY = '';
  */
 var SUBMISSIONS_SHEET_NAME = 'Sheet3';
 
+/**
+ * ★★★ 웰컴 이메일에 들어가는 스튜디오 정보 — 반드시 실제 내용으로 수정하세요! ★★★
+ * (특히 payment / parking / cancel 부분. _kr은 한국어 이메일, _en은 영어 이메일에 사용)
+ */
+var STUDIO = {
+  name: "Let's Pilates LA",
+  address: '672 S La Fayette Park Pl, STE 674, Los Angeles, CA 90057',
+  mapUrl: 'https://maps.google.com/?q=672+S+La+Fayette+Park+Pl+STE+674+Los+Angeles+CA+90057',
+  phone: '310-995-0046',
+  kakao: 'sunnie0210',
+  instagram: '@Letspilates_la',
+  site: 'https://letspilatesla.com',
+
+  payment_kr:
+    '등록 확정은 결제 완료 순으로 진행됩니다. 결제 방법(Zelle/카드/현금 등)과 계좌 정보는 담당자가 개별 연락으로 안내드립니다. 문의: 310-995-0046 / 카카오톡 sunnie0210',
+  payment_en:
+    'Enrollment is confirmed in order of completed payment. Our team will contact you individually with payment methods and details. Questions: 310-995-0046 / KakaoTalk sunnie0210',
+
+  parking_kr:
+    '건물 주차 및 인근 주차 안내는 등록 확정 시 상세히 안내드립니다. 수업 당일 여유 있게 도착해 주세요.',
+  parking_en:
+    'Parking details (building and nearby options) will be provided upon enrollment confirmation. Please arrive with time to spare on training days.',
+
+  cancel_kr:
+    '취소/변경 정책: 코스 시작 14일 전까지 취소 시 전액 환불, 이후에는 수수료가 발생할 수 있습니다. 자세한 내용은 담당자에게 문의해 주세요. 일정 변경이 필요한 경우 최대한 빨리 연락 주시기 바랍니다.',
+  cancel_en:
+    'Cancellation policy: full refund for cancellations made at least 14 days before the course start date; fees may apply afterward. Please contact us as early as possible for any changes.',
+};
+
 /** JSON 응답 헬퍼 */
 function jsonOut_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
@@ -84,6 +113,15 @@ function doPost(e) {
       Logger.log('알림 이메일 발송 실패: ' + mailErr);
     }
 
+    // 신청자 웰컴 이메일 — 실패해도 시트 저장에는 영향 없음
+    try {
+      if (data.email && String(data.email).indexOf('@') > -1) {
+        sendWelcomeEmail_(data);
+      }
+    } catch (welcomeErr) {
+      Logger.log('웰컴 이메일 발송 실패: ' + welcomeErr);
+    }
+
     return ContentService.createTextOutput(
       JSON.stringify({ result: 'success' })
     ).setMimeType(ContentService.MimeType.JSON);
@@ -119,6 +157,203 @@ function sendNotificationEmail_(data) {
   ];
 
   MailApp.sendEmail(recipient, subject, lines.join('\n'));
+}
+
+/** Courses 탭에서 코스 id → 상세정보 맵을 만든다 (웰컴 이메일용) */
+function getCourseMap_() {
+  var map = {};
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Courses');
+  if (!sheet) return map;
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0]) continue;
+    map[cellToString_(r[0])] = {
+      name_en: cellToString_(r[1]),
+      name_kr: cellToString_(r[2]),
+      dates: cellToString_(r[3]),
+      tag_en: cellToString_(r[4]),
+      tag_kr: cellToString_(r[5]),
+      time: r.length > 8 ? cellToString_(r[8]) : '',
+      price: r.length > 9 ? cellToString_(r[9]) : '',
+      desc_en: r.length > 10 ? cellToString_(r[10]) : '',
+      desc_kr: r.length > 11 ? cellToString_(r[11]) : '',
+    };
+  }
+  return map;
+}
+
+/** HTML 이스케이프 */
+function escHtml_(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/** 신청자에게 사이트 테마의 HTML 웰컴 이메일을 발송한다 */
+function sendWelcomeEmail_(data) {
+  var ko = String(data.lang || 'ko') !== 'en';
+  var courseMap = getCourseMap_();
+
+  // "A - ..., C - ..." → 선택한 코스 id 목록
+  var ids = [];
+  String(data.courses || '')
+    .split(', ')
+    .forEach(function (part) {
+      var m = part.match(/^(\S+) - /);
+      if (m) ids.push(m[1]);
+    });
+
+  var name = escHtml_(data.fullName || '');
+  var t = ko
+    ? {
+        subject: "[Let's Pilates LA] 등록 신청이 접수되었습니다",
+        hello: name + '님, 안녕하세요!',
+        intro:
+          "Let's Pilates LA 지도자 과정에 관심을 가져주셔서 감사합니다. 아래 내용으로 등록 신청이 접수되었으며, 저희 팀이 검토 후 곧 연락드리겠습니다.",
+        yourCourses: '신청하신 프로그램',
+        dates: '일정',
+        time: '시간',
+        duration: '기간',
+        price: '수강료',
+        tba: '추후 공지',
+        payment: '결제 안내',
+        location: '위치 & 주차',
+        parking: '주차 안내',
+        cancel: '취소 / 변경 정책',
+        questions: '궁금한 점이 있으시면 언제든 연락 주세요.',
+        map: '지도 보기',
+      }
+    : {
+        subject: "[Let's Pilates LA] Your registration has been received",
+        hello: 'Hello ' + name + ',',
+        intro:
+          "Thank you for your interest in our teacher training courses at Let's Pilates LA. We have received your registration below, and our team will review it and contact you shortly.",
+        yourCourses: 'Your selected program(s)',
+        dates: 'Dates',
+        time: 'Time',
+        duration: 'Duration',
+        price: 'Tuition',
+        tba: 'To be announced',
+        payment: 'Payment',
+        location: 'Location & Parking',
+        parking: 'Parking',
+        cancel: 'Cancellation Policy',
+        questions: 'If you have any questions, feel free to reach out anytime.',
+        map: 'View map',
+      };
+
+  // 코스 카드 블록
+  var courseBlocks = ids
+    .map(function (id) {
+      var c = courseMap[id];
+      if (!c) return '';
+      var cname = escHtml_(ko ? c.name_kr || c.name_en : c.name_en);
+      var rows = '';
+      function row(label, value) {
+        if (!value) return '';
+        return (
+          '<tr><td style="padding:3px 12px 3px 0;color:#6E6A60;font-size:13px;white-space:nowrap;vertical-align:top;">' +
+          label +
+          '</td><td style="padding:3px 0;color:#1C1A16;font-size:13px;">' +
+          escHtml_(value) +
+          '</td></tr>'
+        );
+      }
+      rows += row(t.dates, c.dates || t.tba);
+      rows += row(t.time, c.time);
+      rows += row(t.duration, ko ? c.tag_kr || c.tag_en : c.tag_en);
+      rows += row(t.price, c.price);
+      var desc = ko ? c.desc_kr || c.desc_en : c.desc_en;
+      var descHtml = desc
+        ? '<p style="margin:10px 0 0;color:#6E6A60;font-size:13px;line-height:1.7;">' +
+          escHtml_(desc) +
+          '</p>'
+        : '';
+      return (
+        '<div style="background:#FBF8F2;border-radius:14px;padding:18px 20px;margin-top:12px;">' +
+        '<p style="margin:0 0 8px;font-size:15px;font-weight:700;color:#1C1A16;">' +
+        cname +
+        '</p><table cellpadding="0" cellspacing="0" border="0">' +
+        rows +
+        '</table>' +
+        descHtml +
+        '</div>'
+      );
+    })
+    .join('');
+
+  function section(title, body) {
+    return (
+      '<h3 style="margin:28px 0 8px;font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:#5E6B4F;">' +
+      title +
+      '</h3><p style="margin:0;color:#1C1A16;font-size:14px;line-height:1.8;">' +
+      body +
+      '</p>'
+    );
+  }
+
+  var html =
+    '<div style="background:#FBF8F2;padding:32px 16px;font-family:-apple-system,\'Apple SD Gothic Neo\',\'Malgun Gothic\',Helvetica,Arial,sans-serif;">' +
+    '<div style="max-width:600px;margin:0 auto;background:#FFFFFF;border-radius:20px;padding:36px 32px;border:1px solid rgba(28,26,22,0.08);">' +
+    // 헤더
+    '<p style="margin:0;font-size:22px;font-weight:700;letter-spacing:-0.01em;color:#1C1A16;">Let&#39;s Pilates LA</p>' +
+    '<p style="margin:4px 0 0;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#5E6B4F;">Pilates Studio &nbsp;|&nbsp; GYROTONIC&reg;</p>' +
+    '<hr style="border:none;border-top:1px solid rgba(28,26,22,0.1);margin:24px 0;" />' +
+    // 인사
+    '<p style="margin:0 0 6px;font-size:16px;font-weight:700;color:#1C1A16;">' + t.hello + '</p>' +
+    '<p style="margin:0;color:#6E6A60;font-size:14px;line-height:1.8;">' + t.intro + '</p>' +
+    // 코스
+    '<h3 style="margin:28px 0 4px;font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:#5E6B4F;">' +
+    t.yourCourses +
+    '</h3>' +
+    courseBlocks +
+    // 결제
+    section(t.payment, escHtml_(ko ? STUDIO.payment_kr : STUDIO.payment_en)) +
+    // 위치 & 주차
+    section(
+      t.location,
+      escHtml_(STUDIO.address) +
+        ' &nbsp;·&nbsp; <a href="' + STUDIO.mapUrl + '" style="color:#5E6B4F;">' + t.map + '</a>' +
+        '<br />' +
+        escHtml_(ko ? STUDIO.parking_kr : STUDIO.parking_en)
+    ) +
+    // 취소 정책
+    section(t.cancel, escHtml_(ko ? STUDIO.cancel_kr : STUDIO.cancel_en)) +
+    // 푸터
+    '<hr style="border:none;border-top:1px solid rgba(28,26,22,0.1);margin:28px 0 20px;" />' +
+    '<p style="margin:0;color:#6E6A60;font-size:13px;line-height:1.9;">' +
+    t.questions +
+    '<br />&#9742; ' + escHtml_(STUDIO.phone) +
+    ' &nbsp;·&nbsp; KakaoTalk ' + escHtml_(STUDIO.kakao) +
+    ' &nbsp;·&nbsp; Instagram ' + escHtml_(STUDIO.instagram) +
+    '<br /><a href="' + STUDIO.site + '" style="color:#5E6B4F;">letspilatesla.com</a></p>' +
+    '</div></div>';
+
+  MailApp.sendEmail({
+    to: String(data.email).trim(),
+    subject: t.subject,
+    htmlBody: html,
+    body: t.hello + '\n\n' + t.intro + '\n\n' + STUDIO.site, // HTML 미지원 클라이언트용
+    name: STUDIO.name,
+  });
+}
+
+/**
+ * ★ 웰컴 이메일 미리보기 테스트 — NOTIFY_EMAIL(또는 시트 소유자)에게 샘플 발송.
+ * 함수 드롭다운에서 선택 후 ▶ 실행. Courses 탭의 실제 첫 코스 데이터로 만들어진다.
+ */
+function sendTestWelcomeEmail() {
+  var map = getCourseMap_();
+  var firstId = Object.keys(map)[0] || 'A';
+  sendWelcomeEmail_({
+    email: NOTIFY_EMAIL || Session.getEffectiveUser().getEmail(),
+    fullName: '테스트 신청자',
+    courses: firstId + ' - ' + (map[firstId] ? map[firstId].name_en : 'Test Course'),
+    lang: 'ko',
+  });
+  Logger.log('테스트 웰컴 이메일(한국어)을 발송했습니다. 받은편지함을 확인하세요.');
 }
 
 /**
@@ -165,6 +400,10 @@ function doGet(e) {
           capacity: capacity,
           taken: counts[id] || 0,
           active: isActive,
+          time: r.length > 8 ? cellToString_(r[8]) : '',
+          price: r.length > 9 ? cellToString_(r[9]) : '',
+          desc_en: r.length > 10 ? cellToString_(r[10]) : '',
+          desc_kr: r.length > 11 ? cellToString_(r[11]) : '',
         });
       }
     }
@@ -194,7 +433,7 @@ function handleUpdateCourses_(data) {
     }
 
     var last = sheet.getLastRow();
-    if (last > 1) sheet.getRange(2, 1, last - 1, 8).clearContent();
+    if (last > 1) sheet.getRange(2, 1, last - 1, 12).clearContent();
 
     var rows = [];
     for (var i = 0; i < courses.length; i++) {
@@ -211,9 +450,13 @@ function handleUpdateCourses_(data) {
         c.capacity === '' || c.capacity === null || c.capacity === undefined || isNaN(Number(c.capacity))
           ? ''
           : Number(c.capacity),
+        String(c.time || ''),
+        String(c.price || ''),
+        String(c.desc_en || ''),
+        String(c.desc_kr || ''),
       ]);
     }
-    if (rows.length) sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+    if (rows.length) sheet.getRange(2, 1, rows.length, 12).setValues(rows);
 
     return jsonOut_({ result: 'success', saved: rows.length });
   } catch (error) {
@@ -271,12 +514,12 @@ function setupCoursesTab() {
 
   var sheet = ss.insertSheet('Courses');
   var rows = [
-    ['id', 'name_en', 'name_kr', 'dates', 'tag_en', 'tag_kr', 'active', 'capacity'],
-    ['A', 'GYROTONIC® Level 1 Foundation Course', 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', '', '12 days', '12일', 'TRUE', ''],
-    ['B', 'GYROTONIC® Level 2 Program 1 — Pre-Training', 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', '', '3 days', '3일', 'TRUE', ''],
-    ['C', 'GYROTONIC® Jumping Stretching Board Course', 'GYROTONIC® 점핑 스트레칭 보드 과정 (Jumping Stretching Board)', '', '7 days', '7일', 'TRUE', ''],
-    ['D', 'GYROTONIC® Level 1 Apprentice Review Course', 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', '', '6 days', '6일', 'TRUE', ''],
-    ['E', 'GYROTONIC® Level 2 Program 1 — Foundation Course', 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', '', '4 days', '4일', 'TRUE', ''],
+    ['id', 'name_en', 'name_kr', 'dates', 'tag_en', 'tag_kr', 'active', 'capacity', 'time', 'price', 'desc_en', 'desc_kr'],
+    ['A', 'GYROTONIC® Level 1 Foundation Course', 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', '', '12 days', '12일', 'TRUE', '', '', '', '', ''],
+    ['B', 'GYROTONIC® Level 2 Program 1 — Pre-Training', 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', '', '3 days', '3일', 'TRUE', '', '', '', '', ''],
+    ['C', 'GYROTONIC® Jumping Stretching Board Course', 'GYROTONIC® 점핑 스트레칭 보드 과정 (Jumping Stretching Board)', '', '7 days', '7일', 'TRUE', '', '', '', '', ''],
+    ['D', 'GYROTONIC® Level 1 Apprentice Review Course', 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', '', '6 days', '6일', 'TRUE', '', '', '', '', ''],
+    ['E', 'GYROTONIC® Level 2 Program 1 — Foundation Course', 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', '', '4 days', '4일', 'TRUE', '', '', '', '', ''],
   ];
   sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
 
@@ -300,13 +543,14 @@ function upgradeCoursesTab() {
     setupCoursesTab();
     return;
   }
-  var h1 = String(sheet.getRange('H1').getValue()).trim();
-  if (h1 !== 'capacity') {
-    sheet.getRange('H1').setValue('capacity').setFontWeight('bold');
-    Logger.log('capacity 열을 추가했습니다. 각 코스의 H열에 정원 숫자를 입력하세요.');
-  } else {
-    Logger.log('capacity 열이 이미 있습니다.');
+  // 누락된 열 헤더 보충 (H: capacity, I: time, J: price, K: desc_en, L: desc_kr)
+  var wanted = { H1: 'capacity', I1: 'time', J1: 'price', K1: 'desc_en', L1: 'desc_kr' };
+  for (var cell in wanted) {
+    if (String(sheet.getRange(cell).getValue()).trim() !== wanted[cell]) {
+      sheet.getRange(cell).setValue(wanted[cell]).setFontWeight('bold');
+    }
   }
+  Logger.log('Courses 탭 열 확인/보충 완료 (capacity, time, price, desc_en, desc_kr).');
 }
 
 /**
