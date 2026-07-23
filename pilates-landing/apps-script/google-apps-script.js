@@ -17,6 +17,21 @@
 var NOTIFY_EMAIL = '';
 
 /**
+ * 웰컴 이메일의 발신 주소 (선택사항).
+ * ⚠️ 이 계정(Gmail)의 설정 → 계정 → "다른 주소에서 메일 보내기"에 별칭으로
+ * 등록·인증된 주소만 사용할 수 있다. 예: 'letspilatesla@gmail.com'
+ * 비워두면 시트 소유 계정 주소로 발신된다.
+ */
+var SENDER_ALIAS = '';
+
+/**
+ * 신청자가 "답장"을 눌렀을 때 답장이 가는 주소 (선택사항).
+ * 별칭 등록 없이 바로 쓸 수 있다. 예: 'letspilatesla@gmail.com'
+ * 비워두면 발신 주소로 답장이 간다.
+ */
+var REPLY_TO = '';
+
+/**
  * 관리자 페이지(letspilatesla.com/admin/) 비밀번호 (선택사항).
  * 비워두면('') 비밀번호 없이 저장할 수 있다.
  * 따옴표 안에 값을 넣으면 그 비밀번호를 아는 사람만 저장할 수 있다.
@@ -322,13 +337,29 @@ function sendWelcomeEmail_(data) {
     '<br /><a href="' + STUDIO.site + '" style="color:#5E6B4F;">letspilatesla.com</a></p>' +
     '</div></div>';
 
-  MailApp.sendEmail({
-    to: String(data.email).trim(),
-    subject: t.subject,
+  var options = {
     htmlBody: html,
-    body: t.hello + '\n\n' + t.intro + '\n\n' + STUDIO.site, // HTML 미지원 클라이언트용
     name: STUDIO.name,
-  });
+  };
+  if (REPLY_TO) options.replyTo = REPLY_TO;
+
+  var plainBody = t.hello + '\n\n' + t.intro + '\n\n' + STUDIO.site; // HTML 미지원 클라이언트용
+
+  if (SENDER_ALIAS) {
+    // 별칭 발신은 GmailApp만 지원 (별칭 미등록 주소면 오류 → 기본 발신으로 재시도)
+    try {
+      options.from = SENDER_ALIAS;
+      GmailApp.sendEmail(String(data.email).trim(), t.subject, plainBody, options);
+      return;
+    } catch (aliasErr) {
+      Logger.log('별칭 발신 실패, 기본 주소로 재시도: ' + aliasErr);
+      delete options.from;
+    }
+  }
+  options.to = String(data.email).trim();
+  options.subject = t.subject;
+  options.body = plainBody;
+  MailApp.sendEmail(options);
 }
 
 /**
