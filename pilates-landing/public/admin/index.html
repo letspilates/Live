@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>코스 관리 — Let's Pilates LA</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #FBF8F2;
+      color: #1C1A16;
+      font-family: -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      padding: 32px 16px 64px;
+    }
+    .wrap { max-width: 1080px; margin: 0 auto; }
+    h1 { font-size: 22px; font-weight: 700; }
+    .sub { color: #6E6A60; font-size: 13px; margin-top: 6px; line-height: 1.6; }
+    .bar {
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      margin-top: 20px;
+    }
+    input, button {
+      font: inherit; font-size: 14px;
+      border: 1px solid rgba(28,26,22,0.15); border-radius: 10px;
+      padding: 9px 12px; background: #fff; color: #1C1A16; outline: none;
+    }
+    input:focus { border-color: #5E6B4F; box-shadow: 0 0 0 3px rgba(94,107,79,0.15); }
+    button { cursor: pointer; border: none; font-weight: 600; }
+    .btn-save { background: #5E6B4F; color: #FBF8F2; padding: 10px 22px; border-radius: 999px; }
+    .btn-save:hover { background: #434D38; }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-add { background: #F2EBDD; color: #1C1A16; border-radius: 999px; padding: 10px 18px; }
+    .btn-del {
+      background: transparent; color: #B08763; font-size: 18px; line-height: 1;
+      padding: 6px 8px; border-radius: 8px;
+    }
+    .btn-del:hover { background: rgba(176,135,99,0.12); }
+    .status { font-size: 13px; font-weight: 600; }
+    .status.ok { color: #5E6B4F; }
+    .status.err { color: #C0392B; }
+    .table-scroll {
+      overflow-x: auto; margin-top: 20px;
+      background: #fff; border: 1px solid rgba(28,26,22,0.1); border-radius: 16px;
+    }
+    table { border-collapse: collapse; width: 100%; min-width: 980px; }
+    th, td { padding: 10px 8px; text-align: left; vertical-align: middle; }
+    th {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #6E6A60; border-bottom: 1px solid rgba(28,26,22,0.1);
+      background: #FBF8F2; white-space: nowrap; padding: 12px 8px;
+    }
+    tr + tr td { border-top: 1px solid rgba(28,26,22,0.06); }
+    td input[type="text"], td input[type="number"] { width: 100%; padding: 8px 10px; font-size: 13px; }
+    .col-id { width: 56px; } .col-id input { text-align: center; font-weight: 700; }
+    .col-name { min-width: 220px; }
+    .col-dates { min-width: 140px; }
+    .col-tag { width: 90px; }
+    .col-cap { width: 74px; }
+    .col-taken, .col-remain { width: 64px; text-align: center; font-size: 13px; color: #6E6A60; white-space: nowrap; }
+    .col-active { width: 60px; text-align: center; }
+    .col-active input { width: 18px; height: 18px; accent-color: #5E6B4F; cursor: pointer; }
+    .col-del { width: 44px; text-align: center; }
+    .remain-full { color: #B08763; font-weight: 700; }
+    .hint {
+      margin-top: 14px; font-size: 12px; color: #6E6A60; line-height: 1.7;
+      background: #F2EBDD; border-radius: 12px; padding: 12px 16px;
+    }
+    .loading { padding: 48px; text-align: center; color: #6E6A60; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>코스 관리</h1>
+    <p class="sub">
+      여기서 저장하면 구글 시트(Courses 탭)에 바로 기록되고, 사이트 등록 폼에 즉시 반영됩니다.<br />
+      신청자 수(접수)는 자동 집계라 여기서 수정하지 않습니다.
+    </p>
+
+    <div class="bar">
+      <input type="password" id="adminKey" placeholder="관리자 비밀번호" style="width:180px" />
+      <button class="btn-add" onclick="addRow()">+ 코스 추가</button>
+      <span style="flex:1"></span>
+      <span class="status" id="status"></span>
+      <button class="btn-save" id="saveBtn" onclick="save()">저장</button>
+    </div>
+
+    <div class="table-scroll">
+      <table id="tbl" style="display:none">
+        <thead>
+          <tr>
+            <th class="col-id">ID</th>
+            <th class="col-name">코스명 (영문)</th>
+            <th class="col-name">코스명 (한글)</th>
+            <th class="col-dates">일정 (dates)</th>
+            <th class="col-tag">기간 EN</th>
+            <th class="col-tag">기간 KR</th>
+            <th class="col-cap">정원</th>
+            <th class="col-taken">신청</th>
+            <th class="col-remain">남은자리</th>
+            <th class="col-active">표시</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="loading" id="loading">코스 목록을 불러오는 중...</div>
+    </div>
+
+    <p class="hint">
+      · <b>정원</b>을 비우면 자리 표시 없이 항상 신청 가능, <b>0</b>을 넣으면 즉시 "마감" 처리됩니다.<br />
+      · <b>표시</b> 체크를 끄면 사이트에서 그 코스가 숨겨집니다 (행 삭제 없이 임시 숨김).<br />
+      · <b>일정</b>은 자유 텍스트입니다. 예: <code>7/24 - 7/26</code> 또는 <code>8/7 - 8/9, 8/13 - 8/16</code><br />
+      · 저장 후 사이트 반영 확인: <a href="../#register">등록 폼 열어보기</a>
+    </p>
+  </div>
+
+  <script>
+    const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyTr-4dV5Q-dweH7QAB4i6UeFkt2eh97kHMgrNEpF2n7mGCfC3y2c6J2zWuPpGoJcAS/exec';
+    const KEY_STORE = 'lp-admin-key';
+
+    const rowsEl = document.getElementById('rows');
+    const statusEl = document.getElementById('status');
+    const keyEl = document.getElementById('adminKey');
+    keyEl.value = localStorage.getItem(KEY_STORE) || '';
+
+    function esc(s) {
+      return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    function rowHtml(c) {
+      const cap = c.capacity === null || c.capacity === undefined ? '' : c.capacity;
+      const taken = c.taken ?? '–';
+      let remain = '–';
+      let remainCls = '';
+      if (cap !== '' && !isNaN(Number(cap))) {
+        const r = Math.max(0, Number(cap) - (Number(c.taken) || 0));
+        remain = r === 0 ? '마감' : r;
+        if (r === 0) remainCls = 'remain-full';
+      }
+      return `<tr>
+        <td class="col-id"><input type="text" data-f="id" value="${esc(c.id)}" /></td>
+        <td class="col-name"><input type="text" data-f="name_en" value="${esc(c.name_en)}" /></td>
+        <td class="col-name"><input type="text" data-f="name_kr" value="${esc(c.name_kr)}" /></td>
+        <td class="col-dates"><input type="text" data-f="dates" value="${esc(c.dates)}" placeholder="비우면 추후 공지" /></td>
+        <td class="col-tag"><input type="text" data-f="tag_en" value="${esc(c.tag_en)}" /></td>
+        <td class="col-tag"><input type="text" data-f="tag_kr" value="${esc(c.tag_kr)}" /></td>
+        <td class="col-cap"><input type="number" min="0" data-f="capacity" value="${esc(cap)}" /></td>
+        <td class="col-taken">${esc(taken)}</td>
+        <td class="col-remain ${remainCls}">${esc(remain)}</td>
+        <td class="col-active"><input type="checkbox" data-f="active" ${c.active !== false ? 'checked' : ''} /></td>
+        <td class="col-del"><button class="btn-del" title="삭제" onclick="this.closest('tr').remove()">✕</button></td>
+      </tr>`;
+    }
+
+    function readRows() {
+      return [...rowsEl.querySelectorAll('tr')].map((tr) => {
+        const get = (f) => tr.querySelector(`[data-f="${f}"]`);
+        return {
+          id: get('id').value.trim(),
+          name_en: get('name_en').value.trim(),
+          name_kr: get('name_kr').value.trim(),
+          dates: get('dates').value.trim(),
+          tag_en: get('tag_en').value.trim(),
+          tag_kr: get('tag_kr').value.trim(),
+          capacity: get('capacity').value.trim(),
+          active: get('active').checked,
+        };
+      }).filter((c) => c.id);
+    }
+
+    function setStatus(msg, ok) {
+      statusEl.textContent = msg;
+      statusEl.className = 'status ' + (ok ? 'ok' : 'err');
+    }
+
+    function addRow() {
+      rowsEl.insertAdjacentHTML('beforeend', rowHtml({ id: '', name_en: '', name_kr: '', dates: '', tag_en: '', tag_kr: '', capacity: '', taken: 0, active: true }));
+    }
+
+    async function load() {
+      try {
+        const res = await fetch(ENDPOINT + '?all=1');
+        const j = await res.json();
+        if (j.result !== 'success') throw new Error(j.message || 'load failed');
+        rowsEl.innerHTML = j.courses.map(rowHtml).join('');
+        document.getElementById('tbl').style.display = '';
+        document.getElementById('loading').style.display = 'none';
+      } catch (e) {
+        document.getElementById('loading').textContent =
+          '목록을 불러오지 못했습니다. 새로고침해 보세요. (' + e.message + ')';
+      }
+    }
+
+    async function save() {
+      const key = keyEl.value.trim();
+      if (!key) { setStatus('비밀번호를 입력하세요', false); keyEl.focus(); return; }
+      localStorage.setItem(KEY_STORE, key);
+
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      setStatus('저장 중...', true);
+
+      try {
+        const body = new URLSearchParams({
+          action: 'updateCourses',
+          key,
+          courses: JSON.stringify(readRows()),
+        });
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        });
+        let j = null;
+        try { j = await res.json(); } catch { /* 응답을 못 읽는 브라우저 환경 대비 */ }
+        if (j && j.result === 'error') {
+          throw new Error(j.message === 'unauthorized' ? '비밀번호가 틀렸습니다' : j.message);
+        }
+        // 시트에서 다시 읽어와 실제 반영을 확인 (진짜 저장 여부의 기준)
+        await load();
+        setStatus('✓ 저장 완료 — 사이트에 반영되었습니다', true);
+      } catch (e) {
+        setStatus('저장 실패: ' + e.message, false);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
