@@ -395,6 +395,15 @@ function sendTestWelcomeEmail() {
 function doGet(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // ?registrations=1 → 접수(등록자) 목록 반환 — 관리자 페이지 등록자 탭용
+    if (e && e.parameter && e.parameter.registrations === '1') {
+      if (ADMIN_KEY && String(e.parameter.key || '') !== ADMIN_KEY) {
+        return jsonOut_({ result: 'error', message: 'unauthorized' });
+      }
+      return jsonOut_({ result: 'success', registrations: getRegistrations_(ss) });
+    }
+
     var sheet = ss.getSheetByName('Courses');
     var courses = [];
 
@@ -495,6 +504,44 @@ function handleUpdateCourses_(data) {
   } catch (error) {
     return jsonOut_({ result: 'error', message: error.toString() });
   }
+}
+
+/** 접수 탭(Sheet3)의 모든 등록자 행을 최신순 배열로 반환 (이메일 있는 실제 신청만) */
+function getRegistrations_(ss) {
+  var sub = getSubmissionsSheet_(ss);
+  var out = [];
+  if (!sub) return out;
+  var values = sub.getDataRange().getValues();
+  for (var i = 0; i < values.length; i++) {
+    var r = values[i];
+    var email = String(r[3] || '');
+    if (email.indexOf('@') === -1) continue; // 헤더/불완전 행 제외
+    out.push({
+      timestamp: tsToString_(r[0]),
+      courses: String(r[1] || ''),
+      fullName: String(r[2] || ''),
+      email: email,
+      phone: String(r[4] || ''),
+      certification: String(r[5] || ''),
+      studio: String(r[6] || ''),
+      cityState: String(r[7] || ''),
+      questions: String(r[8] || ''),
+      stage: String(r[9] || ''),
+      prereq: String(r[10] || ''),
+      availability: String(r[11] || ''),
+      anythingElse: String(r[12] || ''),
+    });
+  }
+  return out.reverse(); // 최신 신청이 위로
+}
+
+/** 타임스탬프 셀 → 읽기 좋은 문자열 (Date 셀/ISO 문자열 모두 처리) */
+function tsToString_(v) {
+  var d = null;
+  if (Object.prototype.toString.call(v) === '[object Date]') d = v;
+  else if (v && !isNaN(new Date(v).getTime())) d = new Date(v);
+  if (!d) return String(v || '');
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'M/d/yyyy h:mm a');
 }
 
 /**
