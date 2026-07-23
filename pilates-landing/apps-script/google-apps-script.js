@@ -10,11 +10,12 @@
  */
 
 /**
- * 알림 받을 이메일 주소. 빈 문자열('')이면 시트 소유자(스크립트 계정)로 발송된다.
- * 다른 주소로 받고 싶으면 따옴표 안에 입력: 예) 'studio@example.com'
- * 여러 명이면 쉼표로 구분: 예) 'a@x.com,b@y.com'
+ * 신청 알림을 받을 이메일 주소. 여러 명이면 쉼표로 구분: 예) 'a@x.com,b@y.com'
+ * 여기 적힌 주소들은 BCC(숨은 참조)로 받아서 서로의 주소가 보이지 않는다.
+ * (받는사람(To)은 시트 소유 계정으로 표시된다)
+ * 빈 문자열('')이면 시트 소유자에게만 발송된다.
  */
-var NOTIFY_EMAIL = '';
+var NOTIFY_EMAIL = 'sunnie0210@gmail.com,calvin3919@gmail.com';
 
 /**
  * 웰컴 이메일의 발신 주소 (선택사항).
@@ -144,9 +145,9 @@ function doPost(e) {
   }
 }
 
-/** 새 신청 내용을 이메일로 발송 */
+/** 새 신청 내용을 이메일로 발송 (NOTIFY_EMAIL 주소들은 BCC로 수신) */
 function sendNotificationEmail_(data) {
-  var recipient = NOTIFY_EMAIL || Session.getEffectiveUser().getEmail();
+  var owner = Session.getEffectiveUser().getEmail();
   var subject = "[Let's Pilates LA] 새 지도자 과정 등록 신청 — " + (data.fullName || '이름 없음');
 
   var lines = [
@@ -168,7 +169,14 @@ function sendNotificationEmail_(data) {
     '전체 접수 내역: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl(),
   ];
 
-  MailApp.sendEmail(recipient, subject, lines.join('\n'));
+  var mail = {
+    to: owner,
+    subject: subject,
+    body: lines.join('\n'),
+    name: STUDIO.name,
+  };
+  if (NOTIFY_EMAIL) mail.bcc = NOTIFY_EMAIL;
+  MailApp.sendEmail(mail);
 }
 
 /** Courses 탭에서 코스 id → 상세정보 맵을 만든다 (웰컴 이메일용) */
@@ -370,7 +378,7 @@ function sendTestWelcomeEmail() {
   var map = getCourseMap_();
   var firstId = Object.keys(map)[0] || 'A';
   sendWelcomeEmail_({
-    email: NOTIFY_EMAIL || Session.getEffectiveUser().getEmail(),
+    email: Session.getEffectiveUser().getEmail(),
     fullName: '테스트 신청자',
     courses: firstId + ' - ' + (map[firstId] ? map[firstId].name_en : 'Test Course'),
   });
