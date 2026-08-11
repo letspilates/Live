@@ -195,7 +195,7 @@ const en = {
       eunice: {
         name: 'Eunice Choi',
         role: 'Instructor',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Gyrokinesis®', 'Archway', 'GYROTONIC® Jumping Stretching Board', 'Pre / Post Natal'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROKINESIS®', 'GYROTONIC® Archway', 'GYROTONIC® Jumping Stretching Board', 'Pre / Post Natal'],
       },
       soo: {
         name: 'Su Kyung Yi',
@@ -525,7 +525,7 @@ const ko: Content = {
       eunice: {
         name: 'Eunice Choi',
         role: '강사',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'Gyrokinesis®', 'Archway', 'GYROTONIC® Jumping Stretching Board', '산전 · 산후'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROKINESIS®', 'GYROTONIC® Archway', 'GYROTONIC® Jumping Stretching Board', '산전 · 산후'],
       },
       soo: {
         name: 'Su Kyung Yi',
