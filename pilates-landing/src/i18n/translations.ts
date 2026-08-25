@@ -175,7 +175,7 @@ const en = {
   },
   instructors: {
     eyebrow: 'Instructors',
-    title: ['Four internationally', 'certified', 'dedicated instructors'],
+    title: ['Five internationally', 'certified', 'dedicated instructors'],
     titleAccentIndex: 1,
     body: 'Every instructor is certified through the international GYROTONIC® and STOTT PILATES® programs. The instructor who runs your first assessment stays with you to the end.',
     people: {
@@ -204,6 +204,11 @@ const en = {
       },
       haley: {
         name: 'Haley Han',
+        role: 'Instructor',
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', 'Pre / Post Natal'],
+      },
+      danielle: {
+        name: 'Danielle Kim',
         role: 'Instructor',
         certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', 'Pre / Post Natal'],
       },
@@ -534,6 +539,11 @@ const ko: Content = {
       },
       haley: {
         name: 'Haley Han',
+        role: '강사',
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', '산전 · 산후'],
+      },
+      danielle: {
+        name: 'Danielle Kim',
         role: '강사',
         certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', '산전 · 산후'],
       },
