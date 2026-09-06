@@ -10,36 +10,63 @@
  */
 
 /**
- * 신청 알림을 받을 이메일 주소. 여러 명이면 쉼표로 구분: 예) 'a@x.com,b@y.com'
- * 여기 적힌 주소들은 BCC(숨은 참조)로 받아서 서로의 주소가 보이지 않는다.
- * (받는사람(To)은 시트 소유 계정으로 표시된다)
- * 빈 문자열('')이면 시트 소유자에게만 발송된다.
+ * ★★★ 설정값은 코드가 아니라 "스크립트 속성"에 넣는다 ★★★
+ *
+ * 이 저장소는 공개(public) 저장소라, 비밀번호와 개인 이메일 주소를 코드에 적으면
+ * GitHub에 그대로 노출된다. 그래서 아래 네 가지는 Apps Script 프로젝트 안에만 저장한다.
+ *
+ *   Apps Script 편집기 → 왼쪽 ⚙️ 프로젝트 설정 → 맨 아래 "스크립트 속성"
+ *   → 속성 추가 → 속성 이름과 값을 넣고 저장
+ *
+ * | 속성 이름      | 값 예시                                   | 설명                                    |
+ * |---------------|------------------------------------------|-----------------------------------------|
+ * | ADMIN_KEY     | MySecret123!                             | 관리자 페이지 로그인 비밀번호            |
+ * | NOTIFY_EMAIL  | a@gmail.com,b@gmail.com                  | 신청 알림 받을 주소 (쉼표 구분, BCC 수신) |
+ * | SENDER_ALIAS  | letspilatesla@gmail.com                  | 웰컴 이메일 발신 주소 (Gmail 별칭 등록 필요) |
+ * | REPLY_TO      | letspilatesla@gmail.com                  | 신청자가 답장할 주소 (별칭 등록 불필요)   |
+ *
+ * 한 번만 등록해 두면 이 파일 전체를 다시 붙여넣어도 값이 지워지지 않는다.
+ * 값을 바꾼 뒤에는 재배포 없이 바로 적용된다(코드 상수와 달리 실행 시점에 읽는다).
+ *
+ * 아래 상수들은 스크립트 속성이 없을 때만 쓰이는 예비값이다.
+ * 공개 저장소에 올릴 파일에는 전부 빈 문자열로 둔다.
  */
-var NOTIFY_EMAIL = 'sunnie0210@gmail.com,calvin3919@gmail.com';
 
-/**
- * 웰컴 이메일의 발신 주소 (선택사항).
- * ⚠️ 이 계정(Gmail)의 설정 → 계정 → "다른 주소에서 메일 보내기"에 별칭으로
- * 등록·인증된 주소만 사용할 수 있다. 예: 'letspilatesla@gmail.com'
- * 비워두면 시트 소유 계정 주소로 발신된다.
- */
+/** 관리자 페이지 로그인 비밀번호 — 비어 있으면 로그인·등록자 조회·코스 저장이 모두 거부된다 */
+var ADMIN_KEY = '';
+
+/** 신청 알림 수신 주소 (쉼표 구분). 비워두면 시트 소유자에게만 발송된다 */
+var NOTIFY_EMAIL = '';
+
+/** 웰컴 이메일 발신 주소. 비워두면 시트 소유 계정 주소로 발신된다 */
 var SENDER_ALIAS = '';
 
-/**
- * 신청자가 "답장"을 눌렀을 때 답장이 가는 주소 (선택사항).
- * 별칭 등록 없이 바로 쓸 수 있다. 예: 'letspilatesla@gmail.com'
- * 비워두면 발신 주소로 답장이 간다.
- */
+/** 신청자가 "답장"을 눌렀을 때 가는 주소. 비워두면 발신 주소로 간다 */
 var REPLY_TO = '';
 
-/**
- * ★★★ 관리자 페이지(letspilatesla.com/admin/) 로그인 비밀번호 — 반드시 설정하세요! ★★★
- * 관리자 페이지는 이 비밀번호로 로그인해야 들어갈 수 있다.
- * 비워두면('') 로그인 자체가 거부된다 (관리자 페이지 사용 불가).
- * 예: var ADMIN_KEY = 'MySecret123!';
- * (수정 후 저장 + "배포 관리 → 연필 → 새 버전" 재배포를 해야 적용됩니다)
- */
-var ADMIN_KEY = '';
+/** 스크립트 속성을 먼저 읽고, 없으면 위 상수를 쓴다 */
+function config_(name, fallback) {
+  try {
+    var v = PropertiesService.getScriptProperties().getProperty(name);
+    if (v && String(v).trim()) return String(v).trim();
+  } catch (err) {
+    // 속성을 읽을 수 없으면 예비값으로 넘어간다
+  }
+  return String(fallback || '').trim();
+}
+
+function adminKey_() {
+  return config_('ADMIN_KEY', ADMIN_KEY);
+}
+function notifyEmail_() {
+  return config_('NOTIFY_EMAIL', NOTIFY_EMAIL);
+}
+function senderAlias_() {
+  return config_('SENDER_ALIAS', SENDER_ALIAS);
+}
+function replyTo_() {
+  return config_('REPLY_TO', REPLY_TO);
+}
 
 /**
  * 접수(등록)가 기록되는 탭 이름. 이 이름의 탭이 없으면 첫 번째 탭을 사용한다.
@@ -63,7 +90,7 @@ var STUDIO = {
 
   // 결제 안내
   payment:
-    'Course fees must be paid directly to the Master Trainer on the first day of the course. Studio fees must be paid separately via Venmo or Zelle using the payment information below. Please include your full name and course name in the payment memo.\n\nVenmo: @Sunnie-Lee-2\nZelle: 310-995-0046',
+    'Course fees must be paid directly to the Master Trainer on the first day of the course. Studio fees must be paid separately via Venmo or Zelle using the payment information below. Please include your full name and course name in the payment memo.\n\nVenmo: @Sunnie-Lee-2\nZelle: 213-999-7911',
 
   // 주차 안내
   parking:
@@ -147,6 +174,36 @@ function doPost(e) {
   }
 }
 
+/** "A - ..., C - ..." 형태의 신청 과정 문자열에서 코스 id만 뽑는다 */
+function courseIdsOf_(coursesText) {
+  var ids = [];
+  String(coursesText || '')
+    .split(', ')
+    .forEach(function (part) {
+      var m = part.match(/^(\S+) - /);
+      if (m) ids.push(m[1]);
+    });
+  return ids;
+}
+
+/** 얼리버드가 적용된 코스들의 안내 문구 배열 (관리자 알림 메일용) */
+function earlyFeeNotes_(coursesText) {
+  var map = getCourseMap_();
+  var notes = [];
+  courseIdsOf_(coursesText).forEach(function (id) {
+    var c = map[id];
+    if (!c) return;
+    var ef = effectiveFee_(c);
+    if (!ef.isEarly) return;
+    notes.push(
+      id + ': 스튜디오 Fee ' + money_(ef.amount) +
+        (ef.regular ? ' (정가 ' + money_(ef.regular) + ')' : '') +
+        ' — ' + (ef.lastDay || ef.until) + '까지 (' + ef.until + '부터 정가)'
+    );
+  });
+  return notes;
+}
+
 /** 새 신청 내용을 이메일로 발송 (NOTIFY_EMAIL 주소들은 BCC로 수신) */
 function sendNotificationEmail_(data) {
   var owner = Session.getEffectiveUser().getEmail();
@@ -167,9 +224,18 @@ function sendNotificationEmail_(data) {
     '■ 일정 참석 가능: ' + (data.availability || '-'),
     '■ 질문/요청: ' + (data.questions || '-'),
     '■ 기타: ' + (data.anythingElse || '-'),
-    '',
-    '전체 접수 내역: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl(),
   ];
+
+  // 얼리버드가 적용된 신청이면 실제 청구할 스튜디오 Fee를 함께 알려준다.
+  var earlyNotes = earlyFeeNotes_(data.courses);
+  if (earlyNotes.length) {
+    lines.push('');
+    lines.push('■ 얼리버드 적용 (신청 시각 기준):');
+    for (var i = 0; i < earlyNotes.length; i++) lines.push('   · ' + earlyNotes[i]);
+  }
+
+  lines.push('');
+  lines.push('전체 접수 내역: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl());
 
   var mail = {
     to: owner,
@@ -177,7 +243,8 @@ function sendNotificationEmail_(data) {
     body: lines.join('\n'),
     name: STUDIO.name,
   };
-  if (NOTIFY_EMAIL) mail.bcc = NOTIFY_EMAIL;
+  var bcc = notifyEmail_();
+  if (bcc) mail.bcc = bcc;
   MailApp.sendEmail(mail);
 }
 
@@ -202,9 +269,85 @@ function getCourseMap_() {
       desc_kr: r.length > 11 ? cellToString_(r[11]) : '',
       fee: r.length > 12 ? cellToString_(r[12]) : '',
       conducted_by: r.length > 13 ? cellToString_(r[13]) : '',
+      fee_early: r.length > 14 ? cellToString_(r[14]) : '',
+      early_until: r.length > 15 ? dateToString_(r[15]) : '',
     };
   }
   return map;
+}
+
+/** 스튜디오 기준 시간대 — 얼리버드 마감일은 항상 이 시간대의 "오늘"로 판정한다. */
+var STUDIO_TIMEZONE = 'America/Los_Angeles';
+
+/**
+ * 마감일 셀을 "YYYY-MM-DD" 문자열로 만든다.
+ * 시트가 값을 날짜 객체로 바꿔 저장했더라도 스튜디오 시간대 기준으로 되돌린다.
+ */
+function dateToString_(v) {
+  if (v === null || v === undefined) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    // 시트가 날짜로 바꿔 저장한 경우, 그 값은 "스프레드시트 시간대의 자정"이다.
+    // 그래서 LA가 아니라 스프레드시트 시간대로 되돌려야 하루가 밀리지 않는다.
+    return Utilities.formatDate(v, sheetTimezone_(), 'yyyy-MM-dd');
+  }
+  return String(v).trim();
+}
+
+/** 스프레드시트 시간대 (못 읽으면 스크립트 시간대 → 그것도 없으면 스튜디오 시간대) */
+function sheetTimezone_() {
+  try {
+    var tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+    if (tz) return tz;
+  } catch (err) {
+    // 스프레드시트 컨텍스트가 없으면 아래로
+  }
+  try {
+    return Session.getScriptTimeZone() || STUDIO_TIMEZONE;
+  } catch (err2) {
+    return STUDIO_TIMEZONE;
+  }
+}
+
+/** 스튜디오(LA) 기준 오늘 날짜 "YYYY-MM-DD" */
+function studioToday_() {
+  return Utilities.formatDate(new Date(), STUDIO_TIMEZONE, 'yyyy-MM-dd');
+}
+
+/** "2026-10-01"의 하루 전 → "2026-09-30". 형식이 다르면 빈 문자열. */
+function dayBefore_(s) {
+  var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  var d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) - 1));
+  return Utilities.formatDate(d, 'UTC', 'yyyy-MM-dd');
+}
+
+/**
+ * 코스의 현재 스튜디오 Fee를 계산한다 — 사이트와 이메일이 같은 규칙을 쓰도록 여기 한 곳에서만 판정.
+ * early_until은 "정가가 시작되는 날"이다. 스튜디오 기준 오늘이 그 날짜보다 이전이면 얼리버드,
+ * 그 날짜가 되면 자동으로 정가(fee)로 돌아간다.
+ * 예) early_until = 2026-10-01 → 9/30까지 얼리버드, 10/1부터 정가.
+ * 반환: { amount: 표시 금액, regular: 정가, isEarly: 얼리버드 적용 여부, until: 정가 시작일, lastDay: 얼리버드 마지막 날 }
+ */
+function effectiveFee_(c) {
+  var regular = String((c && c.fee) || '').trim();
+  var early = String((c && c.fee_early) || '').trim();
+  var until = String((c && c.early_until) || '').trim();
+  var isEarly = !!(early && until && studioToday_() < until);
+  return {
+    amount: isEarly ? early : regular,
+    regular: regular,
+    isEarly: isEarly,
+    until: until,
+    lastDay: dayBefore_(until),
+  };
+}
+
+/** "2026-09-30" → "Sep 30" (이메일 표기용). 형식이 다르면 입력 그대로. */
+function earlyUntilLabel_(s) {
+  var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(s || '');
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[Number(m[2]) - 1] + ' ' + Number(m[3]);
 }
 
 /** "1225" / "$1,050" 등 어떤 입력도 "$1,225" 형식으로 통일. 숫자가 아니면 그대로. */
@@ -229,13 +372,7 @@ function sendWelcomeEmail_(data) {
   var courseMap = getCourseMap_();
 
   // "A - ..., C - ..." → 선택한 코스 id 목록
-  var ids = [];
-  String(data.courses || '')
-    .split(', ')
-    .forEach(function (part) {
-      var m = part.match(/^(\S+) - /);
-      if (m) ids.push(m[1]);
-    });
+  var ids = courseIdsOf_(data.courses);
 
   var name = escHtml_(data.fullName || '');
   var t = {
@@ -249,6 +386,7 @@ function sendWelcomeEmail_(data) {
     duration: 'Duration',
     price: 'Course Cost',
     fee: 'Studio Fee',
+    earlyBird: 'Early bird',
     conductedBy: 'Conducted by',
     tba: 'To be announced',
     payment: 'Payment',
@@ -280,7 +418,29 @@ function sendWelcomeEmail_(data) {
       rows += row(t.duration, c.tag_en || c.tag_kr);
       rows += row(t.conductedBy, c.conducted_by);
       rows += row(t.price, money_(c.price));
-      rows += row(t.fee, money_(c.fee));
+
+      // 스튜디오 Fee — 신청 시각(LA 기준)에 얼리버드가 유효하면 얼리버드 금액,
+      // 마감일이 지났으면 정가로 자동 표기된다.
+      var ef = effectiveFee_(c);
+      if (ef.isEarly) {
+        rows +=
+          '<tr><td style="padding:3px 12px 3px 0;color:#6E6A60;font-size:13px;white-space:nowrap;vertical-align:top;">' +
+          t.fee +
+          '</td><td style="padding:3px 0;color:#1C1A16;font-size:13px;">' +
+          escHtml_(money_(ef.amount)) +
+          (ef.regular
+            ? ' <span style="color:#6E6A60;font-size:12px;text-decoration:line-through;">' +
+              escHtml_(money_(ef.regular)) +
+              '</span>'
+            : '') +
+          ' <span style="color:#5E6B4F;font-size:12px;">' +
+          t.earlyBird +
+          ' (through ' +
+          escHtml_(earlyUntilLabel_(ef.lastDay || ef.until)) +
+          ')</span></td></tr>';
+      } else {
+        rows += row(t.fee, money_(ef.amount));
+      }
       var desc = c.desc_en;
       var descHtml = desc
         ? '<p style="margin:10px 0 0;color:#6E6A60;font-size:13px;line-height:1.7;">' +
@@ -351,14 +511,16 @@ function sendWelcomeEmail_(data) {
     htmlBody: html,
     name: STUDIO.name,
   };
-  if (REPLY_TO) options.replyTo = REPLY_TO;
+  var replyTo = replyTo_();
+  if (replyTo) options.replyTo = replyTo;
 
   var plainBody = t.hello + '\n\n' + t.intro + '\n\n' + STUDIO.site; // HTML 미지원 클라이언트용
 
-  if (SENDER_ALIAS) {
+  var alias = senderAlias_();
+  if (alias) {
     // 별칭 발신은 GmailApp만 지원 (별칭 미등록 주소면 오류 → 기본 발신으로 재시도)
     try {
-      options.from = SENDER_ALIAS;
+      options.from = alias;
       GmailApp.sendEmail(String(data.email).trim(), t.subject, plainBody, options);
       return;
     } catch (aliasErr) {
@@ -400,13 +562,15 @@ function doGet(e) {
 
     // ?auth=1&key=... → 관리자 로그인 검증 — 관리자 페이지 로그인 화면용
     if (e && e.parameter && e.parameter.auth === '1') {
-      if (!ADMIN_KEY) {
+      var key = adminKey_();
+      if (!key) {
         return jsonOut_({
           result: 'error',
-          message: 'ADMIN_KEY가 설정되지 않았습니다. Apps Script에서 ADMIN_KEY를 설정하고 재배포하세요.',
+          message:
+            '비밀번호가 설정되지 않았습니다. Apps Script → 프로젝트 설정 → 스크립트 속성에 ADMIN_KEY를 추가하세요.',
         });
       }
-      if (String(e.parameter.key || '') !== ADMIN_KEY) {
+      if (String(e.parameter.key || '') !== key) {
         return jsonOut_({ result: 'error', message: '비밀번호가 올바르지 않습니다.' });
       }
       return jsonOut_({ result: 'success', auth: true });
@@ -414,7 +578,8 @@ function doGet(e) {
 
     // ?registrations=1 → 접수(등록자) 목록 반환 — 관리자 페이지 등록자 탭용 (비밀번호 필수)
     if (e && e.parameter && e.parameter.registrations === '1') {
-      if (!ADMIN_KEY || String(e.parameter.key || '') !== ADMIN_KEY) {
+      var regKey = adminKey_();
+      if (!regKey || String(e.parameter.key || '') !== regKey) {
         return jsonOut_({ result: 'error', message: 'unauthorized' });
       }
       return jsonOut_({ result: 'success', registrations: getRegistrations_(ss) });
@@ -425,7 +590,8 @@ function doGet(e) {
 
     // ?all=1 이면 비활성(active=FALSE) 코스도 포함 — 관리자 페이지용 (비밀번호 필수)
     var showAll = e && e.parameter && e.parameter.all === '1';
-    if (showAll && ADMIN_KEY && String(e.parameter.key || '') !== ADMIN_KEY) {
+    var allKey = adminKey_();
+    if (showAll && (!allKey || String(e.parameter.key || '') !== allKey)) {
       return jsonOut_({ result: 'error', message: 'unauthorized' });
     }
 
@@ -463,6 +629,8 @@ function doGet(e) {
           desc_kr: r.length > 11 ? cellToString_(r[11]) : '',
           fee: r.length > 12 ? cellToString_(r[12]) : '',
           conducted_by: r.length > 13 ? cellToString_(r[13]) : '',
+          fee_early: r.length > 14 ? cellToString_(r[14]) : '',
+          early_until: r.length > 15 ? dateToString_(r[15]) : '',
         });
       }
     }
@@ -475,12 +643,13 @@ function doGet(e) {
 
 /**
  * 관리자 페이지에서 보낸 코스 목록으로 Courses 탭 전체를 교체한다.
- * ADMIN_KEY가 설정되어 있고 요청의 key와 일치할 때만 동작한다.
- * (ADMIN_KEY가 비어 있으면 저장을 거부한다 — 보안상 fail-closed)
+ * 관리자 비밀번호(스크립트 속성 ADMIN_KEY)가 설정되어 있고 요청의 key와 일치할 때만 동작한다.
+ * (비밀번호가 없으면 저장을 거부한다 — 보안상 fail-closed)
  */
 function handleUpdateCourses_(data) {
   try {
-    if (!ADMIN_KEY || String(data.key || '') !== ADMIN_KEY) {
+    var saveKey = adminKey_();
+    if (!saveKey || String(data.key || '') !== saveKey) {
       return jsonOut_({ result: 'error', message: 'unauthorized' });
     }
 
@@ -493,7 +662,7 @@ function handleUpdateCourses_(data) {
     }
 
     var last = sheet.getLastRow();
-    if (last > 1) sheet.getRange(2, 1, last - 1, 14).clearContent();
+    if (last > 1) sheet.getRange(2, 1, last - 1, 16).clearContent();
 
     var rows = [];
     for (var i = 0; i < courses.length; i++) {
@@ -516,9 +685,11 @@ function handleUpdateCourses_(data) {
         String(c.desc_kr || ''),
         String(c.fee || ''),
         String(c.conducted_by || ''),
+        String(c.fee_early || ''),
+        String(c.early_until || ''),
       ]);
     }
-    if (rows.length) sheet.getRange(2, 1, rows.length, 14).setValues(rows);
+    if (rows.length) sheet.getRange(2, 1, rows.length, 16).setValues(rows);
 
     return jsonOut_({ result: 'success', saved: rows.length });
   } catch (error) {
@@ -614,17 +785,18 @@ function setupCoursesTab() {
 
   var sheet = ss.insertSheet('Courses');
   var rows = [
-    ['id', 'name_en', 'name_kr', 'dates', 'tag_en', 'tag_kr', 'active', 'capacity', 'time', 'price', 'desc_en', 'desc_kr', 'fee', 'conducted_by'],
-    ['A', 'GYROTONIC® Level 1 Foundation Course', 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', '', '12 days', '12일', 'TRUE', '', '', '', '', '', '', ''],
-    ['B', 'GYROTONIC® Level 2 Program 1 — Pre-Training', 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', '', '3 days', '3일', 'TRUE', '', '', '', '', '', '', ''],
-    ['C', 'GYROTONIC® Jumping Stretching Board Course', 'GYROTONIC® 점핑 스트레칭 보드 과정 (Jumping Stretching Board)', '', '7 days', '7일', 'TRUE', '', '', '', '', '', '', ''],
-    ['D', 'GYROTONIC® Level 1 Apprentice Review Course', 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', '', '6 days', '6일', 'TRUE', '', '', '', '', '', '', ''],
-    ['E', 'GYROTONIC® Level 2 Program 1 — Foundation Course', 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', '', '4 days', '4일', 'TRUE', '', '', '', '', '', '', ''],
+    ['id', 'name_en', 'name_kr', 'dates', 'tag_en', 'tag_kr', 'active', 'capacity', 'time', 'price', 'desc_en', 'desc_kr', 'fee', 'conducted_by', 'fee_early', 'early_until'],
+    ['A', 'GYROTONIC® Level 1 Foundation Course', 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', '', '12 days', '12일', 'TRUE', '', '', '', '', '', '', '', '', ''],
+    ['B', 'GYROTONIC® Level 2 Program 1 — Pre-Training', 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', '', '3 days', '3일', 'TRUE', '', '', '', '', '', '', '', '', ''],
+    ['C', 'GYROTONIC® Jumping Stretching Board Course', 'GYROTONIC® 점핑 스트레칭 보드 과정 (Jumping Stretching Board)', '', '7 days', '7일', 'TRUE', '', '', '', '', '', '', '', '', ''],
+    ['D', 'GYROTONIC® Level 1 Apprentice Review Course', 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', '', '6 days', '6일', 'TRUE', '', '', '', '', '', '', '', '', ''],
+    ['E', 'GYROTONIC® Level 2 Program 1 — Foundation Course', 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', '', '4 days', '4일', 'TRUE', '', '', '', '', '', '', '', '', ''],
   ];
   sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
 
-  // dates 열(D)은 "4/10" 입력이 날짜로 자동 변환되지 않도록 일반 텍스트로 고정
+  // dates 열(D)과 early_until 열(P)은 입력이 날짜 객체로 자동 변환되지 않도록 일반 텍스트로 고정
   sheet.getRange('D:D').setNumberFormat('@');
+  sheet.getRange('P:P').setNumberFormat('@');
   sheet.getRange(1, 1, 1, rows[0].length).setFontWeight('bold');
   sheet.autoResizeColumns(1, rows[0].length);
   sheet.setFrozenRows(1);
@@ -643,14 +815,19 @@ function upgradeCoursesTab() {
     setupCoursesTab();
     return;
   }
-  // 누락된 열 헤더 보충 (H: capacity, I: time, J: price, K: desc_en, L: desc_kr)
-  var wanted = { H1: 'capacity', I1: 'time', J1: 'price', K1: 'desc_en', L1: 'desc_kr', M1: 'fee', N1: 'conducted_by' };
+  // 누락된 열 헤더 보충 (H: capacity, I: time, J: price, K: desc_en, L: desc_kr, O/P: 얼리버드)
+  var wanted = {
+    H1: 'capacity', I1: 'time', J1: 'price', K1: 'desc_en', L1: 'desc_kr',
+    M1: 'fee', N1: 'conducted_by', O1: 'fee_early', P1: 'early_until',
+  };
   for (var cell in wanted) {
     if (String(sheet.getRange(cell).getValue()).trim() !== wanted[cell]) {
       sheet.getRange(cell).setValue(wanted[cell]).setFontWeight('bold');
     }
   }
-  Logger.log('Courses 탭 열 확인/보충 완료 (capacity, time, price, desc, fee, conducted_by).');
+  // 얼리버드 마감일(P)은 "2026-10-01"이 날짜 객체로 바뀌지 않도록 텍스트 서식
+  sheet.getRange('P:P').setNumberFormat('@');
+  Logger.log('Courses 탭 열 확인/보충 완료 (capacity, time, price, desc, fee, conducted_by, fee_early, early_until).');
 }
 
 /**

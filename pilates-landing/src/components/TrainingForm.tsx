@@ -28,6 +28,8 @@ interface RemoteCourse {
   taken?: number;
   price?: string;
   fee?: string;
+  fee_early?: string;
+  early_until?: string;
   conducted_by?: string;
 }
 
@@ -41,6 +43,52 @@ function formatMoney(v: string): string {
   const n = Number(s.replace(/[$,\s]/g, ''));
   if (Number.isNaN(n)) return s;
   return '$' + n.toLocaleString('en-US');
+}
+
+// 얼리버드 날짜는 무조건 스튜디오(LA) 기준으로만 판정한다 — 보는 사람의 기기 시간대는 쓰지 않는다.
+// en-CA 로캘이 "YYYY-MM-DD"를 준다. Intl을 못 쓰는 구형 브라우저에서도 UTC로 새지 않도록
+// 예비 경로는 PST(UTC-8)로 직접 계산한다.
+function studioToday(): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+  } catch {
+    return new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  }
+}
+
+// "2026-10-01"의 하루 전 → "2026-09-30". 형식이 다르면 빈 문자열.
+function dayBefore(v: string): string {
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) - 1));
+  return d.toISOString().slice(0, 10);
+}
+
+// 지금 적용되는 스튜디오 Fee. early_until은 "정가가 시작되는 날"이라, 오늘이 그 날짜보다
+// 이전이면 얼리버드 가격이고 그 날짜가 되면 자동으로 정가로 돌아간다.
+// 예) 2026-10-01 → 9/30까지 얼리버드, 10/1부터 정가. (Apps Script effectiveFee_와 동일 규칙)
+function effectiveFee(c: { fee?: string; fee_early?: string; early_until?: string }) {
+  const regular = (c.fee || '').trim();
+  const early = (c.fee_early || '').trim();
+  const until = (c.early_until || '').trim();
+  const isEarly = Boolean(early && until && studioToday() < until);
+  return { amount: isEarly ? early : regular, regular, isEarly, until, lastDay: dayBefore(until) };
+}
+
+// "2026-10-01" → EN "Oct 1" / KR "10월 1일". 형식이 다르면 입력 그대로 보여준다.
+function formatEarlyDate(v: string, lang: string): string {
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return v;
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (lang === 'ko') return `${month}월 ${day}일`;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[month - 1]} ${day}`;
 }
 
 function readCachedCourses(): RemoteCourse[] | null {
@@ -145,7 +193,8 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
           remaining,
           full: remaining !== null && remaining <= 0,
           price: c.price || '',
-          fee: c.fee || '',
+          // 캐시에는 원본 값만 담기므로 표시 시점에 계산한다 — 마감일이 지나면 재방문 없이도 정가로 전환.
+          feeInfo: effectiveFee(c),
           conductedBy: c.conducted_by || '',
         };
       })
@@ -157,7 +206,7 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
         remaining: null as number | null,
         full: false,
         price: '',
-        fee: '',
+        feeInfo: { amount: '', regular: '', isEarly: false, until: '', lastDay: '' },
         conductedBy: '',
       }));
 
@@ -417,11 +466,21 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                                 <span className="block text-ink">{c.conductedBy}</span>
                               </span>
                             )}
-                            {(c.price || c.fee) && (
+                            {(c.price || c.feeInfo.amount) && (
                               <span className="mt-1 block text-[13px] font-medium text-ink">
                                 {c.price && `${f.courseCost} ${formatMoney(c.price)}`}
-                                {c.price && c.fee && '  |  '}
-                                {c.fee && `${f.studioFee} ${formatMoney(c.fee)}`}
+                                {c.price && c.feeInfo.amount && '  |  '}
+                                {c.feeInfo.amount && `${f.studioFee} ${formatMoney(c.feeInfo.amount)}`}
+                                {c.feeInfo.isEarly && c.feeInfo.regular && (
+                                  <span className="ml-1.5 font-normal text-mute line-through">
+                                    {formatMoney(c.feeInfo.regular)}
+                                  </span>
+                                )}
+                                {c.feeInfo.isEarly && (
+                                  <span className="mt-0.5 block text-[12px] text-sage">
+                                    {f.earlyBird.replace('{date}', formatEarlyDate(c.feeInfo.lastDay || c.feeInfo.until, lang))}
+                                  </span>
+                                )}
                               </span>
                             )}
                             {c.remaining !== null && !c.full && (

@@ -10,6 +10,7 @@ const roster = [
   { key: 'eunice', featured: false },
   { key: 'soo', featured: false },
   { key: 'haley', featured: false },
+  { key: 'danielle', featured: false },
 ] as const;
 
 export default function InstructorsSection() {

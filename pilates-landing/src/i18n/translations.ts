@@ -127,6 +127,7 @@ const en = {
     conductedBy: 'Conducted by',
     courseCost: 'Course Cost',
     studioFee: 'Studio Fee',
+    earlyBird: 'Early bird — through {date}',
     s2Title: 'Personal Information',
     s2Subtitle: 'Please provide your contact details for registration.',
     lblName: 'Full name',
@@ -175,7 +176,7 @@ const en = {
   },
   instructors: {
     eyebrow: 'Instructors',
-    title: ['Four internationally', 'certified', 'dedicated instructors'],
+    title: ['Five internationally', 'certified', 'dedicated instructors'],
     titleAccentIndex: 1,
     body: 'Every instructor is certified through the international GYROTONIC® and STOTT PILATES® programs. The instructor who runs your first assessment stays with you to the end.',
     people: {
@@ -206,6 +207,11 @@ const en = {
         name: 'Haley Han',
         role: 'Instructor',
         certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', 'Pre / Post Natal'],
+      },
+      danielle: {
+        name: 'Danielle Kim',
+        role: 'Instructor',
+        certs: ['Contemporary Pilates', 'GYROTONIC® Level 1'],
       },
     },
   },
@@ -458,6 +464,7 @@ const ko: Content = {
     conductedBy: 'Conducted by',
     courseCost: 'Course Cost',
     studioFee: 'Studio Fee',
+    earlyBird: '얼리버드 — {date}까지',
     s2Title: '개인 정보',
     s2Subtitle: '등록 및 연락을 위한 정보를 입력해 주세요.',
     lblName: '성함',
@@ -536,6 +543,11 @@ const ko: Content = {
         name: 'Haley Han',
         role: '강사',
         certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', '산전 · 산후'],
+      },
+      danielle: {
+        name: 'Danielle Kim',
+        role: '강사',
+        certs: ['Contemporary Pilates', 'GYROTONIC® Level 1'],
       },
     },
   },
