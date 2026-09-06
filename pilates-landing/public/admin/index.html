@@ -67,10 +67,17 @@
       .grid-3 { grid-template-columns: 1fr 1fr; }
     }
 
+    .early-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .early-toggle input { width: 20px; height: 20px; accent-color: #5E6B4F; cursor: pointer; padding: 0; flex-shrink: 0; }
+    .early-toggle span {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; color: #6E6A60;
+    }
     .early-box {
       background: rgba(94,107,79,0.05); border: 1px dashed rgba(94,107,79,0.45);
-      border-radius: 14px; padding: 12px;
+      border-radius: 14px; padding: 12px; margin-top: 10px;
     }
+    .early-box[hidden] { display: none; }
     .early-note { margin: 10px 0 0; font-size: 12px; line-height: 1.7; color: #6E6A60; }
     .early-note .chip { display: inline-block; margin-top: 6px; }
 
@@ -338,12 +345,26 @@
       return isNaN(n) ? s : '$' + n.toLocaleString('en-US');
     }
 
+    // 저장된 값이 있으면 얼리버드 체크박스를 켠 상태로 카드를 연다
+    function hasEarly(c) {
+      return Boolean(String(c.fee_early ?? '').trim() || String(c.early_until ?? '').trim());
+    }
+
+    // 체크박스로 얼리버드 입력칸을 열고 닫는다.
+    // 끄면 입력값은 화면에 남겨두되(다시 켜면 그대로) 저장할 때는 빈 값으로 보내
+    // 사이트와 이메일이 정가로 돌아가게 한다.
+    function toggleEarly(box) {
+      const card = box.closest('.card');
+      card.querySelector('.early-box').hidden = !box.checked;
+      if (box.checked) refreshEarly(box);
+    }
+
     // 지금 상태를 카드 안에 한 줄로 보여준다 (저장 전에도 즉시 갱신)
     function earlyNote(c) {
       const early = String(c.fee_early ?? '').trim();
       const until = String(c.early_until ?? '').trim();
       const fee = String(c.fee ?? '').trim();
-      if (!early && !until) return '비워두면 항상 정가로 표시됩니다.';
+      if (!early && !until) return '금액과 마감일을 모두 입력해야 얼리버드가 적용됩니다.';
       if (!early) return '⚠️ 마감일만 있고 얼리버드 금액이 없습니다 — 정가로 표시됩니다.';
       if (!until) return '⚠️ 얼리버드 금액만 있고 마감일이 없습니다 — 정가로 표시됩니다.';
       const today = studioToday();
@@ -399,12 +420,18 @@
           <div><label>코스 가격 (Course Cost)</label><input type="text" data-f="price" value="${esc(c.price)}" placeholder="$1,050" /></div>
           <div><label>스튜디오 Fee (정가)</label><input type="text" data-f="fee" value="${esc(c.fee)}" placeholder="$350" oninput="refreshEarly(this)" /></div>
         </div>
-        <div class="field early-box" style="margin-top:12px">
-          <div class="grid-2">
-            <div><label>얼리버드 Fee</label><input type="text" data-f="fee_early" value="${esc(c.fee_early)}" placeholder="비우면 사용 안 함" oninput="refreshEarly(this)" /></div>
-            <div><label>얼리버드 마감일</label><input type="date" data-f="early_until" value="${esc(c.early_until)}" oninput="refreshEarly(this)" /></div>
+        <div class="field early-wrap" style="margin-top:12px">
+          <label class="early-toggle">
+            <input type="checkbox" data-f="early_on" ${hasEarly(c) ? 'checked' : ''} onchange="toggleEarly(this)" />
+            <span>얼리버드 가격 사용</span>
+          </label>
+          <div class="early-box" ${hasEarly(c) ? '' : 'hidden'}>
+            <div class="grid-2">
+              <div><label>얼리버드 Fee</label><input type="text" data-f="fee_early" value="${esc(c.fee_early)}" placeholder="$250" oninput="refreshEarly(this)" /></div>
+              <div><label>얼리버드 마감일</label><input type="date" data-f="early_until" value="${esc(c.early_until)}" oninput="refreshEarly(this)" /></div>
+            </div>
+            <p class="early-note">${earlyNote(c)}</p>
           </div>
-          <p class="early-note">${earlyNote(c)}</p>
         </div>
         <div class="field"><label>진행 (Conducted by)</label>
           <select data-f="conducted_by" style="width:100%;font:inherit;font-size:15px;border:1px solid rgba(28,26,22,0.15);border-radius:10px;padding:10px 12px;background:#fff;color:#1C1A16;">
@@ -447,8 +474,9 @@
           time: get('time').value.trim(),
           price: get('price').value.trim(),
           fee: get('fee').value.trim(),
-          fee_early: get('fee_early').value.trim(),
-          early_until: get('early_until').value.trim(),
+          // 체크 해제 상태면 빈 값으로 저장 → 사이트·이메일 모두 정가로 돌아간다
+          fee_early: get('early_on').checked ? get('fee_early').value.trim() : '',
+          early_until: get('early_on').checked ? get('early_until').value.trim() : '',
           conducted_by: get('conducted_by').value,
           desc_en: get('desc_en').value.trim(),
           active: get('active').checked,
