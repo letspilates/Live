@@ -45,8 +45,9 @@ function formatMoney(v: string): string {
   return '$' + n.toLocaleString('en-US');
 }
 
-// 얼리버드 마감일은 항상 스튜디오(LA) 기준으로 판정한다. 보는 사람의 기기 시간대를 쓰면
-// 한국에서 접속했을 때 하루 먼저 정가로 바뀌어 버린다. en-CA 로캘이 "YYYY-MM-DD"를 준다.
+// 얼리버드 날짜는 무조건 스튜디오(LA) 기준으로만 판정한다 — 보는 사람의 기기 시간대는 쓰지 않는다.
+// en-CA 로캘이 "YYYY-MM-DD"를 준다. Intl을 못 쓰는 구형 브라우저에서도 UTC로 새지 않도록
+// 예비 경로는 PST(UTC-8)로 직접 계산한다.
 function studioToday(): string {
   try {
     return new Intl.DateTimeFormat('en-CA', {
@@ -56,7 +57,7 @@ function studioToday(): string {
       day: '2-digit',
     }).format(new Date());
   } catch {
-    return new Date().toISOString().slice(0, 10);
+    return new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
   }
 }
 
