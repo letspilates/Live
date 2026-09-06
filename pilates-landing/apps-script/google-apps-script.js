@@ -171,7 +171,7 @@ function earlyFeeNotes_(coursesText) {
     notes.push(
       id + ': 스튜디오 Fee ' + money_(ef.amount) +
         (ef.regular ? ' (정가 ' + money_(ef.regular) + ')' : '') +
-        ' — ' + ef.until + '까지'
+        ' — ' + (ef.lastDay || ef.until) + '까지 (' + ef.until + '부터 정가)'
     );
   });
   return notes;
@@ -268,26 +268,36 @@ function studioToday_() {
   return Utilities.formatDate(new Date(), STUDIO_TIMEZONE, 'yyyy-MM-dd');
 }
 
+/** "2026-10-01"의 하루 전 → "2026-09-30". 형식이 다르면 빈 문자열. */
+function dayBefore_(s) {
+  var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  var d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) - 1));
+  return Utilities.formatDate(d, 'UTC', 'yyyy-MM-dd');
+}
+
 /**
  * 코스의 현재 스튜디오 Fee를 계산한다 — 사이트와 이메일이 같은 규칙을 쓰도록 여기 한 곳에서만 판정.
- * 얼리버드 금액과 마감일이 모두 있고, 스튜디오 기준 오늘이 마감일 당일까지면 얼리버드 가격.
- * 마감일 다음 날부터는 자동으로 정가(fee)로 돌아간다.
- * 반환: { amount: 표시 금액, regular: 정가, isEarly: 얼리버드 적용 여부, until: 마감일 }
+ * early_until은 "정가가 시작되는 날"이다. 스튜디오 기준 오늘이 그 날짜보다 이전이면 얼리버드,
+ * 그 날짜가 되면 자동으로 정가(fee)로 돌아간다.
+ * 예) early_until = 2026-10-01 → 9/30까지 얼리버드, 10/1부터 정가.
+ * 반환: { amount: 표시 금액, regular: 정가, isEarly: 얼리버드 적용 여부, until: 정가 시작일, lastDay: 얼리버드 마지막 날 }
  */
 function effectiveFee_(c) {
   var regular = String((c && c.fee) || '').trim();
   var early = String((c && c.fee_early) || '').trim();
   var until = String((c && c.early_until) || '').trim();
-  var isEarly = !!(early && until && studioToday_() <= until);
+  var isEarly = !!(early && until && studioToday_() < until);
   return {
     amount: isEarly ? early : regular,
     regular: regular,
     isEarly: isEarly,
     until: until,
+    lastDay: dayBefore_(until),
   };
 }
 
-/** "2026-10-01" → "Oct 1" (이메일 표기용). 형식이 다르면 입력 그대로. */
+/** "2026-09-30" → "Sep 30" (이메일 표기용). 형식이 다르면 입력 그대로. */
 function earlyUntilLabel_(s) {
   var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return String(s || '');
@@ -381,7 +391,7 @@ function sendWelcomeEmail_(data) {
           ' <span style="color:#5E6B4F;font-size:12px;">' +
           t.earlyBird +
           ' (through ' +
-          escHtml_(earlyUntilLabel_(ef.until)) +
+          escHtml_(earlyUntilLabel_(ef.lastDay || ef.until)) +
           ')</span></td></tr>';
       } else {
         rows += row(t.fee, money_(ef.amount));

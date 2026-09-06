@@ -60,14 +60,23 @@ function studioToday(): string {
   }
 }
 
-// 지금 적용되는 스튜디오 Fee. 얼리버드 금액과 마감일이 모두 있고 오늘이 마감일 당일까지면
-// 얼리버드 가격, 그 다음 날부터는 자동으로 정가로 돌아간다. (Apps Script effectiveFee_와 동일 규칙)
+// "2026-10-01"의 하루 전 → "2026-09-30". 형식이 다르면 빈 문자열.
+function dayBefore(v: string): string {
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) - 1));
+  return d.toISOString().slice(0, 10);
+}
+
+// 지금 적용되는 스튜디오 Fee. early_until은 "정가가 시작되는 날"이라, 오늘이 그 날짜보다
+// 이전이면 얼리버드 가격이고 그 날짜가 되면 자동으로 정가로 돌아간다.
+// 예) 2026-10-01 → 9/30까지 얼리버드, 10/1부터 정가. (Apps Script effectiveFee_와 동일 규칙)
 function effectiveFee(c: { fee?: string; fee_early?: string; early_until?: string }) {
   const regular = (c.fee || '').trim();
   const early = (c.fee_early || '').trim();
   const until = (c.early_until || '').trim();
-  const isEarly = Boolean(early && until && studioToday() <= until);
-  return { amount: isEarly ? early : regular, regular, isEarly, until };
+  const isEarly = Boolean(early && until && studioToday() < until);
+  return { amount: isEarly ? early : regular, regular, isEarly, until, lastDay: dayBefore(until) };
 }
 
 // "2026-10-01" → EN "Oct 1" / KR "10월 1일". 형식이 다르면 입력 그대로 보여준다.
@@ -196,7 +205,7 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
         remaining: null as number | null,
         full: false,
         price: '',
-        feeInfo: { amount: '', regular: '', isEarly: false, until: '' },
+        feeInfo: { amount: '', regular: '', isEarly: false, until: '', lastDay: '' },
         conductedBy: '',
       }));
 
@@ -468,7 +477,7 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                                 )}
                                 {c.feeInfo.isEarly && (
                                   <span className="mt-0.5 block text-[12px] text-sage">
-                                    {f.earlyBird.replace('{date}', formatEarlyDate(c.feeInfo.until, lang))}
+                                    {f.earlyBird.replace('{date}', formatEarlyDate(c.feeInfo.lastDay || c.feeInfo.until, lang))}
                                   </span>
                                 )}
                               </span>
