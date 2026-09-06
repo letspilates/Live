@@ -63,7 +63,7 @@ var STUDIO = {
 
   // 결제 안내
   payment:
-    'Course fees must be paid directly to the Master Trainer on the first day of the course. Studio fees must be paid separately via Venmo or Zelle using the payment information below. Please include your full name and course name in the payment memo.\n\nVenmo: @Sunnie-Lee-2\nZelle: 310-995-0046',
+    'Course fees must be paid directly to the Master Trainer on the first day of the course. Studio fees must be paid separately via Venmo or Zelle using the payment information below. Please include your full name and course name in the payment memo.\n\nVenmo: @Sunnie-Lee-2\nZelle: 213-999-7911',
 
   // 주차 안내
   parking:
