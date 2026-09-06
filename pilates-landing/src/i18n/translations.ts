@@ -211,7 +211,7 @@ const en = {
       danielle: {
         name: 'Danielle Kim',
         role: 'Instructor',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', 'Pre / Post Natal'],
+        certs: ['Contemporary Pilates', 'GYROTONIC® Level 1'],
       },
     },
   },
@@ -547,7 +547,7 @@ const ko: Content = {
       danielle: {
         name: 'Danielle Kim',
         role: '강사',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', '산전 · 산후'],
+        certs: ['Contemporary Pilates', 'GYROTONIC® Level 1'],
       },
     },
   },
