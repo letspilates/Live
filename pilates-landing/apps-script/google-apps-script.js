@@ -286,9 +286,26 @@ var STUDIO_TIMEZONE = 'America/Los_Angeles';
 function dateToString_(v) {
   if (v === null || v === undefined) return '';
   if (Object.prototype.toString.call(v) === '[object Date]') {
-    return Utilities.formatDate(v, STUDIO_TIMEZONE, 'yyyy-MM-dd');
+    // 시트가 날짜로 바꿔 저장한 경우, 그 값은 "스프레드시트 시간대의 자정"이다.
+    // 그래서 LA가 아니라 스프레드시트 시간대로 되돌려야 하루가 밀리지 않는다.
+    return Utilities.formatDate(v, sheetTimezone_(), 'yyyy-MM-dd');
   }
   return String(v).trim();
+}
+
+/** 스프레드시트 시간대 (못 읽으면 스크립트 시간대 → 그것도 없으면 스튜디오 시간대) */
+function sheetTimezone_() {
+  try {
+    var tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+    if (tz) return tz;
+  } catch (err) {
+    // 스프레드시트 컨텍스트가 없으면 아래로
+  }
+  try {
+    return Session.getScriptTimeZone() || STUDIO_TIMEZONE;
+  } catch (err2) {
+    return STUDIO_TIMEZONE;
+  }
 }
 
 /** 스튜디오(LA) 기준 오늘 날짜 "YYYY-MM-DD" */
