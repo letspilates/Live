@@ -10,36 +10,63 @@
  */
 
 /**
- * 신청 알림을 받을 이메일 주소. 여러 명이면 쉼표로 구분: 예) 'a@x.com,b@y.com'
- * 여기 적힌 주소들은 BCC(숨은 참조)로 받아서 서로의 주소가 보이지 않는다.
- * (받는사람(To)은 시트 소유 계정으로 표시된다)
- * 빈 문자열('')이면 시트 소유자에게만 발송된다.
+ * ★★★ 설정값은 코드가 아니라 "스크립트 속성"에 넣는다 ★★★
+ *
+ * 이 저장소는 공개(public) 저장소라, 비밀번호와 개인 이메일 주소를 코드에 적으면
+ * GitHub에 그대로 노출된다. 그래서 아래 네 가지는 Apps Script 프로젝트 안에만 저장한다.
+ *
+ *   Apps Script 편집기 → 왼쪽 ⚙️ 프로젝트 설정 → 맨 아래 "스크립트 속성"
+ *   → 속성 추가 → 속성 이름과 값을 넣고 저장
+ *
+ * | 속성 이름      | 값 예시                                   | 설명                                    |
+ * |---------------|------------------------------------------|-----------------------------------------|
+ * | ADMIN_KEY     | MySecret123!                             | 관리자 페이지 로그인 비밀번호            |
+ * | NOTIFY_EMAIL  | a@gmail.com,b@gmail.com                  | 신청 알림 받을 주소 (쉼표 구분, BCC 수신) |
+ * | SENDER_ALIAS  | letspilatesla@gmail.com                  | 웰컴 이메일 발신 주소 (Gmail 별칭 등록 필요) |
+ * | REPLY_TO      | letspilatesla@gmail.com                  | 신청자가 답장할 주소 (별칭 등록 불필요)   |
+ *
+ * 한 번만 등록해 두면 이 파일 전체를 다시 붙여넣어도 값이 지워지지 않는다.
+ * 값을 바꾼 뒤에는 재배포 없이 바로 적용된다(코드 상수와 달리 실행 시점에 읽는다).
+ *
+ * 아래 상수들은 스크립트 속성이 없을 때만 쓰이는 예비값이다.
+ * 공개 저장소에 올릴 파일에는 전부 빈 문자열로 둔다.
  */
-var NOTIFY_EMAIL = 'sunnie0210@gmail.com,calvin3919@gmail.com';
 
-/**
- * 웰컴 이메일의 발신 주소 (선택사항).
- * ⚠️ 이 계정(Gmail)의 설정 → 계정 → "다른 주소에서 메일 보내기"에 별칭으로
- * 등록·인증된 주소만 사용할 수 있다. 예: 'letspilatesla@gmail.com'
- * 비워두면 시트 소유 계정 주소로 발신된다.
- */
+/** 관리자 페이지 로그인 비밀번호 — 비어 있으면 로그인·등록자 조회·코스 저장이 모두 거부된다 */
+var ADMIN_KEY = '';
+
+/** 신청 알림 수신 주소 (쉼표 구분). 비워두면 시트 소유자에게만 발송된다 */
+var NOTIFY_EMAIL = '';
+
+/** 웰컴 이메일 발신 주소. 비워두면 시트 소유 계정 주소로 발신된다 */
 var SENDER_ALIAS = '';
 
-/**
- * 신청자가 "답장"을 눌렀을 때 답장이 가는 주소 (선택사항).
- * 별칭 등록 없이 바로 쓸 수 있다. 예: 'letspilatesla@gmail.com'
- * 비워두면 발신 주소로 답장이 간다.
- */
+/** 신청자가 "답장"을 눌렀을 때 가는 주소. 비워두면 발신 주소로 간다 */
 var REPLY_TO = '';
 
-/**
- * ★★★ 관리자 페이지(letspilatesla.com/admin/) 로그인 비밀번호 — 반드시 설정하세요! ★★★
- * 관리자 페이지는 이 비밀번호로 로그인해야 들어갈 수 있다.
- * 비워두면('') 로그인 자체가 거부된다 (관리자 페이지 사용 불가).
- * 예: var ADMIN_KEY = 'MySecret123!';
- * (수정 후 저장 + "배포 관리 → 연필 → 새 버전" 재배포를 해야 적용됩니다)
- */
-var ADMIN_KEY = '';
+/** 스크립트 속성을 먼저 읽고, 없으면 위 상수를 쓴다 */
+function config_(name, fallback) {
+  try {
+    var v = PropertiesService.getScriptProperties().getProperty(name);
+    if (v && String(v).trim()) return String(v).trim();
+  } catch (err) {
+    // 속성을 읽을 수 없으면 예비값으로 넘어간다
+  }
+  return String(fallback || '').trim();
+}
+
+function adminKey_() {
+  return config_('ADMIN_KEY', ADMIN_KEY);
+}
+function notifyEmail_() {
+  return config_('NOTIFY_EMAIL', NOTIFY_EMAIL);
+}
+function senderAlias_() {
+  return config_('SENDER_ALIAS', SENDER_ALIAS);
+}
+function replyTo_() {
+  return config_('REPLY_TO', REPLY_TO);
+}
 
 /**
  * 접수(등록)가 기록되는 탭 이름. 이 이름의 탭이 없으면 첫 번째 탭을 사용한다.
@@ -216,7 +243,8 @@ function sendNotificationEmail_(data) {
     body: lines.join('\n'),
     name: STUDIO.name,
   };
-  if (NOTIFY_EMAIL) mail.bcc = NOTIFY_EMAIL;
+  var bcc = notifyEmail_();
+  if (bcc) mail.bcc = bcc;
   MailApp.sendEmail(mail);
 }
 
@@ -466,14 +494,16 @@ function sendWelcomeEmail_(data) {
     htmlBody: html,
     name: STUDIO.name,
   };
-  if (REPLY_TO) options.replyTo = REPLY_TO;
+  var replyTo = replyTo_();
+  if (replyTo) options.replyTo = replyTo;
 
   var plainBody = t.hello + '\n\n' + t.intro + '\n\n' + STUDIO.site; // HTML 미지원 클라이언트용
 
-  if (SENDER_ALIAS) {
+  var alias = senderAlias_();
+  if (alias) {
     // 별칭 발신은 GmailApp만 지원 (별칭 미등록 주소면 오류 → 기본 발신으로 재시도)
     try {
-      options.from = SENDER_ALIAS;
+      options.from = alias;
       GmailApp.sendEmail(String(data.email).trim(), t.subject, plainBody, options);
       return;
     } catch (aliasErr) {
@@ -515,13 +545,15 @@ function doGet(e) {
 
     // ?auth=1&key=... → 관리자 로그인 검증 — 관리자 페이지 로그인 화면용
     if (e && e.parameter && e.parameter.auth === '1') {
-      if (!ADMIN_KEY) {
+      var key = adminKey_();
+      if (!key) {
         return jsonOut_({
           result: 'error',
-          message: 'ADMIN_KEY가 설정되지 않았습니다. Apps Script에서 ADMIN_KEY를 설정하고 재배포하세요.',
+          message:
+            '비밀번호가 설정되지 않았습니다. Apps Script → 프로젝트 설정 → 스크립트 속성에 ADMIN_KEY를 추가하세요.',
         });
       }
-      if (String(e.parameter.key || '') !== ADMIN_KEY) {
+      if (String(e.parameter.key || '') !== key) {
         return jsonOut_({ result: 'error', message: '비밀번호가 올바르지 않습니다.' });
       }
       return jsonOut_({ result: 'success', auth: true });
@@ -529,7 +561,8 @@ function doGet(e) {
 
     // ?registrations=1 → 접수(등록자) 목록 반환 — 관리자 페이지 등록자 탭용 (비밀번호 필수)
     if (e && e.parameter && e.parameter.registrations === '1') {
-      if (!ADMIN_KEY || String(e.parameter.key || '') !== ADMIN_KEY) {
+      var regKey = adminKey_();
+      if (!regKey || String(e.parameter.key || '') !== regKey) {
         return jsonOut_({ result: 'error', message: 'unauthorized' });
       }
       return jsonOut_({ result: 'success', registrations: getRegistrations_(ss) });
@@ -540,7 +573,8 @@ function doGet(e) {
 
     // ?all=1 이면 비활성(active=FALSE) 코스도 포함 — 관리자 페이지용 (비밀번호 필수)
     var showAll = e && e.parameter && e.parameter.all === '1';
-    if (showAll && ADMIN_KEY && String(e.parameter.key || '') !== ADMIN_KEY) {
+    var allKey = adminKey_();
+    if (showAll && (!allKey || String(e.parameter.key || '') !== allKey)) {
       return jsonOut_({ result: 'error', message: 'unauthorized' });
     }
 
@@ -592,12 +626,13 @@ function doGet(e) {
 
 /**
  * 관리자 페이지에서 보낸 코스 목록으로 Courses 탭 전체를 교체한다.
- * ADMIN_KEY가 설정되어 있고 요청의 key와 일치할 때만 동작한다.
- * (ADMIN_KEY가 비어 있으면 저장을 거부한다 — 보안상 fail-closed)
+ * 관리자 비밀번호(스크립트 속성 ADMIN_KEY)가 설정되어 있고 요청의 key와 일치할 때만 동작한다.
+ * (비밀번호가 없으면 저장을 거부한다 — 보안상 fail-closed)
  */
 function handleUpdateCourses_(data) {
   try {
-    if (!ADMIN_KEY || String(data.key || '') !== ADMIN_KEY) {
+    var saveKey = adminKey_();
+    if (!saveKey || String(data.key || '') !== saveKey) {
       return jsonOut_({ result: 'error', message: 'unauthorized' });
     }
 
