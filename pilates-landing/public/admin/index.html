@@ -67,6 +67,13 @@
       .grid-3 { grid-template-columns: 1fr 1fr; }
     }
 
+    .early-box {
+      background: rgba(94,107,79,0.05); border: 1px dashed rgba(94,107,79,0.45);
+      border-radius: 14px; padding: 12px;
+    }
+    .early-note { margin: 10px 0 0; font-size: 12px; line-height: 1.7; color: #6E6A60; }
+    .early-note .chip { display: inline-block; margin-top: 6px; }
+
     .toggle-row {
       display: flex; align-items: center; gap: 8px; margin-top: 14px;
       padding-top: 12px; border-top: 1px solid rgba(28,26,22,0.07);
@@ -313,6 +320,52 @@
       return m ? m[0] : '';
     }
 
+    // 얼리버드 마감일은 스튜디오(LA) 기준으로 판정한다 — 관리자가 한국에서 열어도 사이트와 같은 날짜를 본다.
+    function studioToday() {
+      try {
+        return new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
+        }).format(new Date());
+      } catch (e) {
+        return new Date().toISOString().slice(0, 10);
+      }
+    }
+
+    function money(v) {
+      const s = String(v ?? '').trim();
+      if (!s) return '';
+      const n = Number(s.replace(/[$,\s]/g, ''));
+      return isNaN(n) ? s : '$' + n.toLocaleString('en-US');
+    }
+
+    // 지금 상태를 카드 안에 한 줄로 보여준다 (저장 전에도 즉시 갱신)
+    function earlyNote(c) {
+      const early = String(c.fee_early ?? '').trim();
+      const until = String(c.early_until ?? '').trim();
+      const fee = String(c.fee ?? '').trim();
+      if (!early && !until) return '비워두면 항상 정가로 표시됩니다.';
+      if (!early) return '⚠️ 마감일만 있고 얼리버드 금액이 없습니다 — 정가로 표시됩니다.';
+      if (!until) return '⚠️ 얼리버드 금액만 있고 마감일이 없습니다 — 정가로 표시됩니다.';
+      const today = studioToday();
+      const d = new Date(until + 'T00:00:00');
+      const t = new Date(today + 'T00:00:00');
+      const days = Math.round((d - t) / 86400000);
+      const label = `${until}까지 ${money(early)}` + (fee ? ` → 다음 날부터 정가 ${money(fee)}` : '');
+      if (today <= until) {
+        return `${label}<br><span class="chip sage">얼리버드 적용중 · ${days === 0 ? '오늘 마지막날' : 'D-' + days}</span>`;
+      }
+      return `${label}<br><span class="chip clay">얼리버드 종료 — 정가 적용중</span>`;
+    }
+
+    // 금액/마감일을 고치면 안내 문구를 바로 다시 그린다
+    function refreshEarly(input) {
+      const card = input.closest('.card');
+      const val = (f) => card.querySelector(`[data-f="${f}"]`).value.trim();
+      card.querySelector('.early-note').innerHTML = earlyNote({
+        fee: val('fee'), fee_early: val('fee_early'), early_until: val('early_until'),
+      });
+    }
+
     function statChips(c) {
       const cap = c.capacity;
       if (cap === null || cap === undefined || cap === '' || isNaN(Number(cap))) {
@@ -344,7 +397,14 @@
         </div>
         <div class="field grid-2" style="margin-top:12px">
           <div><label>코스 가격 (Course Cost)</label><input type="text" data-f="price" value="${esc(c.price)}" placeholder="$1,050" /></div>
-          <div><label>스튜디오 Fee</label><input type="text" data-f="fee" value="${esc(c.fee)}" placeholder="$350" /></div>
+          <div><label>스튜디오 Fee (정가)</label><input type="text" data-f="fee" value="${esc(c.fee)}" placeholder="$350" oninput="refreshEarly(this)" /></div>
+        </div>
+        <div class="field early-box" style="margin-top:12px">
+          <div class="grid-2">
+            <div><label>얼리버드 Fee</label><input type="text" data-f="fee_early" value="${esc(c.fee_early)}" placeholder="비우면 사용 안 함" oninput="refreshEarly(this)" /></div>
+            <div><label>얼리버드 마감일</label><input type="date" data-f="early_until" value="${esc(c.early_until)}" oninput="refreshEarly(this)" /></div>
+          </div>
+          <p class="early-note">${earlyNote(c)}</p>
         </div>
         <div class="field"><label>진행 (Conducted by)</label>
           <select data-f="conducted_by" style="width:100%;font:inherit;font-size:15px;border:1px solid rgba(28,26,22,0.15);border-radius:10px;padding:10px 12px;background:#fff;color:#1C1A16;">
@@ -387,6 +447,8 @@
           time: get('time').value.trim(),
           price: get('price').value.trim(),
           fee: get('fee').value.trim(),
+          fee_early: get('fee_early').value.trim(),
+          early_until: get('early_until').value.trim(),
           conducted_by: get('conducted_by').value,
           desc_en: get('desc_en').value.trim(),
           active: get('active').checked,
@@ -400,7 +462,7 @@
     }
 
     function addRow() {
-      cardsEl.insertAdjacentHTML('beforeend', cardHtml({ id: '', name_en: '', name_kr: '', dates: '', tag_en: '', tag_kr: '', capacity: '', taken: 0, active: true }));
+      cardsEl.insertAdjacentHTML('beforeend', cardHtml({ id: '', name_en: '', name_kr: '', dates: '', tag_en: '', tag_kr: '', capacity: '', taken: 0, active: true, fee_early: '', early_until: '' }));
       cardsEl.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
       cardsEl.lastElementChild.querySelector('[data-f="id"]').focus();
     }

@@ -28,6 +28,8 @@ interface RemoteCourse {
   taken?: number;
   price?: string;
   fee?: string;
+  fee_early?: string;
+  early_until?: string;
   conducted_by?: string;
 }
 
@@ -41,6 +43,42 @@ function formatMoney(v: string): string {
   const n = Number(s.replace(/[$,\s]/g, ''));
   if (Number.isNaN(n)) return s;
   return '$' + n.toLocaleString('en-US');
+}
+
+// 얼리버드 마감일은 항상 스튜디오(LA) 기준으로 판정한다. 보는 사람의 기기 시간대를 쓰면
+// 한국에서 접속했을 때 하루 먼저 정가로 바뀌어 버린다. en-CA 로캘이 "YYYY-MM-DD"를 준다.
+function studioToday(): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+// 지금 적용되는 스튜디오 Fee. 얼리버드 금액과 마감일이 모두 있고 오늘이 마감일 당일까지면
+// 얼리버드 가격, 그 다음 날부터는 자동으로 정가로 돌아간다. (Apps Script effectiveFee_와 동일 규칙)
+function effectiveFee(c: { fee?: string; fee_early?: string; early_until?: string }) {
+  const regular = (c.fee || '').trim();
+  const early = (c.fee_early || '').trim();
+  const until = (c.early_until || '').trim();
+  const isEarly = Boolean(early && until && studioToday() <= until);
+  return { amount: isEarly ? early : regular, regular, isEarly, until };
+}
+
+// "2026-10-01" → EN "Oct 1" / KR "10월 1일". 형식이 다르면 입력 그대로 보여준다.
+function formatEarlyDate(v: string, lang: string): string {
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return v;
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (lang === 'ko') return `${month}월 ${day}일`;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[month - 1]} ${day}`;
 }
 
 function readCachedCourses(): RemoteCourse[] | null {
@@ -145,7 +183,8 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
           remaining,
           full: remaining !== null && remaining <= 0,
           price: c.price || '',
-          fee: c.fee || '',
+          // 캐시에는 원본 값만 담기므로 표시 시점에 계산한다 — 마감일이 지나면 재방문 없이도 정가로 전환.
+          feeInfo: effectiveFee(c),
           conductedBy: c.conducted_by || '',
         };
       })
@@ -157,7 +196,7 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
         remaining: null as number | null,
         full: false,
         price: '',
-        fee: '',
+        feeInfo: { amount: '', regular: '', isEarly: false, until: '' },
         conductedBy: '',
       }));
 
@@ -417,11 +456,21 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                                 <span className="block text-ink">{c.conductedBy}</span>
                               </span>
                             )}
-                            {(c.price || c.fee) && (
+                            {(c.price || c.feeInfo.amount) && (
                               <span className="mt-1 block text-[13px] font-medium text-ink">
                                 {c.price && `${f.courseCost} ${formatMoney(c.price)}`}
-                                {c.price && c.fee && '  |  '}
-                                {c.fee && `${f.studioFee} ${formatMoney(c.fee)}`}
+                                {c.price && c.feeInfo.amount && '  |  '}
+                                {c.feeInfo.amount && `${f.studioFee} ${formatMoney(c.feeInfo.amount)}`}
+                                {c.feeInfo.isEarly && c.feeInfo.regular && (
+                                  <span className="ml-1.5 font-normal text-mute line-through">
+                                    {formatMoney(c.feeInfo.regular)}
+                                  </span>
+                                )}
+                                {c.feeInfo.isEarly && (
+                                  <span className="mt-0.5 block text-[12px] text-sage">
+                                    {f.earlyBird.replace('{date}', formatEarlyDate(c.feeInfo.until, lang))}
+                                  </span>
+                                )}
                               </span>
                             )}
                             {c.remaining !== null && !c.full && (

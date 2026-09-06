@@ -147,6 +147,36 @@ function doPost(e) {
   }
 }
 
+/** "A - ..., C - ..." 형태의 신청 과정 문자열에서 코스 id만 뽑는다 */
+function courseIdsOf_(coursesText) {
+  var ids = [];
+  String(coursesText || '')
+    .split(', ')
+    .forEach(function (part) {
+      var m = part.match(/^(\S+) - /);
+      if (m) ids.push(m[1]);
+    });
+  return ids;
+}
+
+/** 얼리버드가 적용된 코스들의 안내 문구 배열 (관리자 알림 메일용) */
+function earlyFeeNotes_(coursesText) {
+  var map = getCourseMap_();
+  var notes = [];
+  courseIdsOf_(coursesText).forEach(function (id) {
+    var c = map[id];
+    if (!c) return;
+    var ef = effectiveFee_(c);
+    if (!ef.isEarly) return;
+    notes.push(
+      id + ': 스튜디오 Fee ' + money_(ef.amount) +
+        (ef.regular ? ' (정가 ' + money_(ef.regular) + ')' : '') +
+        ' — ' + ef.until + '까지'
+    );
+  });
+  return notes;
+}
+
 /** 새 신청 내용을 이메일로 발송 (NOTIFY_EMAIL 주소들은 BCC로 수신) */
 function sendNotificationEmail_(data) {
   var owner = Session.getEffectiveUser().getEmail();
@@ -167,9 +197,18 @@ function sendNotificationEmail_(data) {
     '■ 일정 참석 가능: ' + (data.availability || '-'),
     '■ 질문/요청: ' + (data.questions || '-'),
     '■ 기타: ' + (data.anythingElse || '-'),
-    '',
-    '전체 접수 내역: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl(),
   ];
+
+  // 얼리버드가 적용된 신청이면 실제 청구할 스튜디오 Fee를 함께 알려준다.
+  var earlyNotes = earlyFeeNotes_(data.courses);
+  if (earlyNotes.length) {
+    lines.push('');
+    lines.push('■ 얼리버드 적용 (신청 시각 기준):');
+    for (var i = 0; i < earlyNotes.length; i++) lines.push('   · ' + earlyNotes[i]);
+  }
+
+  lines.push('');
+  lines.push('전체 접수 내역: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl());
 
   var mail = {
     to: owner,
@@ -202,9 +241,58 @@ function getCourseMap_() {
       desc_kr: r.length > 11 ? cellToString_(r[11]) : '',
       fee: r.length > 12 ? cellToString_(r[12]) : '',
       conducted_by: r.length > 13 ? cellToString_(r[13]) : '',
+      fee_early: r.length > 14 ? cellToString_(r[14]) : '',
+      early_until: r.length > 15 ? dateToString_(r[15]) : '',
     };
   }
   return map;
+}
+
+/** 스튜디오 기준 시간대 — 얼리버드 마감일은 항상 이 시간대의 "오늘"로 판정한다. */
+var STUDIO_TIMEZONE = 'America/Los_Angeles';
+
+/**
+ * 마감일 셀을 "YYYY-MM-DD" 문자열로 만든다.
+ * 시트가 값을 날짜 객체로 바꿔 저장했더라도 스튜디오 시간대 기준으로 되돌린다.
+ */
+function dateToString_(v) {
+  if (v === null || v === undefined) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, STUDIO_TIMEZONE, 'yyyy-MM-dd');
+  }
+  return String(v).trim();
+}
+
+/** 스튜디오(LA) 기준 오늘 날짜 "YYYY-MM-DD" */
+function studioToday_() {
+  return Utilities.formatDate(new Date(), STUDIO_TIMEZONE, 'yyyy-MM-dd');
+}
+
+/**
+ * 코스의 현재 스튜디오 Fee를 계산한다 — 사이트와 이메일이 같은 규칙을 쓰도록 여기 한 곳에서만 판정.
+ * 얼리버드 금액과 마감일이 모두 있고, 스튜디오 기준 오늘이 마감일 당일까지면 얼리버드 가격.
+ * 마감일 다음 날부터는 자동으로 정가(fee)로 돌아간다.
+ * 반환: { amount: 표시 금액, regular: 정가, isEarly: 얼리버드 적용 여부, until: 마감일 }
+ */
+function effectiveFee_(c) {
+  var regular = String((c && c.fee) || '').trim();
+  var early = String((c && c.fee_early) || '').trim();
+  var until = String((c && c.early_until) || '').trim();
+  var isEarly = !!(early && until && studioToday_() <= until);
+  return {
+    amount: isEarly ? early : regular,
+    regular: regular,
+    isEarly: isEarly,
+    until: until,
+  };
+}
+
+/** "2026-10-01" → "Oct 1" (이메일 표기용). 형식이 다르면 입력 그대로. */
+function earlyUntilLabel_(s) {
+  var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(s || '');
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[Number(m[2]) - 1] + ' ' + Number(m[3]);
 }
 
 /** "1225" / "$1,050" 등 어떤 입력도 "$1,225" 형식으로 통일. 숫자가 아니면 그대로. */
@@ -229,13 +317,7 @@ function sendWelcomeEmail_(data) {
   var courseMap = getCourseMap_();
 
   // "A - ..., C - ..." → 선택한 코스 id 목록
-  var ids = [];
-  String(data.courses || '')
-    .split(', ')
-    .forEach(function (part) {
-      var m = part.match(/^(\S+) - /);
-      if (m) ids.push(m[1]);
-    });
+  var ids = courseIdsOf_(data.courses);
 
   var name = escHtml_(data.fullName || '');
   var t = {
@@ -249,6 +331,7 @@ function sendWelcomeEmail_(data) {
     duration: 'Duration',
     price: 'Course Cost',
     fee: 'Studio Fee',
+    earlyBird: 'Early bird',
     conductedBy: 'Conducted by',
     tba: 'To be announced',
     payment: 'Payment',
@@ -280,7 +363,29 @@ function sendWelcomeEmail_(data) {
       rows += row(t.duration, c.tag_en || c.tag_kr);
       rows += row(t.conductedBy, c.conducted_by);
       rows += row(t.price, money_(c.price));
-      rows += row(t.fee, money_(c.fee));
+
+      // 스튜디오 Fee — 신청 시각(LA 기준)에 얼리버드가 유효하면 얼리버드 금액,
+      // 마감일이 지났으면 정가로 자동 표기된다.
+      var ef = effectiveFee_(c);
+      if (ef.isEarly) {
+        rows +=
+          '<tr><td style="padding:3px 12px 3px 0;color:#6E6A60;font-size:13px;white-space:nowrap;vertical-align:top;">' +
+          t.fee +
+          '</td><td style="padding:3px 0;color:#1C1A16;font-size:13px;">' +
+          escHtml_(money_(ef.amount)) +
+          (ef.regular
+            ? ' <span style="color:#6E6A60;font-size:12px;text-decoration:line-through;">' +
+              escHtml_(money_(ef.regular)) +
+              '</span>'
+            : '') +
+          ' <span style="color:#5E6B4F;font-size:12px;">' +
+          t.earlyBird +
+          ' (through ' +
+          escHtml_(earlyUntilLabel_(ef.until)) +
+          ')</span></td></tr>';
+      } else {
+        rows += row(t.fee, money_(ef.amount));
+      }
       var desc = c.desc_en;
       var descHtml = desc
         ? '<p style="margin:10px 0 0;color:#6E6A60;font-size:13px;line-height:1.7;">' +
@@ -463,6 +568,8 @@ function doGet(e) {
           desc_kr: r.length > 11 ? cellToString_(r[11]) : '',
           fee: r.length > 12 ? cellToString_(r[12]) : '',
           conducted_by: r.length > 13 ? cellToString_(r[13]) : '',
+          fee_early: r.length > 14 ? cellToString_(r[14]) : '',
+          early_until: r.length > 15 ? dateToString_(r[15]) : '',
         });
       }
     }
@@ -493,7 +600,7 @@ function handleUpdateCourses_(data) {
     }
 
     var last = sheet.getLastRow();
-    if (last > 1) sheet.getRange(2, 1, last - 1, 14).clearContent();
+    if (last > 1) sheet.getRange(2, 1, last - 1, 16).clearContent();
 
     var rows = [];
     for (var i = 0; i < courses.length; i++) {
@@ -516,9 +623,11 @@ function handleUpdateCourses_(data) {
         String(c.desc_kr || ''),
         String(c.fee || ''),
         String(c.conducted_by || ''),
+        String(c.fee_early || ''),
+        String(c.early_until || ''),
       ]);
     }
-    if (rows.length) sheet.getRange(2, 1, rows.length, 14).setValues(rows);
+    if (rows.length) sheet.getRange(2, 1, rows.length, 16).setValues(rows);
 
     return jsonOut_({ result: 'success', saved: rows.length });
   } catch (error) {
@@ -614,17 +723,18 @@ function setupCoursesTab() {
 
   var sheet = ss.insertSheet('Courses');
   var rows = [
-    ['id', 'name_en', 'name_kr', 'dates', 'tag_en', 'tag_kr', 'active', 'capacity', 'time', 'price', 'desc_en', 'desc_kr', 'fee', 'conducted_by'],
-    ['A', 'GYROTONIC® Level 1 Foundation Course', 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', '', '12 days', '12일', 'TRUE', '', '', '', '', '', '', ''],
-    ['B', 'GYROTONIC® Level 2 Program 1 — Pre-Training', 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', '', '3 days', '3일', 'TRUE', '', '', '', '', '', '', ''],
-    ['C', 'GYROTONIC® Jumping Stretching Board Course', 'GYROTONIC® 점핑 스트레칭 보드 과정 (Jumping Stretching Board)', '', '7 days', '7일', 'TRUE', '', '', '', '', '', '', ''],
-    ['D', 'GYROTONIC® Level 1 Apprentice Review Course', 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', '', '6 days', '6일', 'TRUE', '', '', '', '', '', '', ''],
-    ['E', 'GYROTONIC® Level 2 Program 1 — Foundation Course', 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', '', '4 days', '4일', 'TRUE', '', '', '', '', '', '', ''],
+    ['id', 'name_en', 'name_kr', 'dates', 'tag_en', 'tag_kr', 'active', 'capacity', 'time', 'price', 'desc_en', 'desc_kr', 'fee', 'conducted_by', 'fee_early', 'early_until'],
+    ['A', 'GYROTONIC® Level 1 Foundation Course', 'GYROTONIC® Level 1 기초 과정 (Foundation Course)', '', '12 days', '12일', 'TRUE', '', '', '', '', '', '', '', '', ''],
+    ['B', 'GYROTONIC® Level 2 Program 1 — Pre-Training', 'GYROTONIC® Level 2 Program 1 — 사전 교육 (Pre-Training)', '', '3 days', '3일', 'TRUE', '', '', '', '', '', '', '', '', ''],
+    ['C', 'GYROTONIC® Jumping Stretching Board Course', 'GYROTONIC® 점핑 스트레칭 보드 과정 (Jumping Stretching Board)', '', '7 days', '7일', 'TRUE', '', '', '', '', '', '', '', '', ''],
+    ['D', 'GYROTONIC® Level 1 Apprentice Review Course', 'GYROTONIC® Level 1 견습 리뷰 과정 (Apprentice Review)', '', '6 days', '6일', 'TRUE', '', '', '', '', '', '', '', '', ''],
+    ['E', 'GYROTONIC® Level 2 Program 1 — Foundation Course', 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', '', '4 days', '4일', 'TRUE', '', '', '', '', '', '', '', '', ''],
   ];
   sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
 
-  // dates 열(D)은 "4/10" 입력이 날짜로 자동 변환되지 않도록 일반 텍스트로 고정
+  // dates 열(D)과 early_until 열(P)은 입력이 날짜 객체로 자동 변환되지 않도록 일반 텍스트로 고정
   sheet.getRange('D:D').setNumberFormat('@');
+  sheet.getRange('P:P').setNumberFormat('@');
   sheet.getRange(1, 1, 1, rows[0].length).setFontWeight('bold');
   sheet.autoResizeColumns(1, rows[0].length);
   sheet.setFrozenRows(1);
@@ -643,14 +753,19 @@ function upgradeCoursesTab() {
     setupCoursesTab();
     return;
   }
-  // 누락된 열 헤더 보충 (H: capacity, I: time, J: price, K: desc_en, L: desc_kr)
-  var wanted = { H1: 'capacity', I1: 'time', J1: 'price', K1: 'desc_en', L1: 'desc_kr', M1: 'fee', N1: 'conducted_by' };
+  // 누락된 열 헤더 보충 (H: capacity, I: time, J: price, K: desc_en, L: desc_kr, O/P: 얼리버드)
+  var wanted = {
+    H1: 'capacity', I1: 'time', J1: 'price', K1: 'desc_en', L1: 'desc_kr',
+    M1: 'fee', N1: 'conducted_by', O1: 'fee_early', P1: 'early_until',
+  };
   for (var cell in wanted) {
     if (String(sheet.getRange(cell).getValue()).trim() !== wanted[cell]) {
       sheet.getRange(cell).setValue(wanted[cell]).setFontWeight('bold');
     }
   }
-  Logger.log('Courses 탭 열 확인/보충 완료 (capacity, time, price, desc, fee, conducted_by).');
+  // 얼리버드 마감일(P)은 "2026-10-01"이 날짜 객체로 바뀌지 않도록 텍스트 서식
+  sheet.getRange('P:P').setNumberFormat('@');
+  Logger.log('Courses 탭 열 확인/보충 완료 (capacity, time, price, desc, fee, conducted_by, fee_early, early_until).');
 }
 
 /**
