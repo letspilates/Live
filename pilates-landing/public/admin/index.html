@@ -42,6 +42,7 @@
       width: 52px; text-align: center; font-weight: 700; font-size: 16px;
       padding: 8px 0; flex-shrink: 0;
     }
+    .id-badge[readonly] { cursor: default; background: #F2EBDD; }
     .stats { flex: 1; display: flex; gap: 6px; flex-wrap: wrap; }
     .chip {
       font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
@@ -219,10 +220,14 @@
       <div class="loading" id="loading">코스 목록을 불러오는 중...</div>
 
       <p class="hint">
+        · <b>ID(A, B, C…)</b>는 <b>일정의 첫 날짜 순서로 자동 지정</b>됩니다 — 직접 입력하지 않습니다.
+          일정이 비었거나 날짜를 읽을 수 없는 코스는 맨 뒤로, 숨긴 코스는 표시 중인 코스 다음으로 갑니다.<br />
+        · 신청 수는 접수된 <b>코스명</b>으로 집계되므로 ID 글자가 바뀌어도 그대로 따라옵니다.<br />
         · <b>정원</b>을 비우면 자리 표시 없이 항상 신청 가능, <b>0</b>을 넣으면 즉시 "마감" 처리됩니다.<br />
         · <b>사이트에 표시</b>를 끄면 그 코스가 사이트에서 숨겨집니다 (삭제 없이).<br />
         · <b>일정</b>은 자유 텍스트: <code>7/24 - 7/26</code>, <code>8/7 - 8/9, 8/13 - 8/16</code><br />
-        · 저장 후 확인: <a href="../#register">등록 폼 열어보기</a>
+        · 저장 후 확인: <a href="../#register">등록 폼 열어보기</a><br />
+        · Apps Script 버전: <b id="scriptVer">확인 중…</b> <span id="scriptVerNote"></span>
       </p>
     </div>
 
@@ -346,8 +351,10 @@
       return isNaN(n) ? s : '$' + n.toLocaleString('en-US');
     }
 
-    // 저장된 값이 있으면 얼리버드 체크박스를 켠 상태로 카드를 연다
-    function hasEarly(c) {
+    // 저장된 값이 있으면 얼리버드 체크박스를 켠 상태로 카드를 연다.
+    // 카드를 다시 그릴 때는 화면의 체크 상태(early_on)를 그대로 유지한다.
+    function earlyOn(c) {
+      if (typeof c.early_on === 'boolean') return c.early_on;
       return Boolean(String(c.fee_early ?? '').trim() || String(c.early_until ?? '').trim());
     }
 
@@ -411,15 +418,15 @@
     function cardHtml(c) {
       const cap = c.capacity === null || c.capacity === undefined ? '' : c.capacity;
       const isActive = c.active !== false;
-      return `<div class="card ${isActive ? '' : 'hidden-course'}">
+      return `<div class="card ${isActive ? '' : 'hidden-course'}" data-taken="${esc(c.taken ?? 0)}">
         <div class="card-head">
-          <input class="id-badge" type="text" data-f="id" value="${esc(c.id)}" placeholder="ID" />
+          <input class="id-badge" type="text" data-f="id" value="${esc(c.id)}" placeholder="ID" readonly title="일정 순서에 따라 자동 지정됩니다" />
           <div class="stats">${statChips(c)}</div>
           <button class="btn-del" title="삭제" onclick="delRow(this)">✕</button>
         </div>
         <div class="field"><label>코스명 (영문)</label><input type="text" data-f="name_en" value="${esc(c.name_en)}" /></div>
         <div class="field"><label>코스명 (한글)</label><input type="text" data-f="name_kr" value="${esc(c.name_kr)}" /></div>
-        <div class="field"><label>일정</label><input type="text" data-f="dates" value="${esc(c.dates)}" placeholder="비우면 '일정 추후 공지'로 표시" /></div>
+        <div class="field"><label>일정</label><input type="text" data-f="dates" value="${esc(c.dates)}" placeholder="비우면 '일정 추후 공지'로 표시" onchange="applyOrder(this)" /></div>
         <div class="field grid-3" style="margin-top:12px">
           <div><label>기간 (일수)</label><input type="number" min="1" inputmode="numeric" data-f="days" value="${esc(daysOf(c))}" placeholder="3" /></div>
           <div><label>정원</label><input type="number" min="0" inputmode="numeric" data-f="capacity" value="${esc(cap)}" placeholder="없음" /></div>
@@ -431,10 +438,10 @@
         </div>
         <div class="field early-wrap" style="margin-top:12px">
           <label class="early-toggle">
-            <input type="checkbox" data-f="early_on" ${hasEarly(c) ? 'checked' : ''} onchange="toggleEarly(this)" />
+            <input type="checkbox" data-f="early_on" ${earlyOn(c) ? 'checked' : ''} onchange="toggleEarly(this)" />
             <span>얼리버드 가격 사용</span>
           </label>
-          <div class="early-box" ${hasEarly(c) ? '' : 'hidden'}>
+          <div class="early-box" ${earlyOn(c) ? '' : 'hidden'}>
             <div class="grid-2">
               <div><label>얼리버드 Fee</label><input type="text" data-f="fee_early" value="${esc(c.fee_early)}" placeholder="$250" oninput="refreshEarly(this)" /></div>
               <div><label>정가 시작일</label><input type="date" data-f="early_until" value="${esc(c.early_until)}" oninput="refreshEarly(this)" /></div>
@@ -451,7 +458,7 @@
         </div>
         <div class="field"><label>설명 (이메일용 · 영어)</label><input type="text" data-f="desc_en" value="${esc(c.desc_en)}" placeholder="Course description shown in the welcome email" /></div>
         <div class="toggle-row">
-          <input type="checkbox" id="act-${esc(c.id) || Math.random().toString(36).slice(2)}" data-f="active" ${isActive ? 'checked' : ''} onchange="this.closest('.card').classList.toggle('hidden-course', !this.checked)" />
+          <input type="checkbox" id="act-${esc(c.id) || Math.random().toString(36).slice(2)}" data-f="active" ${isActive ? 'checked' : ''} onchange="this.closest('.card').classList.toggle('hidden-course', !this.checked); applyOrder(this)" />
           <span>사이트에 표시</span>
           <span class="off-note">— 현재 사이트에서 숨김 상태</span>
         </div>
@@ -464,33 +471,124 @@
       }
     }
 
-    function readRows() {
-      return [...cardsEl.querySelectorAll('.card')].map((card) => {
-        const get = (f) => card.querySelector(`[data-f="${f}"]`);
+    // 카드 하나의 현재 입력 상태 (다시 그리거나 저장할 때 씀)
+    function readCard(card) {
+      const get = (f) => card.querySelector(`[data-f="${f}"]`);
+      const days = get('days').value.trim();
+      const n = parseInt(days, 10);
+      return {
+        id: get('id').value.trim(),
+        name_en: get('name_en').value.trim(),
+        name_kr: get('name_kr').value.trim(),
+        dates: get('dates').value.trim(),
         // 일수 숫자 하나로 영문/한글 기간 표기를 자동 생성
-        const days = get('days').value.trim();
-        const n = parseInt(days, 10);
-        const tag_en = days && !isNaN(n) ? `${n} ${n === 1 ? 'day' : 'days'}` : '';
-        const tag_kr = days && !isNaN(n) ? `${n}일` : '';
-        return {
-          id: get('id').value.trim(),
-          name_en: get('name_en').value.trim(),
-          name_kr: get('name_kr').value.trim(),
-          dates: get('dates').value.trim(),
-          tag_en,
-          tag_kr,
-          capacity: get('capacity').value.trim(),
-          time: get('time').value.trim(),
-          price: get('price').value.trim(),
-          fee: get('fee').value.trim(),
+        tag_en: days && !isNaN(n) ? `${n} ${n === 1 ? 'day' : 'days'}` : '',
+        tag_kr: days && !isNaN(n) ? `${n}일` : '',
+        capacity: get('capacity').value.trim(),
+        taken: Number(card.dataset.taken) || 0,
+        time: get('time').value.trim(),
+        price: get('price').value.trim(),
+        fee: get('fee').value.trim(),
+        fee_early: get('fee_early').value.trim(),
+        early_until: get('early_until').value.trim(),
+        early_on: get('early_on').checked,
+        conducted_by: get('conducted_by').value,
+        desc_en: get('desc_en').value.trim(),
+        active: get('active').checked,
+      };
+    }
+
+    // 저장용 목록: 내용이 하나도 없는 빈 카드를 뺀 뒤 일정 순으로 정렬해 ID를 매긴다
+    function readRows() {
+      const filled = [...cardsEl.querySelectorAll('.card')].map(readCard)
+        .filter((c) => c.name_en || c.name_kr || c.dates);
+      return autoOrder(filled)
+        .map((c) => ({
+          ...c,
           // 체크 해제 상태면 빈 값으로 저장 → 사이트·이메일 모두 정가로 돌아간다
-          fee_early: get('early_on').checked ? get('fee_early').value.trim() : '',
-          early_until: get('early_on').checked ? get('early_until').value.trim() : '',
-          conducted_by: get('conducted_by').value,
-          desc_en: get('desc_en').value.trim(),
-          active: get('active').checked,
-        };
-      }).filter((c) => c.id);
+          fee_early: c.early_on ? c.fee_early : '',
+          early_until: c.early_on ? c.early_until : '',
+          early_on: undefined,
+          taken: undefined,
+        }));
+    }
+
+    /* ═══════════ ID 자동 지정 — 일정의 첫 날짜 순으로 A, B, C… ═══════════ */
+    const MONTH_NAMES = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+
+    // 연도가 없는 날짜(예: 7/24)는 오늘(LA 기준)과 가장 가까운 해로 해석한다.
+    // 9월에 "1/10"이면 지난 1월(8개월 전)보다 다음 1월(4개월 뒤)이 가깝다 → 다음 해.
+    function nearestYear(month, day, today) {
+      const y = Number(today.slice(0, 4));
+      const base = Date.UTC(y, Number(today.slice(5, 7)) - 1, Number(today.slice(8, 10)));
+      let best = y;
+      let bestDiff = Infinity;
+      for (const cand of [y - 1, y, y + 1]) {
+        const diff = Math.abs(Date.UTC(cand, month - 1, day) - base);
+        if (diff < bestDiff || (diff === bestDiff && cand > best)) { best = cand; bestDiff = diff; }
+      }
+      return best;
+    }
+
+    // 일정 텍스트에서 첫 번째 날짜를 "YYYY-MM-DD"로 뽑는다. 못 찾으면 ''.
+    // 지원: 7/24, 7/24/2026, 7/24/26, 2026-07-24, Jul 24, July 24 2026, 7월 24일
+    function firstDateOf(text, today = studioToday()) {
+      const s = String(text || '');
+      const re = /(\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?|(\d{1,2})월\s*(\d{1,2})일|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?!\d)(?:,?\s*(\d{4}))?/g;
+      let m;
+      while ((m = re.exec(s))) {
+        let y = null, mo, d;
+        if (m[1]) { y = Number(m[1]); mo = Number(m[2]); d = Number(m[3]); }
+        else if (m[4]) { mo = Number(m[4]); d = Number(m[5]); if (m[6]) y = Number(m[6].length === 2 ? '20' + m[6] : m[6]); }
+        else if (m[7]) { mo = Number(m[7]); d = Number(m[8]); }
+        else {
+          mo = MONTH_NAMES[m[9].slice(0, 3).toLowerCase()];
+          if (!mo) continue;
+          d = Number(m[10]);
+          if (m[11]) y = Number(m[11]);
+        }
+        if (!(mo >= 1 && mo <= 12 && d >= 1 && d <= 31)) continue;
+        if (y === null) y = nearestYear(mo, d, today);
+        return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+      return '';
+    }
+
+    // 0 → A, 1 → B … 25 → Z, 26 → AA
+    function letterOf(i) {
+      let n = i + 1, out = '';
+      while (n > 0) { n -= 1; out = String.fromCharCode(65 + (n % 26)) + out; n = Math.floor(n / 26); }
+      return out;
+    }
+
+    // 표시 중인 코스를 일정 순으로 먼저, 숨긴 코스를 그 뒤에 일정 순으로 놓고 A, B, C…를 새로 매긴다.
+    // 일정이 없거나 읽을 수 없는 코스는 각 그룹의 맨 뒤 (기존 순서 유지).
+    function autoOrder(list, today = studioToday()) {
+      const keyed = list.map((c, i) => ({ c, i, date: firstDateOf(c.dates, today) }));
+      keyed.sort((a, b) => {
+        const aActive = a.c.active !== false, bActive = b.c.active !== false;
+        if (aActive !== bActive) return aActive ? -1 : 1;
+        if (a.date && b.date && a.date !== b.date) return a.date < b.date ? -1 : 1;
+        if (Boolean(a.date) !== Boolean(b.date)) return a.date ? -1 : 1;
+        return a.i - b.i;
+      });
+      return keyed.map((k, i) => ({ ...k.c, id: letterOf(i) }));
+    }
+
+    // 카드를 일정 순으로 다시 그린다. 순서나 ID가 바뀌었으면 true.
+    // el(방금 고친 입력칸)을 주면 그 카드가 옮겨간 자리로 화면을 따라가게 한다.
+    function applyOrder(el) {
+      const cards = [...cardsEl.querySelectorAll('.card')];
+      const before = cards.map((card, i) => ({ ...readCard(card), _i: i }));
+      const after = autoOrder(before);
+      const changed = JSON.stringify(before.map((c) => [c.id, c.name_en, c.dates])) !==
+        JSON.stringify(after.map((c) => [c.id, c.name_en, c.dates]));
+      if (!changed) return false;
+      const from = el ? cards.indexOf(el.closest('.card')) : -1;
+      cardsEl.innerHTML = after.map(cardHtml).join('');
+      const to = after.findIndex((c) => c._i === from);
+      if (to >= 0) cardsEl.children[to].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return true;
     }
 
     function setStatus(msg, ok) {
@@ -499,9 +597,10 @@
     }
 
     function addRow() {
-      cardsEl.insertAdjacentHTML('beforeend', cardHtml({ id: '', name_en: '', name_kr: '', dates: '', tag_en: '', tag_kr: '', capacity: '', taken: 0, active: true, fee_early: '', early_until: '' }));
+      const n = cardsEl.querySelectorAll('.card').length;
+      cardsEl.insertAdjacentHTML('beforeend', cardHtml({ id: letterOf(n), name_en: '', name_kr: '', dates: '', tag_en: '', tag_kr: '', capacity: '', taken: 0, active: true, fee_early: '', early_until: '' }));
       cardsEl.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      cardsEl.lastElementChild.querySelector('[data-f="id"]').focus();
+      cardsEl.lastElementChild.querySelector('[data-f="name_en"]').focus();
     }
 
     async function load() {
@@ -509,8 +608,16 @@
         const res = await fetch(`${ENDPOINT}?all=1&key=${encodeURIComponent(KEY)}&t=${Date.now()}`);
         const j = await res.json();
         if (j.result !== 'success') throw new Error(j.message || 'load failed');
-        cardsEl.innerHTML = j.courses.map(cardHtml).join('');
+        courseList = j.courses;
+        showScriptVersion(j.version);
+        const ordered = autoOrder(j.courses);
+        cardsEl.innerHTML = ordered.map(cardHtml).join('');
         document.getElementById('loading').style.display = 'none';
+        // 시트의 글자/순서가 일정 순과 다르면 알려준다 — 저장해야 사이트 순서도 바뀐다
+        const sheetIds = j.courses.map((c) => `${c.id}:${c.name_en}`).join('|');
+        const newIds = ordered.map((c) => `${c.id}:${c.name_en}`).join('|');
+        if (sheetIds !== newIds) setStatus('일정 순서에 맞춰 ID를 다시 매겼습니다 — 저장을 누르면 사이트에 반영됩니다', true);
+        if (regs !== null) { buildRegFilter(); renderRegs(); }
       } catch (e) {
         document.getElementById('loading').textContent =
           '목록을 불러오지 못했습니다. 새로고침해 보세요. (' + e.message + ')';
@@ -541,6 +648,8 @@
         // 시트에서 다시 읽어와 실제 반영을 확인 (진짜 저장 여부의 기준)
         await load();
         setStatus('✓ 저장 완료 — 사이트에 반영되었습니다', true);
+        // load()가 다른 안내로 덮어썼을 수 있으니 저장 완료를 마지막에 표시
+        window.setTimeout(() => setStatus('✓ 저장 완료 — 사이트에 반영되었습니다', true), 0);
       } catch (e) {
         setStatus('저장 실패: ' + e.message, false);
       } finally {
@@ -550,6 +659,71 @@
 
     /* ═══════════ 등록자 탭 ═══════════ */
     let regs = null; // 마지막으로 불러온 등록자 목록
+    let courseList = null; // 코스 관리 탭에서 불러온 현재 코스 목록 (숨김 포함)
+
+    // 코스명 비교용 정규화 — Apps Script의 normalizeKey_와 같은 규칙
+    function normKey(s) {
+      return String(s || '').toLowerCase().replace(/[®™©]/g, '').replace(/[\u2010-\u2015\u2212]/g, '-')
+        .replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, ' ').trim();
+    }
+
+    // 관리자 페이지가 호출하는 스크립트가 최신인지 하단에 표시
+    const EXPECTED_SCRIPT_VERSION = '2026-09-14b';
+    function showScriptVersion(v) {
+      const el = document.getElementById('scriptVer');
+      const note = document.getElementById('scriptVerNote');
+      if (!el) return;
+      if (!v) {
+        el.textContent = '구버전';
+        note.innerHTML = '<span class="chip clay">재배포 필요 — 코드 교체 → 저장 → 배포 관리 → ✏️ → 새 버전</span>';
+      } else if (v !== EXPECTED_SCRIPT_VERSION) {
+        el.textContent = v;
+        note.innerHTML = `<span class="chip clay">이 페이지는 ${EXPECTED_SCRIPT_VERSION} 기준 — 재배포가 반영되지 않았습니다</span>`;
+      } else {
+        el.textContent = v;
+        note.innerHTML = '<span class="chip sage">최신</span>';
+      }
+    }
+
+    // "D - Gyrotonic® Level 1 Apprentice Review Course" → 현재 코스 (Apps Script의 resolveCourseIndex_와 같은 규칙)
+    // 코스명 정확 일치 → 한쪽이 다른 쪽을 포함하는 코스가 하나뿐 → 글자(id) 순. 없으면 null.
+    function resolveCourse(part) {
+      const m = String(part || '').match(/^(\S+) - (.*)$/);
+      const rawId = m ? m[1] : '';
+      const nameKey = normKey(m ? m[2] : part);
+      const list = courseList || [];
+      if (nameKey) {
+        const exact = list.find((c) => normKey(c.name_en) === nameKey || normKey(c.name_kr) === nameKey);
+        if (exact) return exact;
+        const contains = (k) => k && (k.includes(nameKey) || nameKey.includes(k));
+        const partial = list.filter((c) => contains(normKey(c.name_en)) || contains(normKey(c.name_kr)));
+        if (partial.length === 1) return partial[0];
+      }
+      return (rawId && list.find((c) => normKey(c.id) === normKey(rawId))) || null;
+    }
+
+    function resolveCourseId(part) {
+      const c = resolveCourse(part);
+      if (c) return c.id;
+      const m = String(part || '').match(/^(\S+) - /);
+      return m ? m[1] : String(part || '').trim();
+    }
+
+    // 접수 셀을 항목으로 쪼갠다 (쉼표 뒤 공백 없음·줄바꿈도 허용)
+    function splitCourses(cell) {
+      return String(cell || '').split(/\s*(?:,|\n)\s*/).map((p) => p.trim()).filter(Boolean);
+    }
+
+    // 현재 코스 어디에도 안 맞는 접수 항목들 (집계에서 빠지는 것들)
+    function unmatchedParts(coursesStr) {
+      if (!courseList) return [];
+      return splitCourses(coursesStr).filter((p) => !resolveCourse(p));
+    }
+
+    function courseLabel(id) {
+      const c = (courseList || []).find((x) => x.id === id);
+      return c ? `${id} · ${c.name_en}` : `${id} 코스`;
+    }
 
     function switchTab(tab) {
       const isRegs = tab === 'regs';
@@ -561,17 +735,16 @@
       if (isRegs && regs === null) loadRegs();
     }
 
-    // "A - Gyrotonic® ..." 목록 → id 배열
+    // "A - Gyrotonic® ..., C - ..." 목록 → 현재 코스 id 배열 (중복 제거)
     function courseIds(coursesStr) {
-      return String(coursesStr || '')
-        .split(', ')
-        .map((p) => (p.match(/^(\S+) - /) || [])[1])
-        .filter(Boolean);
+      return [...new Set(splitCourses(coursesStr).map(resolveCourseId).filter(Boolean))];
     }
 
     function regCardHtml(r, i) {
       const ids = courseIds(r.courses);
-      const chips = ids.map((id) => `<span class="chip sage">${esc(id)}</span>`).join('');
+      const bad = unmatchedParts(r.courses);
+      const chips = ids.map((id) => `<span class="chip ${bad.some((p) => resolveCourseId(p) === id) ? 'clay' : 'sage'}">${esc(id)}</span>`).join('') +
+        (bad.length ? `<span class="chip clay" style="white-space:normal">⚠️ 현재 코스와 매칭 안 됨 — 집계 제외: ${esc(bad.join(', '))}</span>` : '');
       const tel = r.phone ? `<a href="tel:${esc(r.phone.replace(/[^\\d+]/g, ''))}">📞 ${esc(r.phone)}</a>` : '';
       const mail = r.email ? `<a href="mailto:${esc(r.email)}">✉️ ${esc(r.email)}</a>` : '';
       const row = (label, v) => (v ? `<div class="rrow"><b>${label}</b><span>${esc(v)}</span></div>` : '');
@@ -613,7 +786,7 @@
         '<option value="">전체 코스</option>' +
         ids.map((id) => {
           const n = regs.filter((r) => courseIds(r.courses).includes(id)).length;
-          return `<option value="${esc(id)}">${esc(id)} 코스 (${n}명)</option>`;
+          return `<option value="${esc(id)}">${esc(courseLabel(id))} (${n}명)</option>`;
         }).join('');
       sel.value = current && ids.includes(current) ? current : '';
     }

@@ -44,6 +44,13 @@ var SENDER_ALIAS = '';
 /** 신청자가 "답장"을 눌렀을 때 가는 주소. 비워두면 발신 주소로 간다 */
 var REPLY_TO = '';
 
+/**
+ * 배포된 코드 버전 — 관리자 페이지 하단에 표시된다.
+ * 코드를 교체하고 재배포했는데 관리자 페이지의 버전이 이 값과 다르면
+ * "새 배포"(주소가 바뀜)를 했거나 저장 전에 배포한 것이다.
+ */
+var SCRIPT_VERSION = '2026-09-14b';
+
 /** 스크립트 속성을 먼저 읽고, 없으면 위 상수를 쓴다 */
 function config_(name, fallback) {
   try {
@@ -582,7 +589,7 @@ function doGet(e) {
       if (!regKey || String(e.parameter.key || '') !== regKey) {
         return jsonOut_({ result: 'error', message: 'unauthorized' });
       }
-      return jsonOut_({ result: 'success', registrations: getRegistrations_(ss) });
+      return jsonOut_({ result: 'success', version: SCRIPT_VERSION, registrations: getRegistrations_(ss) });
     }
 
     var sheet = ss.getSheetByName('Courses');
@@ -595,9 +602,9 @@ function doGet(e) {
       return jsonOut_({ result: 'error', message: 'unauthorized' });
     }
 
-    // 접수 탭(Sheet3)에서 코스 id별 신청 수 집계
-    var counts = countRegistrations_(ss);
-
+    // Courses 탭의 모든 행(숨김 포함)을 먼저 읽는다 — 신청 수 매칭은 숨김 코스까지 포함해야
+    // 글자(id)가 겹치는 숨김 코스의 신청이 보이는 코스로 잘못 집계되지 않는다.
+    var all = [];
     if (sheet) {
       var rows = sheet.getDataRange().getValues();
       for (var i = 1; i < rows.length; i++) {
@@ -606,22 +613,20 @@ function doGet(e) {
 
         var active = String(r[6]).trim().toLowerCase();
         var isActive = !(active === 'false' || active === 'no' || active === '');
-        if (!isActive && !showAll) continue;
 
-        var id = cellToString_(r[0]);
         var capRaw = r.length > 7 ? r[7] : '';
         var capacity =
           capRaw === '' || capRaw === null || isNaN(Number(capRaw)) ? null : Number(capRaw);
 
-        courses.push({
-          id: id,
+        all.push({
+          id: cellToString_(r[0]),
           name_en: cellToString_(r[1]),
           name_kr: cellToString_(r[2]),
           dates: cellToString_(r[3]),
           tag_en: cellToString_(r[4]),
           tag_kr: cellToString_(r[5]),
           capacity: capacity,
-          taken: counts[id] || 0,
+          taken: 0,
           active: isActive,
           time: r.length > 8 ? cellToString_(r[8]) : '',
           price: r.length > 9 ? cellToString_(r[9]) : '',
@@ -635,7 +640,14 @@ function doGet(e) {
       }
     }
 
-    return jsonOut_({ result: 'success', courses: courses });
+    // 접수 탭(Sheet3)의 신청을 코스별로 집계 — 코스명 우선, 글자(id)는 예비 매칭
+    var counts = countRegistrations_(ss, all);
+    for (var k = 0; k < all.length; k++) {
+      all[k].taken = counts[k] || 0;
+      if (all[k].active || showAll) courses.push(all[k]);
+    }
+
+    return jsonOut_({ result: 'success', version: SCRIPT_VERSION, courses: courses });
   } catch (error) {
     return jsonOut_({ result: 'error', message: error.toString() });
   }
@@ -736,12 +748,84 @@ function tsToString_(v) {
 }
 
 /**
- * 접수 탭(Sheet3)의 신청 과정 열에서 "A - ..." 형태의 코스 id별 신청 수를 센다.
- * 이메일 열(D)에 @가 있는 행만 실제 신청으로 인정 — 헤더/메모/불완전 행은 집계에서 제외.
- * 한 사람이 여러 과정을 선택한 행("A - ..., C - ...")은 각 과정에 1명씩 집계된다.
+ * 코스명·id 비교용 정규화: 대소문자·®™·따옴표·대시 종류·공백 차이를 무시한다.
+ * ("GYROTONIC® Level 1 – Foundation" ≡ "Gyrotonic Level 1 - Foundation")
  */
-function countRegistrations_(ss) {
-  var counts = {};
+function normalizeKey_(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[®™©]/g, '')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * 접수 시트의 "D - Gyrotonic® Level 1 Apprentice Review Course" 한 항목이 현재 코스 목록의
+ * 몇 번째 코스인지 찾는다. 코스명(영/한)이 같으면 그 코스, 코스명이 안 맞을 때만 글자(id)로 찾는다.
+ * → 관리자 페이지에서 글자가 바뀌어도(A→B) 예전 신청이 엉뚱한 코스로 세어지지 않는다.
+ * 반환: courses 배열의 인덱스. 어디에도 안 맞으면 -1.
+ */
+function resolveCourseIndex_(part, courses) {
+  var m = String(part || '').match(/^(\S+) - (.*)$/);
+  var rawId = m ? m[1] : '';
+  var rawName = m ? m[2] : String(part || '');
+  var nameKey = normalizeKey_(rawName);
+  var idKey = normalizeKey_(rawId);
+  var list = courses || [];
+  if (nameKey) {
+    for (var i = 0; i < list.length; i++) {
+      if (normalizeKey_(list[i].name_en) === nameKey || normalizeKey_(list[i].name_kr) === nameKey) {
+        return i;
+      }
+    }
+    // 정확히 같은 이름이 없으면 한쪽이 다른 쪽을 포함하는 코스가 "딱 하나"일 때만 인정
+    // (예: 접수엔 "Level 1 Apprentise Review Course", 현재 코스명은 "GYROTONIC® Level 1 Apprentice Review Course")
+    var hit = -1;
+    var hits = 0;
+    for (var k = 0; k < list.length; k++) {
+      var en = normalizeKey_(list[k].name_en);
+      var kr = normalizeKey_(list[k].name_kr);
+      if (
+        (en && (en.indexOf(nameKey) > -1 || nameKey.indexOf(en) > -1)) ||
+        (kr && (kr.indexOf(nameKey) > -1 || nameKey.indexOf(kr) > -1))
+      ) {
+        hit = k;
+        hits += 1;
+      }
+    }
+    if (hits === 1) return hit;
+  }
+  if (idKey) {
+    for (var j = 0; j < list.length; j++) {
+      if (normalizeKey_(list[j].id) === idKey) return j;
+    }
+  }
+  return -1;
+}
+
+/** "A - ..., C - ..." 셀을 항목 배열로. 쉼표 뒤 공백이 없거나 줄바꿈으로 나뉜 셀(수기 입력)도 처리 */
+function splitCourses_(cell) {
+  return String(cell || '')
+    .split(/\s*(?:,|\n)\s*/)
+    .map(function (p) { return p.trim(); })
+    .filter(Boolean);
+}
+
+/**
+ * 접수 탭(Sheet3)의 신청 과정 열("A - ..., C - ...")을 코스별 신청 수로 집계한다.
+ * - 이메일 열(D)에 @가 있는 행만 실제 신청으로 인정 — 헤더/메모/불완전 행은 집계에서 제외.
+ * - 한 사람이 여러 과정을 선택한 행은 각 과정에 1명씩 집계된다 (같은 과정 중복 선택은 1명).
+ * - 각 항목은 resolveCourseIndex_로 현재 코스에 매칭한다 (코스명 우선, 글자는 예비).
+ *   현재 코스 어디에도 안 맞는 신청(삭제된 코스 등)은 세지 않는다.
+ * courses: Courses 탭 전체 목록 [{id, name_en, name_kr}] (숨김 코스 포함)
+ * 반환: courses와 같은 순서의 신청 수 배열
+ */
+function countRegistrations_(ss, courses) {
+  var list = courses || [];
+  var counts = [];
+  for (var c = 0; c < list.length; c++) counts.push(0);
   var sub = getSubmissionsSheet_(ss);
   if (!sub) return counts;
   var values = sub.getDataRange().getValues();
@@ -750,10 +834,13 @@ function countRegistrations_(ss) {
     if (email.indexOf('@') === -1) continue; // 실제 신청 행만 집계
     var cell = String(values[i][1] || ''); // B열 = 신청 과정
     if (!cell) continue;
-    var parts = cell.split(', ');
+    var parts = splitCourses_(cell);
+    var seen = {};
     for (var j = 0; j < parts.length; j++) {
-      var m = parts[j].match(/^(\S+) - /);
-      if (m) counts[m[1]] = (counts[m[1]] || 0) + 1;
+      var idx = resolveCourseIndex_(parts[j], list);
+      if (idx < 0 || seen[idx]) continue;
+      seen[idx] = true;
+      counts[idx] += 1;
     }
   }
   return counts;
