@@ -226,7 +226,8 @@
         · <b>정원</b>을 비우면 자리 표시 없이 항상 신청 가능, <b>0</b>을 넣으면 즉시 "마감" 처리됩니다.<br />
         · <b>사이트에 표시</b>를 끄면 그 코스가 사이트에서 숨겨집니다 (삭제 없이).<br />
         · <b>일정</b>은 자유 텍스트: <code>7/24 - 7/26</code>, <code>8/7 - 8/9, 8/13 - 8/16</code><br />
-        · 저장 후 확인: <a href="../#register">등록 폼 열어보기</a>
+        · 저장 후 확인: <a href="../#register">등록 폼 열어보기</a><br />
+        · Apps Script 버전: <b id="scriptVer">확인 중…</b> <span id="scriptVerNote"></span>
       </p>
     </div>
 
@@ -608,6 +609,7 @@
         const j = await res.json();
         if (j.result !== 'success') throw new Error(j.message || 'load failed');
         courseList = j.courses;
+        showScriptVersion(j.version);
         const ordered = autoOrder(j.courses);
         cardsEl.innerHTML = ordered.map(cardHtml).join('');
         document.getElementById('loading').style.display = 'none';
@@ -665,16 +667,57 @@
         .replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, ' ').trim();
     }
 
-    // "D - Gyrotonic® Level 1 Apprentice Review Course" → 현재 코스의 ID (코스명 우선, 없으면 글자 그대로)
-    function resolveCourseId(part) {
+    // 관리자 페이지가 호출하는 스크립트가 최신인지 하단에 표시
+    const EXPECTED_SCRIPT_VERSION = '2026-09-14b';
+    function showScriptVersion(v) {
+      const el = document.getElementById('scriptVer');
+      const note = document.getElementById('scriptVerNote');
+      if (!el) return;
+      if (!v) {
+        el.textContent = '구버전';
+        note.innerHTML = '<span class="chip clay">재배포 필요 — 코드 교체 → 저장 → 배포 관리 → ✏️ → 새 버전</span>';
+      } else if (v !== EXPECTED_SCRIPT_VERSION) {
+        el.textContent = v;
+        note.innerHTML = `<span class="chip clay">이 페이지는 ${EXPECTED_SCRIPT_VERSION} 기준 — 재배포가 반영되지 않았습니다</span>`;
+      } else {
+        el.textContent = v;
+        note.innerHTML = '<span class="chip sage">최신</span>';
+      }
+    }
+
+    // "D - Gyrotonic® Level 1 Apprentice Review Course" → 현재 코스 (Apps Script의 resolveCourseIndex_와 같은 규칙)
+    // 코스명 정확 일치 → 한쪽이 다른 쪽을 포함하는 코스가 하나뿐 → 글자(id) 순. 없으면 null.
+    function resolveCourse(part) {
       const m = String(part || '').match(/^(\S+) - (.*)$/);
       const rawId = m ? m[1] : '';
       const nameKey = normKey(m ? m[2] : part);
       const list = courseList || [];
-      const byName = nameKey && list.find((c) => normKey(c.name_en) === nameKey || normKey(c.name_kr) === nameKey);
-      if (byName) return byName.id;
-      const byId = rawId && list.find((c) => normKey(c.id) === normKey(rawId));
-      return byId ? byId.id : rawId;
+      if (nameKey) {
+        const exact = list.find((c) => normKey(c.name_en) === nameKey || normKey(c.name_kr) === nameKey);
+        if (exact) return exact;
+        const contains = (k) => k && (k.includes(nameKey) || nameKey.includes(k));
+        const partial = list.filter((c) => contains(normKey(c.name_en)) || contains(normKey(c.name_kr)));
+        if (partial.length === 1) return partial[0];
+      }
+      return (rawId && list.find((c) => normKey(c.id) === normKey(rawId))) || null;
+    }
+
+    function resolveCourseId(part) {
+      const c = resolveCourse(part);
+      if (c) return c.id;
+      const m = String(part || '').match(/^(\S+) - /);
+      return m ? m[1] : String(part || '').trim();
+    }
+
+    // 접수 셀을 항목으로 쪼갠다 (쉼표 뒤 공백 없음·줄바꿈도 허용)
+    function splitCourses(cell) {
+      return String(cell || '').split(/\s*(?:,|\n)\s*/).map((p) => p.trim()).filter(Boolean);
+    }
+
+    // 현재 코스 어디에도 안 맞는 접수 항목들 (집계에서 빠지는 것들)
+    function unmatchedParts(coursesStr) {
+      if (!courseList) return [];
+      return splitCourses(coursesStr).filter((p) => !resolveCourse(p));
     }
 
     function courseLabel(id) {
@@ -694,12 +737,14 @@
 
     // "A - Gyrotonic® ..., C - ..." 목록 → 현재 코스 id 배열 (중복 제거)
     function courseIds(coursesStr) {
-      return [...new Set(String(coursesStr || '').split(', ').map(resolveCourseId).filter(Boolean))];
+      return [...new Set(splitCourses(coursesStr).map(resolveCourseId).filter(Boolean))];
     }
 
     function regCardHtml(r, i) {
       const ids = courseIds(r.courses);
-      const chips = ids.map((id) => `<span class="chip sage">${esc(id)}</span>`).join('');
+      const bad = unmatchedParts(r.courses);
+      const chips = ids.map((id) => `<span class="chip ${bad.some((p) => resolveCourseId(p) === id) ? 'clay' : 'sage'}">${esc(id)}</span>`).join('') +
+        (bad.length ? `<span class="chip clay" style="white-space:normal">⚠️ 현재 코스와 매칭 안 됨 — 집계 제외: ${esc(bad.join(', '))}</span>` : '');
       const tel = r.phone ? `<a href="tel:${esc(r.phone.replace(/[^\\d+]/g, ''))}">📞 ${esc(r.phone)}</a>` : '';
       const mail = r.email ? `<a href="mailto:${esc(r.email)}">✉️ ${esc(r.email)}</a>` : '';
       const row = (label, v) => (v ? `<div class="rrow"><b>${label}</b><span>${esc(v)}</span></div>` : '');

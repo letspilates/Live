@@ -44,6 +44,13 @@ var SENDER_ALIAS = '';
 /** 신청자가 "답장"을 눌렀을 때 가는 주소. 비워두면 발신 주소로 간다 */
 var REPLY_TO = '';
 
+/**
+ * 배포된 코드 버전 — 관리자 페이지 하단에 표시된다.
+ * 코드를 교체하고 재배포했는데 관리자 페이지의 버전이 이 값과 다르면
+ * "새 배포"(주소가 바뀜)를 했거나 저장 전에 배포한 것이다.
+ */
+var SCRIPT_VERSION = '2026-09-14b';
+
 /** 스크립트 속성을 먼저 읽고, 없으면 위 상수를 쓴다 */
 function config_(name, fallback) {
   try {
@@ -582,7 +589,7 @@ function doGet(e) {
       if (!regKey || String(e.parameter.key || '') !== regKey) {
         return jsonOut_({ result: 'error', message: 'unauthorized' });
       }
-      return jsonOut_({ result: 'success', registrations: getRegistrations_(ss) });
+      return jsonOut_({ result: 'success', version: SCRIPT_VERSION, registrations: getRegistrations_(ss) });
     }
 
     var sheet = ss.getSheetByName('Courses');
@@ -640,7 +647,7 @@ function doGet(e) {
       if (all[k].active || showAll) courses.push(all[k]);
     }
 
-    return jsonOut_({ result: 'success', courses: courses });
+    return jsonOut_({ result: 'success', version: SCRIPT_VERSION, courses: courses });
   } catch (error) {
     return jsonOut_({ result: 'error', message: error.toString() });
   }
@@ -773,6 +780,22 @@ function resolveCourseIndex_(part, courses) {
         return i;
       }
     }
+    // 정확히 같은 이름이 없으면 한쪽이 다른 쪽을 포함하는 코스가 "딱 하나"일 때만 인정
+    // (예: 접수엔 "Level 1 Apprentise Review Course", 현재 코스명은 "GYROTONIC® Level 1 Apprentice Review Course")
+    var hit = -1;
+    var hits = 0;
+    for (var k = 0; k < list.length; k++) {
+      var en = normalizeKey_(list[k].name_en);
+      var kr = normalizeKey_(list[k].name_kr);
+      if (
+        (en && (en.indexOf(nameKey) > -1 || nameKey.indexOf(en) > -1)) ||
+        (kr && (kr.indexOf(nameKey) > -1 || nameKey.indexOf(kr) > -1))
+      ) {
+        hit = k;
+        hits += 1;
+      }
+    }
+    if (hits === 1) return hit;
   }
   if (idKey) {
     for (var j = 0; j < list.length; j++) {
@@ -780,6 +803,14 @@ function resolveCourseIndex_(part, courses) {
     }
   }
   return -1;
+}
+
+/** "A - ..., C - ..." 셀을 항목 배열로. 쉼표 뒤 공백이 없거나 줄바꿈으로 나뉜 셀(수기 입력)도 처리 */
+function splitCourses_(cell) {
+  return String(cell || '')
+    .split(/\s*(?:,|\n)\s*/)
+    .map(function (p) { return p.trim(); })
+    .filter(Boolean);
 }
 
 /**
@@ -803,7 +834,7 @@ function countRegistrations_(ss, courses) {
     if (email.indexOf('@') === -1) continue; // 실제 신청 행만 집계
     var cell = String(values[i][1] || ''); // B열 = 신청 과정
     if (!cell) continue;
-    var parts = cell.split(', ');
+    var parts = splitCourses_(cell);
     var seen = {};
     for (var j = 0; j < parts.length; j++) {
       var idx = resolveCourseIndex_(parts[j], list);
