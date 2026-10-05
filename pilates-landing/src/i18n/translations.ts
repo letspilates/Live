@@ -196,17 +196,17 @@ const en = {
       eunice: {
         name: 'Eunice Choi',
         role: 'Instructor',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROKINESIS®', 'GYROTONIC® Archway', 'GYROTONIC® Jumping Stretching Board', 'Pre / Post Natal'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROKINESIS®', 'GYROTONIC® Archway', 'GYROTONIC® Jumping Stretching Board', 'GYROTONER®', 'Pre / Post Natal'],
       },
       soo: {
         name: 'Su Kyung Yi',
         role: 'Instructor',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', 'Pre / Post Natal'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', 'GYROTONER®', 'Pre / Post Natal'],
       },
       haley: {
         name: 'Haley Han',
         role: 'Instructor',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', 'Pre / Post Natal'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', 'GYROTONER®', 'Pre / Post Natal'],
       },
       danielle: {
         name: 'Danielle Kim',
@@ -532,17 +532,17 @@ const ko: Content = {
       eunice: {
         name: 'Eunice Choi',
         role: '강사',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROKINESIS®', 'GYROTONIC® Archway', 'GYROTONIC® Jumping Stretching Board', '산전 · 산후'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROKINESIS®', 'GYROTONIC® Archway', 'GYROTONIC® Jumping Stretching Board', 'GYROTONER®', '산전 · 산후'],
       },
       soo: {
         name: 'Su Kyung Yi',
         role: '강사',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', '산전 · 산후'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', 'GYROTONER®', '산전 · 산후'],
       },
       haley: {
         name: 'Haley Han',
         role: '강사',
-        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', '산전 · 산후'],
+        certs: ['STOTT PILATES®', 'GYROTONIC® Level 1', 'GYROTONIC® Jumping Stretching Board', 'GYROTONER®', '산전 · 산후'],
       },
       danielle: {
         name: 'Danielle Kim',
