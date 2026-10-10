@@ -13,7 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import LogoIcon from '../components/LogoIcon';
-import { useAuth, useStaff, type Role } from './auth';
+import { ROLES, useAuth, useStaff, type Role } from './auth';
 import { setLang, useT, type TextKey } from './i18n';
 import { Link, useRoute } from './router';
 import type { AdminPath } from './routes';
@@ -21,7 +21,7 @@ import { IS_STAGING } from './supabase';
 import { Initials } from './ui';
 
 const NAV: { to: AdminPath; label: TextKey; Icon: LucideIcon; roles: Role[] }[] = [
-  { to: '', label: 'navDashboard', Icon: LayoutDashboard, roles: ['OWNER', 'INSTRUCTOR'] },
+  { to: '', label: 'navDashboard', Icon: LayoutDashboard, roles: ROLES },
   { to: 'staff', label: 'navStaff', Icon: Users, roles: ['OWNER'] },
 ];
 

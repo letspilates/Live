@@ -9,7 +9,7 @@
 // but an owner.
 //
 // POST JSON { action, ... }:
-//   create       { email, fullName, password, role, pricingTier? }
+//   create       { email, fullName, password, role (OWNER|INSTRUCTOR|STAFF), pricingTier? }
 //                An email that already has a login is linked as is (password unchanged).
 //   deactivate   { userId }  blocks data access, then sign-in
 //   reactivate   { userId }  restores both
@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     const { error: linkError } = await asCaller.rpc('add_staff_account', {
       p_email: email,
       p_full_name: fullName,
-      p_role: body.role === 'OWNER' ? 'OWNER' : 'INSTRUCTOR',
+      p_role: body.role === 'OWNER' || body.role === 'STAFF' ? body.role : 'INSTRUCTOR',
       p_pricing_tier: body.pricingTier || null,
     });
     if (linkError) {

@@ -4,7 +4,7 @@
 // changes are an owner-checked database function.
 import { useEffect, useState, type FormEvent } from 'react';
 import { Ban, CircleCheck, Hourglass, UserPlus } from 'lucide-react';
-import { useStaff, type PricingTier, type Role, type StaffStatus } from '../auth';
+import { ROLES, useStaff, type PricingTier, type Role, type StaffStatus } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
 import { functionError, supabase } from '../supabase';
@@ -21,7 +21,7 @@ interface StaffRow {
   last_sign_in_at: string | null;
 }
 
-type Action = 'deactivate' | 'reactivate' | 'makeOwner' | 'makeInstructor';
+type Pending = { action: 'deactivate' | 'reactivate'; row: StaffRow } | { action: 'role'; row: StaffRow; role: Role };
 type Message = { tone: 'success' | 'error' | 'info'; text: string };
 
 const ICON = { size: 16, strokeWidth: 1.75, 'aria-hidden': true } as const;
@@ -45,7 +45,7 @@ export default function StaffPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [version, setVersion] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
-  const [pending, setPending] = useState<{ action: Action; row: StaffRow } | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
 
@@ -66,33 +66,24 @@ export default function StaffPage() {
 
   const run = async () => {
     if (!pending || busy) return;
-    const { action, row } = pending;
-    const vars = { name: row.full_name, email: row.email };
+    const { row } = pending;
     setBusy(true);
-    if (action === 'makeOwner' || action === 'makeInstructor') {
-      const { error } = await supabase!.rpc('set_staff_role', {
-        p_user_id: row.user_id,
-        p_role: action === 'makeOwner' ? 'OWNER' : 'INSTRUCTOR',
-      });
+    if (pending.action === 'role') {
+      const { error } = await supabase!.rpc('set_staff_role', { p_user_id: row.user_id, p_role: pending.role });
       report(error ? { error: error.message } : {}, t('roleUpdated'));
     } else {
-      const result = await staffAdmin({ action, userId: row.user_id });
-      const done: Record<typeof action, TextKey> = {
-        deactivate: 'deactivated',
-        reactivate: 'reactivated',
-      };
-      report(result, t(done[action], vars));
+      const result = await staffAdmin({ action: pending.action, userId: row.user_id });
+      report(result, t(pending.action === 'deactivate' ? 'deactivated' : 'reactivated', { name: row.full_name }));
     }
     setBusy(false);
     setPending(null);
     reload();
   };
 
-  const confirmText: Record<Action, TextKey> = {
-    deactivate: 'confirmDeactivate',
-    reactivate: 'confirmReactivate',
-    makeOwner: 'confirmMakeOwner',
-    makeInstructor: 'confirmMakeInstructor',
+  const confirmMessage = (p: Pending) => {
+    const name = p.row.full_name;
+    if (p.action !== 'role') return t(p.action === 'deactivate' ? 'confirmDeactivate' : 'confirmReactivate', { name });
+    return p.role === 'OWNER' ? t('confirmMakeOwner', { name }) : t('confirmChangeRole', { name, role: t(p.role) });
   };
 
   const actionsFor = (row: StaffRow) => {
@@ -105,9 +96,20 @@ export default function StaffPage() {
     );
     if (row.status === 'INACTIVE') return [btn('reactivate', () => setPending({ action: 'reactivate', row }))];
     return [
-      row.role === 'OWNER'
-        ? btn('makeInstructor', () => setPending({ action: 'makeInstructor', row }))
-        : btn('makeOwner', () => setPending({ action: 'makeOwner', row })),
+      <select
+        key="role"
+        aria-label={`${t('role')}: ${row.full_name}`}
+        className="h-9 rounded-full border border-ink/15 bg-paper px-3 text-base text-ink md:text-[13px]"
+        value={row.role}
+        disabled={busy}
+        onChange={(e) => setPending({ action: 'role', row, role: e.target.value as Role })}
+      >
+        {ROLES.map((r) => (
+          <option key={r} value={r}>
+            {t(r)}
+          </option>
+        ))}
+      </select>,
       btn('deactivate', () => setPending({ action: 'deactivate', row })),
     ];
   };
@@ -195,7 +197,7 @@ export default function StaffPage() {
         {pending && (
           <>
             <p className="text-sm text-ink">
-              {t(confirmText[pending.action], { name: pending.row.full_name, email: pending.row.email })}
+              {confirmMessage(pending)}
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setPending(null)}>
@@ -325,6 +327,7 @@ function AddStaffDialog({
             </label>
             <select id="add-role" className={inputCls} value={role} onChange={(e) => setRole(e.target.value as Role)}>
               <option value="INSTRUCTOR">{t('INSTRUCTOR')}</option>
+              <option value="STAFF">{t('STAFF')}</option>
               <option value="OWNER">{t('OWNER')}</option>
             </select>
           </div>

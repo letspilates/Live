@@ -577,7 +577,7 @@ Invite instructor (모달)
 
 ```
  auth.users ──1:1── staff_profiles ───────────────┐ (recorded_by / collected_by / payee)
-                      │ role OWNER|INSTRUCTOR      │
+                      │ role OWNER|INSTRUCTOR|STAFF│
                       │                            │
  students ──1:N── enrollments ──N:1── courses      │
     │  (merged_into → students)   │                │
@@ -605,7 +605,7 @@ staff_profiles (                       -- 명세의 profiles + user_roles 통합
   user_id        uuid PK  → auth.users(id) RESTRICT,
   full_name      text NOT NULL CHECK (length between 1 and 80),
   email          text NOT NULL,
-  role           text NOT NULL CHECK (role IN ('OWNER','INSTRUCTOR')),   -- 역할 추가 = CHECK 수정
+  role           text NOT NULL CHECK (role IN ('OWNER','INSTRUCTOR','STAFF')),   -- 역할 추가 = CHECK 수정 (STAFF: 2026-10-10)
   status         text NOT NULL DEFAULT 'INVITED' CHECK (status IN ('INVITED','ACTIVE','INACTIVE')),
   pricing_tier   text CHECK (pricing_tier IN ('CERTIFIED','MASTER')),
   invited_at, activated_at, deactivated_at, created_at, updated_at
@@ -820,6 +820,10 @@ audit_logs (
 | 계정 관리 | ✅ | ❌ | Edge Function `staff-admin` (오너 확인 후 service role) |
 | 역할 변경 | ✅ (신뢰된 함수) | ❌ | `set_staff_role()` — 마지막 오너 보호 |
 | 설정 | ✅ | 본인 계정만 | RLS / `update_my_name()` |
+
+> **STAFF 역할 (2026-10-10 추가):** 수업하지 않는 직원(프런트 데스크·보조)용. 현재 권한은 **INSTRUCTOR와 같다**
+> (오너 전용 기능은 모두 ❌, `is_active_staff()`로 열리는 기능은 ✅). 이후 모듈(결제 입력·학생 검색 등)에서 STAFF를 다르게 할지는
+> 그 Phase 계획 때 사용자에게 확인한다. DB는 `role = 'INSTRUCTOR'`가 아니라 `is_owner()` / `is_active_staff()`로만 판단하므로 역할을 늘려도 기존 검사는 그대로다.
 
 **4개 층 (명세 6장):** ① 메뉴 표시 ② 경로 가드 ③ DB 함수·Edge Function의 서버 검사 ④ RLS. **①②는 편의일 뿐이고 보안은 ③④에서만 보장한다.**
 

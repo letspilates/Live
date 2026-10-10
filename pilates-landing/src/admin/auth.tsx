@@ -5,7 +5,8 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
-export type Role = 'OWNER' | 'INSTRUCTOR';
+export type Role = 'OWNER' | 'INSTRUCTOR' | 'STAFF';
+export const ROLES: Role[] = ['OWNER', 'INSTRUCTOR', 'STAFF'];
 export type StaffStatus = 'INVITED' | 'ACTIVE' | 'INACTIVE';
 export type PricingTier = 'CERTIFIED' | 'MASTER';
 

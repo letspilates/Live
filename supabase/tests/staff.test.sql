@@ -136,6 +136,8 @@ select t.expect_error('last owner: demote self', '23514',
   $$select public.set_staff_role(auth.uid(), 'INSTRUCTOR')$$);
 select t.expect_error('last owner: deactivate self', '23514',
   $$select public.set_staff_status(auth.uid(), 'INACTIVE')$$);
+select t.expect_error('last owner: demote self to staff', '23514',
+  $$select public.set_staff_role(auth.uid(), 'STAFF')$$);
 reset role;
 select app.grant_owner('owner2@test.local', 'Owner Two');
 select t.login('00000000-0000-0000-0000-0000000000a1');
@@ -192,6 +194,25 @@ select t.expect_error('add staff: anon refused', '42501',
 reset role;
 select t.login('00000000-0000-0000-0000-0000000000e1');
 select t.check('added instructor can sign in and is active', (select status = 'ACTIVE' from public.current_staff()));
+reset role;
+
+-- STAFF role --------------------------------------------------------------------
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000f1', 'desk@test.local');
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select public.add_staff_account('desk@test.local', 'Front Desk', 'STAFF');
+select t.check('staff role: added', (select role = 'STAFF' and status = 'ACTIVE'
+  from public.staff_profiles where user_id = '00000000-0000-0000-0000-0000000000f1'));
+select t.check('staff role: instructor -> staff', public.set_staff_role('00000000-0000-0000-0000-0000000000b2', 'STAFF'));
+select t.check('staff role: staff -> instructor', public.set_staff_role('00000000-0000-0000-0000-0000000000b2', 'INSTRUCTOR'));
+select t.expect_error('staff role: unknown role', '22023',
+  $$select public.set_staff_role('00000000-0000-0000-0000-0000000000b2', 'ADMIN')$$);
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000f1');
+select t.check('staff role: active staff', app.is_active_staff());
+select t.check('staff role: not owner', not app.is_owner());
+select t.check('staff role: sees only own profile', (select count(*) = 1 from public.staff_profiles));
+select t.expect_error('staff role: list_staff denied', '42501', $$select * from public.list_staff()$$);
+select t.expect_error('staff role: cannot promote self', '42501', $$select public.set_staff_role(auth.uid(), 'OWNER')$$);
 reset role;
 
 -- Exposure check still passes ---------------------------------------------------
