@@ -50,7 +50,7 @@ Claude가 `Staging`에 push할 때 `supabase/migrations/`의 새 SQL이 **자동
 - 설정을 바꾼 **뒤의 push부터** 반응한다. 설정 전에 올라간 커밋은 다시 보지 않는다.
 - 운영용 프로젝트를 만들면 **그 프로젝트**를 `main`에 연결한다.
 
-- 확인: Supabase → **Database → Migrations**(또는 Integrations → GitHub의 배포 기록)에 `20261010133933` (foundation) 이 보이면 완료.
+- 확인: Supabase → **Database → Migrations**에 첫 마이그레이션이 보이면 완료. 첫 파일은 번호가 `0001`이라 화면에 안 보일 수 있으니, SQL Editor에서 `select version from supabase_migrations.schema_migrations;` 로 `0001`을 확인해도 된다.
   SQL Editor에서 `select * from staff_profiles;` 가 오류 없이 빈 결과를 내도 완료.
 - ⚠️ **같은 SQL을 SQL Editor에 다시 붙여넣지 않는다.** 연동은 자기가 적용한 기록만 알기 때문에, 손으로 먼저 실행하면 다음 자동 적용이 "already exists"로 실패한다.
 - **Automatic branching(미리보기 브랜치)은 꺼 둔다.** PR마다 DB를 새로 만드는 유료 기능이라 지금은 필요 없다.
@@ -127,6 +127,7 @@ Claude Code 클라우드 환경 설정 → Network access → **Allowed domains*
 
 ## 개발자 참고
 
-- DB 변경은 `supabase/migrations/`에 `<타임스탬프>_이름.sql` 형식으로 추가한다 (`date -u +%Y%m%d%H%M%S`). `Staging` push → 연동이 스테이징 DB에 적용한다.
+- DB 변경은 `supabase/migrations/`에 `<타임스탬프>_이름.sql` 형식으로 추가한다 (`date -u +%Y%m%d%H%M%S`).
+  첫 파일 `0001_foundation.sql`은 이미 적용되어 DB에 버전 `0001`로 기록돼 있으므로 이름을 그대로 둔다. `Staging` push → 연동이 스테이징 DB에 적용한다.
   이미 적용된 마이그레이션 파일의 **이름을 바꾸지 않는다** (새 마이그레이션으로 인식되어 다시 실행되다 실패한다).
 - 로컬 검증: `bash supabase/tests/run-local.sh` (임시 Postgres에 마이그레이션 + 권한 테스트, 실제 프로젝트는 건드리지 않음).
