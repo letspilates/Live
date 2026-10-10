@@ -1,6 +1,8 @@
 # Daily Income — 통합 구현 플랜
 
-> 상태: **제안 (검토 대기)** · 작성 2026-10-10 · 코드 변경 없음
+> ⚠️ **이 문서는 `ADMIN-PORTAL-MASTER-PLAN.md`로 대체되었다 (2026-10-10).** Daily Income은 `/admin/daily-income` 모듈로 흡수됨. 기록 보존용.
+>
+> 상태: ~~제안 (검토 대기)~~ 대체됨 · 작성 2026-10-10 · 코드 변경 없음
 > 원 요구사항: "Let's Pilates Website — Daily Income Page Integration"
 > 이 문서는 현재 사이트 조사 결과와 구현 계획이다. §8 "결정 필요" 항목에 답을 받은 뒤 착수한다.
 
