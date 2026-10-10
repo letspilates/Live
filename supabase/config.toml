@@ -1,0 +1,9 @@
+# Supabase CLI / GitHub integration settings. Only what this project needs;
+# everything else keeps Supabase defaults. Auth settings stay in the dashboard
+# (production deploys ignore the auth section of this file).
+project_id = "letspilates"
+
+# The new sb_ API keys are not JWTs, so the platform check is off and the
+# function verifies the caller itself (see the comment in its index.ts).
+[functions.staff-admin]
+verify_jwt = false

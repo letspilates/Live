@@ -32,14 +32,16 @@
      - `http://localhost:5173/admin/set-password/`
 3. **비밀번호 최소 길이:** Email 설정의 Minimum password length → **8**.
 
-## 3단계 — 데이터베이스 구조 만들기 (SQL 1회 실행)
+## 3단계 — 데이터베이스 구조 (자동: GitHub 연동)
 
-1. 이 파일을 연다: https://github.com/letspilates/Live/blob/Staging/supabase/migrations/0001_foundation.sql
-   → **Raw** 버튼 → 전체 선택 → 복사.
-2. Supabase → **SQL Editor** → New query → 붙여넣기 → **Run**.
-3. `Success. No rows returned`가 보이면 완료.
-   - 오류가 나면 **아무것도 만들어지지 않는다**(한 덩어리로 실행됨). 오류 문구를 그대로 알려주면 된다.
-   - 두 번 실행하면 "already exists" 오류가 난다. 무해하다 (이미 만들어졌다는 뜻).
+Supabase ↔ GitHub 연동이 **Production branch = `Staging`, Deploy to production = ON** 으로 되어 있으면,
+Claude가 `Staging`에 push할 때 `supabase/migrations/`의 새 SQL이 **자동으로 적용**된다. 직접 붙여넣지 않는다.
+
+- 확인: Supabase → **Database → Migrations**(또는 Integrations → GitHub의 배포 기록)에 `0001` 이 보이면 완료.
+  SQL Editor에서 `select * from staff_profiles;` 가 오류 없이 빈 결과를 내도 완료.
+- ⚠️ **같은 SQL을 SQL Editor에 다시 붙여넣지 않는다.** 연동은 자기가 적용한 기록만 알기 때문에, 손으로 먼저 실행하면 다음 자동 적용이 "already exists"로 실패한다.
+- **Automatic branching(미리보기 브랜치)은 꺼 둔다.** PR마다 DB를 새로 만드는 유료 기능이라 지금은 필요 없다.
+- 연동을 끄고 수동으로 할 때만: 파일 Raw 내용을 SQL Editor에 붙여넣고 Run (한 번만).
 
 ## 4단계 — 오너 계정 2개 (Calvin, Sunnie)
 
@@ -60,16 +62,14 @@
 > `app.grant_owner`는 **SQL Editor(프로젝트 관리자)에서만** 실행된다. 사이트·API로는 호출할 수 없다.
 > 앞으로 오너 추가는 포털의 직원 화면 → "오너로 지정"으로 한다.
 
-## 5단계 — Edge Function `staff-admin` 배포 (강사 초대·비활성화)
+## 5단계 — Edge Function `staff-admin` (자동: GitHub 연동)
 
-1. **Edge Functions** → **Deploy a new function** → **Via Editor**.
-2. 함수 이름: **`staff-admin`** (정확히 이 이름).
-3. 기본 코드를 지우고 이 파일 전체를 붙여넣기:
-   https://github.com/letspilates/Live/blob/Staging/supabase/functions/staff-admin/index.ts (Raw → 복사)
-4. **Deploy**.
-5. 배포 후 함수 설정(Details)에서 **Verify JWT (Enforce JWT verification) → OFF** → 저장.
-   - 이유: 새 키 형식(`sb_…`)은 JWT가 아니라서 함수가 호출자를 직접 확인한다. 오너가 아니면 DB 함수가 거부한다.
-   - 별도 비밀값 설정은 필요 없다 (Supabase가 자동으로 넣어준다).
+3단계와 같은 push로 `supabase/functions/staff-admin`이 **자동 배포**된다.
+`supabase/config.toml`이 **Verify JWT = OFF**를 지정하므로 대시보드에서 따로 끌 필요가 없다.
+
+- 확인: Supabase → **Edge Functions** 목록에 `staff-admin`이 보이고, 상세 화면의 Verify JWT가 꺼져 있으면 완료.
+- 이유: 새 키 형식(`sb_…`)은 JWT가 아니라서 함수가 호출자를 직접 확인한다. 오너가 아니면 DB 함수가 거부한다.
+- 별도 비밀값 설정은 필요 없다 (Supabase가 자동으로 넣어준다).
 
 ## 6단계 — 메일 발송 설정 (강사 초대 전에 필수)
 
@@ -114,5 +114,6 @@ Claude Code 클라우드 환경 설정 → Network access → **Allowed domains*
 
 ## 개발자 참고
 
-- DB 변경은 `supabase/migrations/`에 번호순 SQL로 추가하고, 스테이징 프로젝트에서 먼저 실행한다.
+- DB 변경은 `supabase/migrations/`에 번호순 SQL로 추가한다. `Staging` push → 연동이 스테이징 DB에 적용한다.
+  이미 적용된 마이그레이션 파일의 **이름을 바꾸지 않는다** (새 마이그레이션으로 인식되어 다시 실행되다 실패한다).
 - 로컬 검증: `bash supabase/tests/run-local.sh` (임시 Postgres에 마이그레이션 + 권한 테스트, 실제 프로젝트는 건드리지 않음).

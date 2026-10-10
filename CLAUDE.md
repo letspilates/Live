@@ -90,8 +90,9 @@ Live/                          ← 저장소 루트
 ├── ADMIN-PORTAL-MASTER-PLAN.md ← 관리자 포털 마스터 플랜 (승인됨 2026-10-10)
 ├── docs/admin/SETUP-KO.md     ← Supabase 설정 가이드 (사장님용)
 ├── supabase/                  ← 관리자 포털 백엔드
-│   ├── migrations/            ← 번호순 SQL (SQL Editor에 붙여넣어 적용, 스테이징 먼저)
-│   ├── functions/             ← Edge Functions (staff-admin)
+│   ├── migrations/            ← 번호순 SQL. Staging push 시 GitHub 연동이 스테이징 DB에 자동 적용
+│   ├── functions/             ← Edge Functions (staff-admin). 같은 연동이 자동 배포
+│   ├── config.toml            ← 함수 설정 (verify_jwt=false). Auth 설정은 대시보드에서
 │   └── tests/run-local.sh     ← 임시 Postgres로 마이그레이션 + 권한 테스트
 └── pilates-landing/           ← ★ 사이트 소스 (Vite 앱)
     ├── src/

@@ -2,8 +2,9 @@
 -- Let's Pilates Admin Portal · 0001 foundation
 -- Staff accounts (OWNER / INSTRUCTOR), audit log, permission helpers.
 --
--- How to apply: Supabase Dashboard → SQL Editor → paste this whole file → Run.
--- Runs as one transaction: either everything is created or nothing is.
+-- Applied by the Supabase GitHub integration when this file reaches the
+-- project's production branch, or by pasting it into SQL Editor once.
+-- Never both: the integration records what it applied, a manual paste does not.
 -- Then create the owner accounts (docs/admin/SETUP-KO.md, step 4).
 --
 -- Security model (ADMIN-PORTAL-MASTER-PLAN.md §I):
@@ -13,7 +14,6 @@
 --   · Privileged changes go through functions that check the caller first.
 -- ============================================================================
 
-begin;
 
 -- Internal helpers live in "app", which the Data API does not expose.
 create schema if not exists app;
@@ -346,5 +346,3 @@ $$;
 revoke all on function app.check_api_exposure() from public, anon, authenticated;
 
 select app.check_api_exposure();
-
-commit;

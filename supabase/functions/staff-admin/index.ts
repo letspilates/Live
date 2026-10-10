@@ -1,10 +1,11 @@
 // staff-admin: owner-only staff account actions that need Supabase Auth admin
 // rights (sending invitations, deleting a pending invite, blocking sign-in).
 //
-// Deploy: Dashboard → Edge Functions → Deploy a new function → name "staff-admin",
-// paste this file, and turn "Verify JWT" OFF. The new sb_ API keys are not JWTs,
-// so this handler checks the caller itself: every database call runs with the
-// caller's own token, and the database functions refuse anyone but an owner.
+// Deployed by the Supabase GitHub integration on push to the project's production
+// branch; supabase/config.toml turns the platform's "Verify JWT" off. The new sb_
+// API keys are not JWTs, so this handler checks the caller itself: every database
+// call runs with the caller's own token, and the database functions refuse anyone
+// but an owner.
 //
 // POST JSON { action, ... }:
 //   invite      { email, fullName, pricingTier?, redirectTo }  (also re-sends)
