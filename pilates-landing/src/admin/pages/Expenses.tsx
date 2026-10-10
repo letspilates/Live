@@ -22,7 +22,7 @@ import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
 import { centsInput, formatCents, formatDay, laToday, parseCents } from '../payments';
 import { supabase } from '../supabase';
-import { Button, Card, Dialog, IconButton, Notice, Skeleton, Stat, TextField, inputCls } from '../ui';
+import { Button, Card, Chip, Dialog, IconButton, Notice, Skeleton, Stat, TextField, inputCls } from '../ui';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 const PAY_KEY = (code: string) => `pay${code}` as TextKey;
@@ -72,7 +72,7 @@ export default function Expenses() {
 
   return (
     <Layout title={t('navExpenses')}>
-      <div role="tablist" aria-label={t('navExpenses')} className="mb-6 inline-flex rounded-full bg-sand p-1">
+      <div role="tablist" aria-label={t('navExpenses')} className="mb-6 inline-flex rounded-full bg-ink/[0.06] p-1">
         {(['expenses', 'recurring'] as const).map((id) => (
           <button
             key={id}
@@ -81,7 +81,7 @@ export default function Expenses() {
             aria-selected={tab === id}
             onClick={() => show(id)}
             className={`min-h-10 rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 ${
-              tab === id ? 'bg-ink text-cream' : 'text-mute hover:text-ink'
+              tab === id ? 'bg-paper text-ink shadow-card' : 'text-mute hover:text-ink'
             }`}
           >
             {t(id === 'expenses' ? 'tabExpenses' : 'tabRecurring')}
@@ -226,8 +226,8 @@ function ExpenseList({ lists, setFlash }: { lists: Lists; setFlash: (f: Flash) =
         </div>
       </div>
 
-      <Card className="mb-4">
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <Card pad={false} className="mb-4 overflow-hidden">
+        <dl className="grid grid-cols-2 gap-px bg-ink/[0.07] sm:grid-cols-3 [&>*]:bg-paper [&>*]:p-4 sm:[&>*]:p-5 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1">
           <Stat label={t('expenseTotal')} value={rows ? formatCents(sums.total) : '—'} strong />
           <Stat label={t('PAID')} value={rows ? formatCents(sums.paid) : '—'} />
           <Stat
@@ -237,7 +237,7 @@ function ExpenseList({ lists, setFlash }: { lists: Lists; setFlash: (f: Flash) =
         </dl>
       </Card>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+      <Card pad={false} className="mb-4 grid grid-cols-2 gap-3 p-4 sm:flex sm:flex-wrap">
         <label className="relative col-span-2 block sm:min-w-64 sm:flex-1">
           <span className="sr-only">{t('searchExpenses')}</span>
           <Search {...ICON} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-mute" />
@@ -268,7 +268,7 @@ function ExpenseList({ lists, setFlash }: { lists: Lists; setFlash: (f: Flash) =
           <option value="PAID">{t('PAID')}</option>
           <option value="VOID">{t('statusVoid')}</option>
         </select>
-      </div>
+      </Card>
 
       {failed ? (
         <div className="max-w-xl">
@@ -284,8 +284,8 @@ function ExpenseList({ lists, setFlash }: { lists: Lists; setFlash: (f: Flash) =
           <p className="text-sm text-mute">{rows.length ? t('noExpensesMatch') : t('noExpenses', { month: formatMonth(month, lang) })}</p>
         </Card>
       ) : (
-        <Card className="p-2 sm:p-2">
-          <ul className="divide-y divide-ink/10">
+        <Card pad={false} className="p-2">
+          <ul className="divide-y divide-ink/[0.07]">
             {shown.map((r) => (
               <li key={r.id} className="flex items-center gap-2 px-1">
                 <button
@@ -293,7 +293,7 @@ function ExpenseList({ lists, setFlash }: { lists: Lists; setFlash: (f: Flash) =
                   onClick={() => setOpen({ expense: r })}
                   className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-ink/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
                 >
-                  <span className="w-12 shrink-0 text-xs text-mute">{formatDay(r.expense_date, lang).replace(/^[^,]*, /, '')}</span>
+                  <DateTile day={r.expense_date} />
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span className={`truncate text-sm font-medium ${r.status === 'VOID' ? 'text-mute line-through' : ''}`}>
@@ -315,17 +315,19 @@ function ExpenseList({ lists, setFlash }: { lists: Lists; setFlash: (f: Flash) =
                     <span className={`block text-sm font-semibold tabular-nums ${r.status === 'VOID' ? 'text-mute line-through' : ''}`}>
                       {formatCents(r.amount_cents)}
                     </span>
-                    <span className="block text-xs text-mute">
-                      {r.status === 'VOID'
-                        ? t('statusVoid')
-                        : r.payment_status === 'PAID'
-                          ? `${t('PAID')} ${r.paid_on ? formatDay(r.paid_on, lang).replace(/^[^,]*, /, '') : ''}`
-                          : t('UNPAID')}
+                    <span className="mt-1 block">
+                      {r.status === 'VOID' ? (
+                        <Chip>{t('statusVoid')}</Chip>
+                      ) : r.payment_status === 'PAID' ? (
+                        <Chip tone="good">{`${t('PAID')} ${r.paid_on ? formatDay(r.paid_on, lang).replace(/^[^,]*, /, '') : ''}`.trim()}</Chip>
+                      ) : (
+                        <Chip tone="warn">{t('UNPAID')}</Chip>
+                      )}
                     </span>
                   </span>
                 </button>
                 {r.status === 'ACTIVE' && r.payment_status === 'UNPAID' && (
-                  <Button variant="secondary" className="hidden px-4 sm:inline-flex" onClick={() => setOpen({ expense: r, paying: true })}>
+                  <Button variant="secondary" className="hidden min-h-9 px-3.5 text-xs sm:inline-flex" onClick={() => setOpen({ expense: r, paying: true })}>
                     {t('markPaid')}
                   </Button>
                 )}
@@ -499,7 +501,7 @@ function ExpenseDialog({
 
           <fieldset className="grid gap-3 rounded-2xl bg-cream/60 p-4">
             <legend className="sr-only">{t('status')}</legend>
-            <div role="radiogroup" className="inline-flex w-fit rounded-full bg-sand p-1">
+            <div role="radiogroup" className="inline-flex w-fit rounded-full bg-ink/[0.06] p-1">
               {[false, true].map((paid) => (
                 <button
                   key={String(paid)}
@@ -508,7 +510,7 @@ function ExpenseDialog({
                   aria-checked={form.paid === paid}
                   onClick={() => set('paid', paid)}
                   className={`min-h-10 rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 ${
-                    form.paid === paid ? 'bg-ink text-cream' : 'text-mute hover:text-ink'
+                    form.paid === paid ? 'bg-paper text-ink shadow-card' : 'text-mute hover:text-ink'
                   }`}
                 >
                   {t(paid ? 'PAID' : 'UNPAID')}
@@ -600,8 +602,8 @@ function RuleList({ lists, setFlash }: { lists: Lists; setFlash: (f: Flash) => v
           <p className="text-sm text-mute">{t('noRules')}</p>
         </Card>
       ) : (
-        <Card className="p-2 sm:p-2">
-          <ul className="divide-y divide-ink/10">
+        <Card pad={false} className="p-2">
+          <ul className="divide-y divide-ink/[0.07]">
             {rules.map((r) => (
               <li key={r.id}>
                 <button
@@ -800,7 +802,20 @@ function RuleDialog({ rule: r, lists, onClose, onDone }: { rule: Rule | null; li
 /* ───────────────────────────── Small parts ───────────────────────────── */
 
 function Tag({ children }: { children: ReactNode }) {
-  return <span className="inline-flex rounded-full bg-clay/20 px-2 py-0.5 text-xs font-medium text-ink">{children}</span>;
+  return <span className="inline-flex rounded-md bg-clay/15 px-1.5 py-0.5 text-[11px] font-medium text-ink">{children}</span>;
+}
+
+/** Day number over a short month (reference: Company dashboard schedule). */
+function DateTile({ day }: { day: string }) {
+  const { lang } = useT();
+  const d = new Date(`${day}T12:00:00Z`);
+  const month = new Intl.DateTimeFormat(lang === 'ko' ? 'ko-KR' : 'en-US', { timeZone: 'UTC', month: 'short' }).format(d);
+  return (
+    <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-ink/[0.04] ring-1 ring-ink/[0.06]">
+      <span className="font-display text-base font-semibold leading-none tabular-nums">{d.getUTCDate()}</span>
+      <span className="mt-0.5 text-[10px] uppercase leading-none tracking-wide text-mute">{month}</span>
+    </span>
+  );
 }
 
 function CloseButton({ onClose }: { onClose: () => void }) {

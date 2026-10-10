@@ -123,7 +123,7 @@ export default function Enrollments() {
 
   return (
     <Layout title={t('navTrainings')}>
-      <div role="tablist" aria-label={t('navTrainings')} className="mb-6 inline-flex rounded-full bg-sand p-1">
+      <div role="tablist" aria-label={t('navTrainings')} className="mb-6 inline-flex rounded-full bg-ink/[0.06] p-1">
         {(['courses', 'registrants'] as const).map((id) => (
           <button
             key={id}
@@ -132,7 +132,7 @@ export default function Enrollments() {
             aria-selected={tab === id}
             onClick={() => show(id)}
             className={`min-h-10 rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 ${
-              tab === id ? 'bg-ink text-cream' : 'text-mute hover:text-ink'
+              tab === id ? 'bg-paper text-ink shadow-card' : 'text-mute hover:text-ink'
             }`}
           >
             {t(id === 'courses' ? 'tabCourses' : 'tabRegistrants')}

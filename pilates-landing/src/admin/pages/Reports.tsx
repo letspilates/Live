@@ -2,7 +2,7 @@
 // monthly closing. The database does the math and the locking; this page
 // only shows it and asks for confirmation.
 import { useEffect, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, CircleCheck, Download, Lock, RefreshCw } from 'lucide-react';
+import { ChartColumn, ChevronLeft, ChevronRight, CircleCheck, Download, Lock, RefreshCw } from 'lucide-react';
 import { addMonths, formatMonth, loadCategories, toCsv, type Category } from '../expenses';
 import { closePeriod, loadPeriod, loadReport, monthEnd, reopenPeriod, thisMonth, type Period, type Report } from '../finance';
 import { useT, type TextKey } from '../i18n';
@@ -10,7 +10,7 @@ import Layout from '../Layout';
 import MonthChart from '../MonthChart';
 import { formatCents, loadMethods, methodLabel, type Method } from '../payments';
 import { supabase } from '../supabase';
-import { Button, Card, Dialog, IconButton, Notice, Skeleton, Stat, TextField } from '../ui';
+import { Button, Card, CardTitle, Chip, Dialog, IconButton, Notice, Skeleton, Stat, TextField } from '../ui';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 
@@ -109,7 +109,7 @@ export default function Reports() {
 
   return (
     <Layout title={t('navReports')}>
-      <div role="tablist" aria-label={t('navReports')} className="mb-6 inline-flex rounded-full bg-sand p-1">
+      <div role="tablist" aria-label={t('navReports')} className="mb-6 inline-flex rounded-full bg-ink/[0.06] p-1">
         {(['overview', 'closing'] as const).map((id) => (
           <button
             key={id}
@@ -118,7 +118,7 @@ export default function Reports() {
             aria-selected={tab === id}
             onClick={() => show(id)}
             className={`min-h-10 rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 ${
-              tab === id ? 'bg-ink text-cream' : 'text-mute hover:text-ink'
+              tab === id ? 'bg-paper text-ink shadow-card' : 'text-mute hover:text-ink'
             }`}
           >
             {t(id === 'overview' ? 'tabOverview' : 'tabClosing')}
@@ -190,12 +190,12 @@ function Stepper({ label, prev, next, prevLabel, nextLabel }: { label: string; p
 function StatusBadge({ status }: { status: 'OPEN' | 'CLOSED' }) {
   const { t } = useT();
   return status === 'CLOSED' ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-ink/[0.07] px-2.5 py-0.5 text-xs font-medium text-ink">
-      <Lock size={12} strokeWidth={2} aria-hidden="true" />
+    <span className="inline-flex items-center gap-1 rounded-full bg-ink/[0.07] px-2 py-0.5 text-xs font-medium text-ink">
+      <Lock size={11} strokeWidth={2} aria-hidden="true" />
       {t('statusCLOSED')}
     </span>
   ) : (
-    <span className="inline-flex rounded-full bg-sage/15 px-2.5 py-0.5 text-xs font-medium text-sage-deep">{t('statusOPEN')}</span>
+    <Chip tone="good">{t('statusOPEN')}</Chip>
   );
 }
 
@@ -264,6 +264,7 @@ function Overview({ lists }: { lists: Lists }) {
           <Statement report={r} status={mode === 'month' ? r.months[0]?.status : undefined} />
           {mode === 'year' && (
             <Card>
+              <CardTitle icon={ChartColumn} title={t('revenueVsExpenses')} />
               <MonthChart months={r.months} />
             </Card>
           )}
@@ -279,6 +280,7 @@ function Overview({ lists }: { lists: Lists }) {
             <Breakdown
               title={t('byCategory')}
               rows={r.by_category.map((c) => ({ key: c.category, label: names.category(c.category), value: c.amount }))}
+              bar="bg-clay/80"
             />
           </div>
           {mode === 'year' && <MonthTable report={r} />}
@@ -310,24 +312,66 @@ function Statement({ report: r, status }: { report: Report; status?: 'OPEN' | 'C
           <StatusBadge status={status} />
         </div>
       )}
-      <dl className="max-w-2xl">
-        {line('grossRevenue', r.gross, '', t('nPayments', { n: String(r.payment_count) }))}
-        {line('refunds', r.refunds, '−')}
-        {line('netRevenue', r.net, '=', undefined, true)}
-        {line('operatingExpenses', r.expenses, '−', t('paidUnpaid', { paid: formatCents(r.expenses_paid), unpaid: formatCents(r.expenses_outstanding) }))}
-        {line('estProfit', r.profit, '=', undefined, true)}
-      </dl>
-      <p className="mt-4 max-w-[70ch] text-pretty text-sm text-mute">{t('reportBasis')}</p>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-10">
+        <div className="min-w-0">
+          <dl className="max-w-2xl">
+            {line('grossRevenue', r.gross, '', t('nPayments', { n: String(r.payment_count) }))}
+            {line('refunds', r.refunds, '−')}
+            {line('netRevenue', r.net, '=', undefined, true)}
+            {line('operatingExpenses', r.expenses, '−', t('paidUnpaid', { paid: formatCents(r.expenses_paid), unpaid: formatCents(r.expenses_outstanding) }))}
+            {line('estProfit', r.profit, '=', undefined, true)}
+          </dl>
+          <p className="mt-4 max-w-[70ch] text-pretty text-sm text-mute">{t('reportBasis')}</p>
+        </div>
+        {r.net > 0 && <Margin report={r} />}
+      </div>
     </Card>
   );
 }
 
-function Breakdown({ title, rows }: { title: string; rows: { key: string; label: string; value: number; note?: string }[] }) {
+/** Where each revenue dollar went: expenses vs what is left (reference: Retainr "This week" panel). */
+function Margin({ report: r }: { report: Report }) {
+  const { t } = useT();
+  const spent = Math.min(Math.max(r.expenses / r.net, 0), 1);
+  const margin = Math.round((r.profit / r.net) * 1000) / 10;
+  return (
+    <div className="self-start rounded-2xl bg-ink/[0.03] p-5 ring-1 ring-ink/[0.05]">
+      <p className="text-sm text-mute">{t('profitMargin')}</p>
+      <p className={`mt-1 font-display text-3xl font-semibold tracking-tight tabular-nums ${margin < 0 ? 'text-red-700' : ''}`}>{margin}%</p>
+      <div aria-hidden="true" className="mt-4 flex h-2.5 gap-[2px] overflow-hidden rounded-full">
+        {spent > 0 && <span className="h-full rounded-l-full bg-clay/80" style={{ width: `${spent * 100}%` }} />}
+        {spent < 1 && <span className="h-full flex-1 rounded-r-full bg-sage" />}
+      </div>
+      <ul className="mt-3 grid gap-1.5 text-xs">
+        <li className="flex items-center gap-2">
+          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-clay/80" />
+          <span className="flex-1 text-mute">{t('operatingExpenses')}</span>
+          <span className="tabular-nums">{Math.round(spent * 100)}%</span>
+        </li>
+        <li className="flex items-center gap-2">
+          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-sage" />
+          <span className="flex-1 text-mute">{t('estProfit')}</span>
+          <span className="tabular-nums">{Math.round((1 - spent) * 100)}%</span>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+function Breakdown({
+  title,
+  rows,
+  bar = 'bg-sage',
+}: {
+  title: string;
+  rows: { key: string; label: string; value: number; note?: string }[];
+  bar?: string;
+}) {
   const { t } = useT();
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.value)));
   return (
     <Card>
-      <h3 className="mb-4 text-sm font-medium text-mute">{title}</h3>
+      <h3 className="mb-5 font-display text-base font-semibold">{title}</h3>
       {rows.length === 0 ? (
         <p className="text-sm text-mute">{t('nothingRecorded')}</p>
       ) : (
@@ -341,8 +385,8 @@ function Breakdown({ title, rows }: { title: string; rows: { key: string; label:
                 </span>
                 <span className="font-medium tabular-nums">{formatCents(r.value)}</span>
               </div>
-              <div aria-hidden="true" className="mt-1.5 h-1.5 rounded-full bg-ink/[0.05]">
-                <div className="h-full rounded-full bg-sage" style={{ width: `${(Math.max(r.value, 0) / max) * 100}%` }} />
+              <div aria-hidden="true" className="mt-2 h-2 rounded-full bg-ink/[0.05]">
+                <div className={`h-full rounded-full ${bar}`} style={{ width: `${(Math.max(r.value, 0) / max) * 100}%` }} />
               </div>
             </li>
           ))}
@@ -354,14 +398,14 @@ function Breakdown({ title, rows }: { title: string; rows: { key: string; label:
 
 function MonthTable({ report: r }: { report: Report }) {
   const { t, lang } = useT();
-  const th = 'px-3 py-2 text-right font-medium first:pl-0 first:text-left last:pr-0';
-  const td = 'px-3 py-2.5 text-right tabular-nums first:pl-0 first:text-left last:pr-0';
+  const th = 'px-3 py-2.5 text-right text-xs font-medium first:rounded-l-lg first:pl-3 first:text-left last:rounded-r-lg';
+  const td = 'px-3 py-3 text-right tabular-nums first:pl-3 first:text-left';
   return (
     <Card className="min-w-0">
       <div className="-mx-1 overflow-x-auto px-1">
         <table className="w-full min-w-[34rem] text-sm">
           <thead className="text-mute">
-            <tr className="border-b border-ink/10">
+            <tr className="bg-ink/[0.04]">
               <th scope="col" className={th}>{t('monthCol')}</th>
               <th scope="col" className={th}>{t('netRevenue')}</th>
               <th scope="col" className={th}>{t('operatingExpenses')}</th>
@@ -372,7 +416,7 @@ function MonthTable({ report: r }: { report: Report }) {
           </thead>
           <tbody>
             {r.months.map((m) => (
-              <tr key={m.month} className="border-b border-ink/5 last:border-0">
+              <tr key={m.month} className="border-b border-ink/[0.06] transition-colors last:border-0 hover:bg-ink/[0.02]">
                 <th scope="row" className={`${td} font-normal`}>{formatMonth(m.month, lang)}</th>
                 <td className={td}>{formatCents(m.net)}</td>
                 <td className={td}>{formatCents(m.expenses)}</td>

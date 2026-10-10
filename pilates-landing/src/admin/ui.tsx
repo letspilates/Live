@@ -17,7 +17,7 @@ const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 // Same input look as the public training form, but 16px text: iOS Safari zooms
 // the page into any field smaller than that and stays zoomed afterwards.
 export const inputCls =
-  'w-full rounded-xl border border-ink/10 bg-cream/60 px-4 py-3 text-base text-ink outline-none transition-colors duration-200 focus:border-sage focus:bg-paper focus:ring-2 focus:ring-sage/20 disabled:opacity-60';
+  'w-full rounded-xl border border-ink/[0.12] bg-paper px-4 py-3 text-base text-ink outline-none transition-colors duration-200 focus:border-sage focus:bg-paper focus:ring-2 focus:ring-sage/20 disabled:opacity-60';
 const inputErrorCls = 'border-red-700/50 ring-2 ring-red-700/10';
 
 type Variant = 'primary' | 'secondary' | 'danger';
@@ -234,9 +234,9 @@ export function Initials({ name, className = '' }: { name: string; className?: s
 /** A labelled number for summary cards (inside a <dl>). */
 export function Stat({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="flex min-w-0 flex-col-reverse">
-      <dt className="text-sm text-mute">{label}</dt>
-      <dd className={`truncate font-display font-semibold tabular-nums ${strong ? 'text-2xl sm:text-3xl' : 'text-xl'}`}>{value}</dd>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <dt className="truncate text-sm text-mute">{label}</dt>
+      <dd className={`truncate font-display font-semibold tracking-tight tabular-nums ${strong ? 'text-2xl sm:text-3xl' : 'text-xl'}`}>{value}</dd>
     </div>
   );
 }

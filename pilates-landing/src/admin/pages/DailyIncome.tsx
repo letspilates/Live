@@ -27,7 +27,7 @@ import {
   type StudentHit,
 } from '../payments';
 import { supabase } from '../supabase';
-import { Button, Card, Dialog, Initials, Notice, Skeleton, TextField, inputCls } from '../ui';
+import { Button, Card, Chip, Dialog, Initials, Notice, Skeleton, TextField, inputCls } from '../ui';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 const LAST_METHOD_KEY = 'lp-admin-last-method';
@@ -72,7 +72,7 @@ export default function DailyIncome() {
 
   return (
     <Layout title={t('navPayments')}>
-      <div role="tablist" aria-label={t('navPayments')} className="mb-6 inline-flex rounded-full bg-sand p-1">
+      <div role="tablist" aria-label={t('navPayments')} className="mb-6 inline-flex rounded-full bg-ink/[0.06] p-1">
         {(['record', 'history'] as const).map((id) => (
           <button
             key={id}
@@ -81,7 +81,7 @@ export default function DailyIncome() {
             aria-selected={tab === id}
             onClick={() => show(id)}
             className={`min-h-10 rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 ${
-              tab === id ? 'bg-ink text-cream' : 'text-mute hover:text-ink'
+              tab === id ? 'bg-paper text-ink shadow-card' : 'text-mute hover:text-ink'
             }`}
           >
             {t(id === 'record' ? 'tabRecord' : owner ? 'tabTransactions' : 'tabMyHistory')}
@@ -655,11 +655,11 @@ function History({ methods, collectors }: { methods: Method[]; collectors: Colle
   );
   const sum = totals(shown);
   const oneDay = from === to;
-  const selectCls = `${inputCls} py-2.5 sm:w-auto`;
+  const selectCls = `${inputCls} h-12 py-0 sm:w-auto`;
 
   return (
     <div className="grid grid-cols-1 gap-4">
-      <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+      <Card pad={false} className="grid grid-cols-2 items-end gap-3 p-4 sm:flex sm:flex-wrap">
         <Select
           label={t('period')}
           value={range}
@@ -706,19 +706,19 @@ function History({ methods, collectors }: { methods: Method[]; collectors: Colle
         )}
         <Button
           variant="secondary"
-          className="min-h-[46px] justify-self-start px-4"
+          className="h-12 w-12 justify-self-start px-0 sm:ml-auto"
           onClick={() => setVersion((v) => v + 1)}
           title={t('refresh')}
         >
           <RefreshCw {...ICON} size={16} />
-          <span className="sr-only sm:not-sr-only">{t('refresh')}</span>
+          <span className="sr-only">{t('refresh')}</span>
         </Button>
-      </div>
+      </Card>
 
       {message && <Notice tone="success">{message}</Notice>}
 
-      <Card>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+      <Card pad={false} className="overflow-hidden">
+        <dl className="grid grid-cols-2 gap-px bg-ink/[0.07] sm:grid-cols-4 [&>*]:bg-paper [&>*]:p-4 sm:[&>*]:p-5">
           <Stat label={t(owner ? 'netRevenue' : 'myNet')} value={formatCents(sum.net)} strong />
           <Stat label={t('grossPayments')} value={formatCents(sum.gross)} />
           <Stat label={t('refunds')} value={sum.refunds ? `−${formatCents(sum.refunds)}` : formatCents(0)} />
@@ -735,8 +735,8 @@ function History({ methods, collectors }: { methods: Method[]; collectors: Colle
           <p className="text-sm text-mute">{t('noPaymentsInPeriod')}</p>
         </Card>
       ) : (
-        <Card className="p-2 sm:p-2">
-          <ul className="divide-y divide-ink/10">
+        <Card pad={false} className="p-2">
+          <ul className="divide-y divide-ink/[0.07]">
             {shown.map((r) => (
               <li key={r.id} className="flex items-center gap-2 pr-1">
                 <button
@@ -744,11 +744,12 @@ function History({ methods, collectors }: { methods: Method[]; collectors: Colle
                   onClick={() => setOpen({ payment: r })}
                   className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-ink/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
                 >
+                  <Initials name={r.payer_name} className="hidden h-9 w-9 rounded-xl text-xs sm:inline-flex" />
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="truncate text-sm font-medium">{r.payer_name}</span>
-                      {r.kind === 'REFUND' && <Tag>{t('refund')}</Tag>}
-                      {r.status === 'VOID' && <Tag tone="void">{t('statusVoid')}</Tag>}
+                      {r.kind === 'REFUND' && <Chip tone="warn">{t('refund')}</Chip>}
+                      {r.status === 'VOID' && <Chip>{t('statusVoid')}</Chip>}
                     </span>
                     <span className="mt-0.5 block truncate text-xs text-mute">
                       {[
@@ -768,7 +769,7 @@ function History({ methods, collectors }: { methods: Method[]; collectors: Colle
                   </span>
                 </button>
                 {owner && r.kind === 'PAYMENT' && r.status === 'VALID' && (
-                  <Button variant="secondary" className="min-h-10 shrink-0 px-4" onClick={() => setOpen({ payment: r, refund: true })}>
+                  <Button variant="secondary" className="min-h-9 shrink-0 px-3.5 text-xs" onClick={() => setOpen({ payment: r, refund: true })}>
                     {t('refund')}
                   </Button>
                 )}
@@ -798,18 +799,13 @@ function History({ methods, collectors }: { methods: Method[]; collectors: Colle
 
 function Stat({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="flex min-w-0 flex-col-reverse">
-      <dt className="text-sm text-mute">{label}</dt>
-      <dd className={`truncate font-display font-semibold tabular-nums ${strong ? 'text-2xl sm:text-3xl' : 'text-xl'}`}>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <dt className="truncate text-sm text-mute">{label}</dt>
+      <dd className={`truncate font-display font-semibold tracking-tight tabular-nums ${strong ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}`}>
         {value}
       </dd>
     </div>
   );
-}
-
-function Tag({ tone = 'plain', children }: { tone?: 'plain' | 'void'; children: ReactNode }) {
-  const cls = tone === 'void' ? 'bg-ink/[0.06] text-mute' : 'bg-clay/20 text-ink';
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>;
 }
 
 function Select({
@@ -857,7 +853,7 @@ function DateInput({
         min={min}
         max={max}
         onChange={(e) => e.target.value && onChange(e.target.value)}
-        className={`${inputCls} min-w-0 py-2.5`}
+        className={`${inputCls} h-12 min-w-0 py-0`}
       />
     </label>
   );

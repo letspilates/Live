@@ -10,7 +10,7 @@ import Layout from '../Layout';
 import { membersFromCsv, type Member, type MemberSource } from '../members';
 import { formatCents, formatDay, type Payment } from '../payments';
 import { supabase } from '../supabase';
-import { Button, Card, Dialog, Notice, Skeleton, TextField, inputCls } from '../ui';
+import { Button, Card, Dialog, Initials, Notice, Skeleton, TextField, inputCls } from '../ui';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 const PAGE = 100;
@@ -167,7 +167,8 @@ export default function Members() {
         </div>
       )}
 
-      <div className="mb-4 grid gap-3 sm:flex sm:flex-wrap sm:items-end">
+      <Card pad={false} className="mb-4 grid gap-3 p-4">
+      <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-end">
         <label className="relative block sm:min-w-72 sm:flex-1">
           <span className="sr-only">{t('searchMembers')}</span>
           <Search {...ICON} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-mute" />
@@ -194,7 +195,7 @@ export default function Members() {
         </select>
       </div>
 
-      <div role="group" aria-label={t('source')} className="mb-4 flex flex-wrap gap-2">
+      <div role="group" aria-label={t('source')} className="flex flex-wrap gap-2">
         {SOURCE_FILTERS.map((f) => (
           <button
             key={f.id}
@@ -213,6 +214,7 @@ export default function Members() {
           </button>
         ))}
       </div>
+      </Card>
 
       {failed ? (
         <div className="max-w-xl">
@@ -228,9 +230,9 @@ export default function Members() {
           <p className="text-sm text-mute">{t(members.length ? 'noMembersMatch' : 'noMembersYet')}</p>
         </Card>
       ) : (
-        <Card className="p-2 sm:p-2">
+        <Card pad={false} className="p-2">
           <p className="px-3 pb-1 pt-2 text-xs text-mute">{t('membersShown', { n: String(shown.length) })}</p>
-          <ul className="divide-y divide-ink/10">
+          <ul className="divide-y divide-ink/[0.07]">
             {shown.slice(0, limit).map((m) => (
               <li key={m.id}>
                 <button
@@ -238,6 +240,7 @@ export default function Members() {
                   onClick={() => setOpen({ member: m })}
                   className="flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-ink/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
                 >
+                  <Initials name={m.full_name} className="h-9 w-9 rounded-xl text-xs" />
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span className="truncate text-sm font-medium">{m.full_name}</span>
@@ -337,7 +340,7 @@ function Badge({ tone, children }: { tone: 'mindbody' | 'schedulista' | 'plain';
     schedulista: 'bg-clay/20 text-ink',
     plain: 'bg-ink/[0.06] text-mute',
   }[tone];
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>;
+  return <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[11px] font-medium ${cls}`}>{children}</span>;
 }
 
 function SourceBadges({ m }: { m: Member }) {
