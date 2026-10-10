@@ -118,7 +118,7 @@ export default function StaffPage() {
 
   return (
     <Layout
-      title={t('navStaff')}
+      title={t('navUsers')}
       actions={
         <Button onClick={() => setAddOpen(true)}>
           <UserPlus size={18} strokeWidth={1.75} aria-hidden="true" />

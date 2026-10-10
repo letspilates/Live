@@ -5,11 +5,12 @@ export const ADMIN_ROUTES = {
   '': 'staff',
   login: 'public',
   'set-password': 'public',
-  'daily-income': 'staff',
-  members: 'owner',
+  clients: 'owner',
+  trainings: 'owner',
+  payments: 'staff',
   expenses: 'owner',
-  enrollments: 'owner',
-  staff: 'owner',
+  users: 'owner',
+  notifications: 'owner',
   account: 'staff',
 } as const;
 

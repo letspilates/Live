@@ -13,16 +13,18 @@ import Enrollments from './pages/Enrollments';
 import Expenses from './pages/Expenses';
 import Login from './pages/Login';
 import Members from './pages/Members';
+import Notifications from './pages/Notifications';
 import SetPassword from './pages/SetPassword';
 import StaffPage from './pages/Staff';
 
 const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType> = {
   '': Dashboard,
-  'daily-income': DailyIncome,
-  members: Members,
+  clients: Members,
+  trainings: Enrollments,
+  payments: DailyIncome,
   expenses: Expenses,
-  enrollments: Enrollments,
-  staff: StaffPage,
+  users: StaffPage,
+  notifications: Notifications,
   account: Account,
 };
 

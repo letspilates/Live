@@ -3,7 +3,7 @@
 // Every member shows which system they came from. Import and edits go through
 // owner-only database functions (import_members / update_member).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { RefreshCw, Search, Upload, X } from 'lucide-react';
+import { Plus, RefreshCw, Search, Upload, X } from 'lucide-react';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
 import { membersFromCsv, type Member, type MemberSource } from '../members';
@@ -59,7 +59,7 @@ export default function Members() {
   const [source, setSource] = useState<SourceFilter>('all');
   const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE' | ''>('ACTIVE');
   const [limit, setLimit] = useState(PAGE);
-  const [open, setOpen] = useState<Member | null>(null);
+  const [open, setOpen] = useState<{ member: Member | null } | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
@@ -123,7 +123,7 @@ export default function Members() {
 
   return (
     <Layout
-      title={t('navMembers')}
+      title={t('navClients')}
       actions={
         <>
           <Button variant="secondary" onClick={() => setVersion((v) => v + 1)} title={t('refresh')}>
@@ -131,6 +131,10 @@ export default function Members() {
             <span className="sr-only sm:not-sr-only">{t('refresh')}</span>
           </Button>
           <CsvPicker onText={pickFile} />
+          <Button onClick={() => setOpen({ member: null })}>
+            <Plus {...ICON} size={16} />
+            {t('addStudent')}
+          </Button>
         </>
       }
     >
@@ -209,7 +213,7 @@ export default function Members() {
               <li key={m.id}>
                 <button
                   type="button"
-                  onClick={() => setOpen(m)}
+                  onClick={() => setOpen({ member: m })}
                   className="flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-ink/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
                 >
                   <span className="min-w-0 flex-1">
@@ -268,7 +272,7 @@ export default function Members() {
 
       {open && (
         <MemberDialog
-          member={open}
+          member={open.member}
           onClose={() => setOpen(null)}
           onSaved={() => {
             setOpen(null);
@@ -321,15 +325,15 @@ function SourceBadges({ m }: { m: Member }) {
   );
 }
 
-function MemberDialog({ member: m, onClose, onSaved }: { member: Member; onClose: () => void; onSaved: () => void }) {
+function MemberDialog({ member: m, onClose, onSaved }: { member: Member | null; onClose: () => void; onSaved: () => void }) {
   const { t, lang } = useT();
   const [form, setForm] = useState({
-    full_name: m.full_name,
-    phone: m.phone,
-    email: m.email,
-    address: m.address,
-    notes: m.notes,
-    status: m.status,
+    full_name: m?.full_name ?? '',
+    phone: m?.phone ?? '',
+    email: m?.email ?? '',
+    address: m?.address ?? '',
+    notes: m?.notes ?? '',
+    status: m?.status ?? 'ACTIVE',
   });
   const [payments, setPayments] = useState<Payment[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -337,6 +341,7 @@ function MemberDialog({ member: m, onClose, onSaved }: { member: Member; onClose
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
 
   useEffect(() => {
+    if (!m) return;
     supabase!
       .from('payment_transactions')
       .select('*')
@@ -344,13 +349,19 @@ function MemberDialog({ member: m, onClose, onSaved }: { member: Member; onClose
       .order('recorded_at', { ascending: false })
       .limit(50)
       .then(({ data }) => setPayments((data as Payment[]) ?? []));
-  }, [m.id]);
+  }, [m]);
 
   const save = async () => {
     if (!form.full_name.trim() || busy) return setError(form.full_name.trim() ? '' : t('enterName'));
     setBusy(true);
+    // A new client: add_student creates them (or finds the same name + phone), then the rest is saved.
+    const created = m ? null : await supabase!.rpc('add_student', { p_full_name: form.full_name.trim(), p_phone: form.phone.trim() });
+    if (created?.error) {
+      setBusy(false);
+      return setError(t('somethingWrong'));
+    }
     const { error: dbError } = await supabase!.rpc('update_member', {
-      p_id: m.id,
+      p_id: m ? m.id : (created!.data as string),
       p_full_name: form.full_name,
       p_phone: form.phone,
       p_email: form.email,
@@ -366,7 +377,7 @@ function MemberDialog({ member: m, onClose, onSaved }: { member: Member; onClose
   const day = (iso: string | null) => (iso ? formatDay(iso.slice(0, 10), lang) : '');
 
   return (
-    <Dialog open onClose={onClose} title={m.full_name}>
+    <Dialog open onClose={onClose} title={m ? m.full_name : t('addStudent')}>
       <button
         type="button"
         onClick={onClose}
@@ -375,17 +386,19 @@ function MemberDialog({ member: m, onClose, onSaved }: { member: Member; onClose
       >
         <X {...ICON} />
       </button>
-      <div className="mb-5 flex flex-wrap gap-1.5">
-        <SourceBadges m={m} />
-      </div>
+      {m && (
+        <div className="mb-5 flex flex-wrap gap-1.5">
+          <SourceBadges m={m} />
+        </div>
+      )}
 
-      {m.mindbody_id && (
+      {m?.mindbody_id && (
         <Section title={t('fromMindbody')}>
           <Row label={t('mindbodyId')} value={m.mindbody_id} />
           <Row label={t('importedOn')} value={day(m.mindbody_imported_at)} />
         </Section>
       )}
-      {m.schedulista_key && (
+      {m?.schedulista_key && (
         <Section title={t('fromSchedulista')}>
           <Row label={t('lastVisit')} value={visitDay(m.schedulista_last_visit, lang) || '—'} />
           <Row label={t('nextVisit')} value={visitDay(m.schedulista_next_visit, lang) || '—'} />
@@ -404,24 +417,26 @@ function MemberDialog({ member: m, onClose, onSaved }: { member: Member; onClose
         </Section>
       )}
 
-      <Section title={t('payments')}>
-        {!payments ? (
-          <Skeleton className="h-10 w-full" />
-        ) : payments.length === 0 ? (
-          <p className="text-sm text-mute">{t('noPaymentsYet')}</p>
-        ) : (
-          payments.map((p) => (
-            <Row
-              key={p.id}
-              label={`${formatDay(p.business_date, lang)}${p.status === 'VOID' ? ` · ${t('statusVoid')}` : ''}`}
-              value={`${p.kind === 'REFUND' ? '−' : ''}${formatCents(p.amount_cents)}`}
-            />
-          ))
-        )}
-      </Section>
+      {m && (
+        <Section title={t('payments')}>
+          {!payments ? (
+            <Skeleton className="h-10 w-full" />
+          ) : payments.length === 0 ? (
+            <p className="text-sm text-mute">{t('noPaymentsYet')}</p>
+          ) : (
+            payments.map((p) => (
+              <Row
+                key={p.id}
+                label={`${formatDay(p.business_date, lang)}${p.status === 'VOID' ? ` · ${t('statusVoid')}` : ''}`}
+                value={`${p.kind === 'REFUND' ? '−' : ''}${formatCents(p.amount_cents)}`}
+              />
+            ))
+          )}
+        </Section>
+      )}
 
       <form
-        className="mt-5 grid gap-4 border-t border-ink/10 pt-5"
+        className={`grid gap-4 ${m ? 'mt-5 border-t border-ink/10 pt-5' : ''}`}
         onSubmit={(e) => {
           e.preventDefault();
           void save();
@@ -445,7 +460,7 @@ function MemberDialog({ member: m, onClose, onSaved }: { member: Member; onClose
             {t('cancel')}
           </Button>
           <Button type="submit" disabled={busy}>
-            {busy ? t('saving') : t('save')}
+            {busy ? t('saving') : m ? t('save') : t('addStudent')}
           </Button>
         </div>
       </form>

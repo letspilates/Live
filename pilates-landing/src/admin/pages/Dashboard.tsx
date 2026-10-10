@@ -88,7 +88,7 @@ function TeamCard() {
           ))}
         </dl>
       )}
-      <Button variant="secondary" className="mt-auto self-start" onClick={() => navigate('staff')}>
+      <Button variant="secondary" className="mt-auto self-start" onClick={() => navigate('users')}>
         {t('manageStaff')}
       </Button>
     </Card>
@@ -129,9 +129,9 @@ function TodayCard() {
         </div>
       )}
       <div className="mt-auto flex flex-wrap gap-3">
-        <Button onClick={() => navigate('daily-income')}>{t('recordPayment')}</Button>
+        <Button onClick={() => navigate('payments')}>{t('recordPayment')}</Button>
         {owner && (
-          <Button variant="secondary" onClick={() => navigate('daily-income', { search: '?tab=history' })}>
+          <Button variant="secondary" onClick={() => navigate('payments', { search: '?tab=history' })}>
             {t('tabTransactions')}
           </Button>
         )}
@@ -145,9 +145,9 @@ function EnrollmentsCard() {
   const { t } = useT();
   return (
     <Card className="flex flex-col">
-      <h2 className="mb-4 text-sm font-medium text-mute">{t('navEnrollments')}</h2>
+      <h2 className="mb-4 text-sm font-medium text-mute">{t('navTrainings')}</h2>
       <p className="mb-6 max-w-[65ch] text-pretty text-ink">{t('enrollmentsCardBody')}</p>
-      <Button variant="secondary" className="mt-auto self-start" onClick={() => navigate('enrollments')}>
+      <Button variant="secondary" className="mt-auto self-start" onClick={() => navigate('trainings')}>
         {t('openEnrollments')}
       </Button>
     </Card>

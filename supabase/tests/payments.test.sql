@@ -260,6 +260,23 @@ select t.check('owner: changes the receiver', (select collected_by = '00000000-0
                               3300, 'CASH', p_collected_by => '00000000-0000-0000-0000-0000000000c1')));
 reset role;
 
+-- "Other" method needs a description; the client's history is visible to every active staff member -----
+select t.login('00000000-0000-0000-0000-0000000000b2');
+select t.expect_error('other: needs a description', '22023',
+  $$select public.record_payment(gen_random_uuid(), 3000, 'OTHER', current_setting('t.mina')::uuid)$$);
+select set_config('t.o1', (select id from public.record_payment('5a5a5a5a-0000-0000-0000-000000000001', 3000, 'OTHER',
+  current_setting('t.mina')::uuid, p_method_other => ' ClassPass '))::text, true);
+select t.check('other: description saved', (select method_other = 'ClassPass' from public.payment_transactions where id = current_setting('t.o1')::uuid));
+select t.check('other: ignored for other methods', (select method_other = '' from public.record_payment(
+  '5a5a5a5a-0000-0000-0000-000000000002', 3100, 'CASH', current_setting('t.mina')::uuid, p_method_other => 'x')));
+select t.expect_error('other: correcting to Other needs a description', '22023',
+  format($$select public.correct_payment('%s', 3000, 'OTHER')$$, current_setting('t.o1')));
+select t.check('other: correcting away from Other clears it', (select method_other = '' from public.correct_payment(
+  current_setting('t.o1')::uuid, 3000, 'ZELLE')));
+select t.check('history: shows payments others recorded', (select count(*) >= 3 and bool_or(amount_cents = 3100)
+  from public.client_payments(current_setting('t.mina')::uuid)));
+reset role;
+
 -- S10: anon gets nothing ---------------------------------------------------------------------
 select t.as_anon();
 select t.expect_error('S10 anon: payments', '42501', $$select * from public.payment_transactions$$);
@@ -268,6 +285,7 @@ select t.expect_error('S10 anon: methods', '42501', $$select * from public.payme
 select t.expect_error('S10 anon: record', '42501',
   $$select public.record_payment(gen_random_uuid(), 100, 'CASH', p_payer_name => 'X')$$);
 select t.expect_error('S10 anon: search', '42501', $$select * from public.search_students('mi')$$);
+select t.expect_error('S10 anon: client history', '42501', format($$select * from public.client_payments('%s')$$, current_setting('t.mina')));
 select t.expect_error('S10 anon: collectors', '42501', $$select * from public.list_collectors()$$);
 reset role;
 

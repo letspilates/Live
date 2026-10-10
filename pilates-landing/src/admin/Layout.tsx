@@ -3,6 +3,7 @@
 // but the database is what actually enforces access.
 import { useRef, useState, type ReactNode } from 'react';
 import {
+  Bell,
   ClipboardList,
   Contact,
   LayoutDashboard,
@@ -25,13 +26,31 @@ import type { AdminPath } from './routes';
 import { IS_STAGING } from './supabase';
 import { Initials } from './ui';
 
-const NAV: { to: AdminPath; label: TextKey; Icon: LucideIcon; roles: Role[] }[] = [
-  { to: '', label: 'navDashboard', Icon: LayoutDashboard, roles: ROLES },
-  { to: 'daily-income', label: 'navDailyIncome', Icon: Wallet, roles: ROLES },
-  { to: 'members', label: 'navMembers', Icon: Contact, roles: ['OWNER'] },
-  { to: 'expenses', label: 'navExpenses', Icon: Receipt, roles: ['OWNER'] },
-  { to: 'enrollments', label: 'navEnrollments', Icon: ClipboardList, roles: ['OWNER'] },
-  { to: 'staff', label: 'navStaff', Icon: Users, roles: ['OWNER'] },
+type NavItem = { to: AdminPath; label: TextKey; Icon: LucideIcon; roles: Role[] };
+const OWNER: Role[] = ['OWNER'];
+const NAV: { group: TextKey; items: NavItem[] }[] = [
+  {
+    group: 'navGroupStudio',
+    items: [
+      { to: '', label: 'navDashboard', Icon: LayoutDashboard, roles: ROLES },
+      { to: 'clients', label: 'navClients', Icon: Contact, roles: OWNER },
+      { to: 'trainings', label: 'navTrainings', Icon: ClipboardList, roles: OWNER },
+    ],
+  },
+  {
+    group: 'navGroupAdmin',
+    items: [
+      { to: 'payments', label: 'navPayments', Icon: Wallet, roles: ROLES },
+      { to: 'expenses', label: 'navExpenses', Icon: Receipt, roles: OWNER },
+    ],
+  },
+  {
+    group: 'navGroupSettings',
+    items: [
+      { to: 'users', label: 'navUsers', Icon: Users, roles: OWNER },
+      { to: 'notifications', label: 'navNotifications', Icon: Bell, roles: OWNER },
+    ],
+  },
 ];
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true } as const;
@@ -166,23 +185,34 @@ function SidebarContent({
         <span className={`font-display font-semibold tracking-tightest ${label}`}>Let&rsquo;s Pilates LA</span>
       </Link>
 
-      <nav className="flex flex-1 flex-col gap-1">
-        {NAV.filter((item) => item.roles.includes(staff.role)).map(({ to, label: key, Icon }) => {
-          const active = route === to;
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
+        {NAV.map(({ group, items }) => {
+          const mine = items.filter((item) => item.roles.includes(staff.role));
+          if (!mine.length) return null;
           return (
-            <Link
-              key={to}
-              to={to}
-              onNavigate={onNavigate}
-              aria-current={active ? 'page' : undefined}
-              title={t(key)}
-              className={`flex h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-3 text-sm font-medium transition-colors ${
-                active ? 'bg-sand text-ink' : 'text-mute hover:bg-ink/[0.04] hover:text-ink'
-              }`}
-            >
-              <Icon {...ICON} className={`shrink-0 ${active ? 'text-sage' : ''}`} />
-              <span className={label}>{t(key)}</span>
-            </Link>
+            <div key={group} className="flex flex-col gap-1 [&+&]:mt-3">
+              {/* Group name in the wide sidebar; a thin line in the icon rail. */}
+              <p className={`px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-mute ${label}`}>{t(group)}</p>
+              <span aria-hidden="true" className={`mx-3 mb-1 border-t border-ink/10 ${alwaysWide ? 'hidden' : wide ? 'lg:hidden' : ''}`} />
+              {mine.map(({ to, label: key, Icon }) => {
+                const active = route === to;
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    onNavigate={onNavigate}
+                    aria-current={active ? 'page' : undefined}
+                    title={t(key)}
+                    className={`flex h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-3 text-sm font-medium transition-colors ${
+                      active ? 'bg-sand text-ink' : 'text-mute hover:bg-ink/[0.04] hover:text-ink'
+                    }`}
+                  >
+                    <Icon {...ICON} className={`shrink-0 ${active ? 'text-sage' : ''}`} />
+                    <span className={label}>{t(key)}</span>
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
       </nav>

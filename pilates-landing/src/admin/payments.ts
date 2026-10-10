@@ -10,6 +10,7 @@ export interface Payment {
   status: 'VALID' | 'VOID';
   amount_cents: number;
   method: string;
+  method_other: string;
   student_id: string | null;
   payer_name: string;
   related_transaction_id: string | null;
@@ -148,9 +149,11 @@ export async function loadMethods(): Promise<Method[]> {
   return data as Method[];
 }
 
-export const methodLabel = (methods: Method[], code: string, lang: 'en' | 'ko') => {
+/** "Zelle"; for Other with a description, "Other (ClassPass)". */
+export const methodLabel = (methods: Method[], code: string, lang: 'en' | 'ko', other = '') => {
   const m = methods.find((x) => x.code === code);
-  return m ? (lang === 'ko' ? m.label_ko : m.label_en) : code;
+  const label = m ? (lang === 'ko' ? m.label_ko : m.label_en) : code;
+  return code === 'OTHER' && other ? `${label} (${other})` : label;
 };
 
 /** Active staff who can be named as having received a payment. */

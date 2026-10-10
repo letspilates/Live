@@ -122,8 +122,8 @@ export default function Enrollments() {
   };
 
   return (
-    <Layout title={t('navEnrollments')}>
-      <div role="tablist" aria-label={t('navEnrollments')} className="mb-6 inline-flex rounded-full bg-sand p-1">
+    <Layout title={t('navTrainings')}>
+      <div role="tablist" aria-label={t('navTrainings')} className="mb-6 inline-flex rounded-full bg-sand p-1">
         {(['courses', 'registrants'] as const).map((id) => (
           <button
             key={id}
