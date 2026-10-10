@@ -11,6 +11,7 @@ import {
   PanelLeftOpen,
   UserRound,
   Users,
+  Wallet,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ import { Initials } from './ui';
 
 const NAV: { to: AdminPath; label: TextKey; Icon: LucideIcon; roles: Role[] }[] = [
   { to: '', label: 'navDashboard', Icon: LayoutDashboard, roles: ROLES },
+  { to: 'daily-income', label: 'navDailyIncome', Icon: Wallet, roles: ROLES },
   { to: 'enrollments', label: 'navEnrollments', Icon: ClipboardList, roles: ['OWNER'] },
   { to: 'staff', label: 'navStaff', Icon: Users, roles: ['OWNER'] },
 ];

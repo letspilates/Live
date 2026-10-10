@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStaff } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
+import { formatCents, laToday, loadPayments, totals, type Totals } from '../payments';
 import { navigate } from '../router';
 import { supabase } from '../supabase';
 import { Button, Card, Notice, Skeleton } from '../ui';
@@ -28,11 +29,13 @@ export default function Dashboard() {
       </p>
       {staff.role === 'OWNER' ? (
         <div className="grid gap-4 md:grid-cols-2">
+          <TodayCard />
           <TeamCard />
           <EnrollmentsCard />
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
+          <TodayCard />
           <ProfileCard />
         </div>
       )}
@@ -92,6 +95,51 @@ function TeamCard() {
   );
 }
 
+// Today's payments (LA date). The database decides what each role sees:
+// owners every payment, everyone else only the ones they recorded.
+function TodayCard() {
+  const { t } = useT();
+  const owner = useStaff().role === 'OWNER';
+  const [sum, setSum] = useState<Totals | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const today = laToday();
+    loadPayments(today, today)
+      .then((rows) => setSum(totals(rows)))
+      .catch(() => setFailed(true));
+  }, []);
+
+  return (
+    <Card className="flex flex-col">
+      <h2 className="mb-4 text-sm font-medium text-mute">{t(owner ? 'todayIncome' : 'myToday')}</h2>
+      {failed ? (
+        <div className="mb-6">
+          <Notice tone="error">{t('somethingWrong')}</Notice>
+        </div>
+      ) : !sum ? (
+        <Skeleton className="mb-6 h-14 w-40" />
+      ) : (
+        <div className="mb-6">
+          <p className="font-display text-3xl font-semibold tabular-nums">{formatCents(sum.net)}</p>
+          <p className="mt-1 text-sm text-mute">
+            {t('nPayments', { n: String(sum.count) })}
+            {sum.refunds > 0 && ` · ${t('refunds')} −${formatCents(sum.refunds)}`}
+          </p>
+        </div>
+      )}
+      <div className="mt-auto flex flex-wrap gap-3">
+        <Button onClick={() => navigate('daily-income')}>{t('recordPayment')}</Button>
+        {owner && (
+          <Button variant="secondary" onClick={() => navigate('daily-income', { search: '?tab=history' })}>
+            {t('tabTransactions')}
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 // No numbers here yet: enrollment data still lives in the Google Sheet (Phase 4A).
 function EnrollmentsCard() {
   const { t } = useT();
@@ -125,7 +173,6 @@ function ProfileCard() {
           </div>
         ))}
       </dl>
-      <p className="mt-5 text-sm text-mute">{t('instructorSoon')}</p>
       <Button variant="secondary" className="mt-6" onClick={() => navigate('account')}>
         {t('navAccount')}
       </Button>

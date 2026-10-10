@@ -7,6 +7,7 @@ import { navigate, useRoute } from './router';
 import { ADMIN_ROUTES, type AdminPath } from './routes';
 import { Button, CenteredCard, Notice, Splash } from './ui';
 import Account from './pages/Account';
+import DailyIncome from './pages/DailyIncome';
 import Dashboard from './pages/Dashboard';
 import Enrollments from './pages/Enrollments';
 import Login from './pages/Login';
@@ -15,6 +16,7 @@ import StaffPage from './pages/Staff';
 
 const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType> = {
   '': Dashboard,
+  'daily-income': DailyIncome,
   enrollments: Enrollments,
   staff: StaffPage,
   account: Account,

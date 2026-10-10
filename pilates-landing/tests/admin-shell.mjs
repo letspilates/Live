@@ -41,6 +41,30 @@ let submitted = null;
 let browserCalledSheet = false;
 let loadMode = 'ok'; // 'ok' | 'fail'
 
+// Daily Income
+const LA_TODAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
+const LA_YESTERDAY = new Date(Date.parse(`${LA_TODAY}T12:00:00Z`) - 864e5).toISOString().slice(0, 10);
+const METHODS = [
+  { code: 'CASH', label_en: 'Cash', label_ko: '현금' },
+  { code: 'ZELLE', label_en: 'Zelle', label_ko: 'Zelle' },
+  { code: 'VENMO', label_en: 'Venmo', label_ko: 'Venmo' },
+  { code: 'CREDIT', label_en: 'Credit card', label_ko: '신용카드' },
+];
+const HITS = [
+  { id: 's-mina', full_name: 'Mina Cho', phone_last4: '0142', last_paid_on: LA_YESTERDAY, last_amount_cents: 10000, last_method: 'ZELLE' },
+  { id: 's-leo', full_name: 'Leo Park', phone_last4: '', last_paid_on: null, last_amount_cents: null, last_method: null },
+];
+const pay = (r) => ({ kind: 'PAYMENT', status: 'VALID', student_id: null, related_transaction_id: null, notes: '', reason: '', business_date: LA_TODAY, ...r });
+const PAYMENTS = [
+  pay({ id: 'p-1', amount_cents: 10000, method: 'CASH', payer_name: 'Mina Cho', recorded_by: 'u-ins', recorded_by_name: 'Ana Park', recorded_at: new Date().toISOString() }),
+  pay({ id: 'p-2', amount_cents: 15000, method: 'ZELLE', payer_name: 'Leo Park', recorded_by: 'u-ben', recorded_by_name: 'Ben Yoo', recorded_at: new Date().toISOString() }),
+  pay({ id: 'p-3', amount_cents: 2000, method: 'CASH', payer_name: 'Mina Cho', kind: 'REFUND', related_transaction_id: 'p-0', recorded_by: 'u-owner', recorded_by_name: 'Calvin Kim', recorded_at: new Date().toISOString() }),
+  pay({ id: 'p-4', amount_cents: 9900, method: 'VENMO', payer_name: 'Walk-in', status: 'VOID', reason: 'typo', recorded_by: 'u-ben', recorded_by_name: 'Ben Yoo', recorded_at: new Date().toISOString() }),
+  pay({ id: 'p-5', amount_cents: 4000, method: 'VENMO', payer_name: 'Old Friend', business_date: LA_YESTERDAY, recorded_by: 'u-ins', recorded_by_name: 'Ana Park', recorded_at: new Date(Date.now() - 864e5).toISOString() }),
+];
+const calls = []; // [rpc name, body]
+let duplicateOnce = false;
+
 /** A page signed in as `who` (or signed out when null) at the given width. */
 async function open(who, width, path = '') {
   const context = await browser.newContext({ viewport: { width, height: width < 768 ? 852 : 900 } });
@@ -86,6 +110,32 @@ async function open(who, width, path = '') {
     submitted = r.request().postDataJSON().p;
     return r.fulfill({ json: 'r-new' });
   });
+  await context.route(`${SUPABASE}/rest/v1/payment_methods?**`, (r) => r.fulfill({ json: METHODS }));
+  await context.route(`${SUPABASE}/rest/v1/payment_transactions?**`, (r) => {
+    const q = new URL(r.request().url()).searchParams;
+    if (q.get('related_transaction_id')) return r.fulfill({ json: [] });
+    const [from, to] = q.getAll('business_date').map((v) => v.slice(4));
+    // RLS stand-in: staff see only what they recorded.
+    const rows = PAYMENTS.filter((p) => (who === 'OWNER' || p.recorded_by === staff?.user_id)
+      && (!from || p.business_date >= from) && (!to || p.business_date <= to));
+    return r.fulfill({ json: rows });
+  });
+  await context.route(`${SUPABASE}/rest/v1/rpc/search_students`, (r) => {
+    const q = (r.request().postDataJSON().p_query ?? '').toLowerCase();
+    return r.fulfill({ json: q.length < 2 ? HITS.filter((h) => h.last_paid_on) : HITS.filter((h) => h.full_name.toLowerCase().includes(q)) });
+  });
+  for (const name of ['add_student', 'record_payment', 'correct_payment', 'void_payment', 'record_refund']) {
+    await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
+      const body = r.request().postDataJSON();
+      calls.push([name, body]);
+      if (name === 'add_student') return r.fulfill({ json: 's-new' });
+      if (name === 'record_payment' && duplicateOnce && !body.p_confirm_duplicate) {
+        duplicateOnce = false;
+        return r.fulfill({ status: 400, json: { code: 'LPDUP', message: 'A payment like this was saved in the last 10 minutes.' } });
+      }
+      return r.fulfill({ json: pay({ id: 'p-new', amount_cents: body.p_amount_cents, method: body.p_method, payer_name: body.p_payer_name ?? 'Mina Cho', recorded_by: staff.user_id, recorded_by_name: staff.full_name, recorded_at: new Date().toISOString() }) });
+    });
+  }
   // Staging no longer uses the Google Sheet at all.
   await context.route('https://script.google.com/**', (r) => {
     browserCalledSheet = true;
@@ -99,6 +149,8 @@ async function open(who, width, path = '') {
   return { page, context, errors };
 }
 
+// SHOTS=<dir> saves screenshots of the Daily Income screens for a visual check.
+const shot = async (page, name) => process.env.SHOTS && (await page.waitForTimeout(400), page.screenshot({ path: `${process.env.SHOTS}/${name}.png`, fullPage: true }));
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 const navLabels = (page) =>
   page.locator('aside nav a').evaluateAll((links) => links.map((a) => a.getAttribute('title')));
@@ -119,7 +171,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Enrollments' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Enrollments,Staff', `${device}: owner menu`);
+    check((await navLabels(page)).join() === 'Dashboard,Daily Income,Enrollments,Staff', `${device}: owner menu`);
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
     } else {
@@ -186,7 +238,8 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(await page.locator('main').getByText(PEOPLE[who].email).isVisible(), `${who} ${device}: shows own email`);
     check(!(await page.getByText('Team', { exact: true }).count()), `${who} ${device}: no team card`);
     check((await page.getByText('Master').count()) === (who === 'INSTRUCTOR' ? 1 : 0), `${who} ${device}: tier only for instructors`);
-    if (device === 'desktop') check((await navLabels(page)).join() === 'Dashboard', `${who}: menu is Dashboard only`);
+    if (device === 'desktop') check((await navLabels(page)).join() === 'Dashboard,Daily Income', `${who}: menu is Dashboard + Daily Income`);
+    check(await page.getByText('My payments today').isVisible(), `${who} ${device}: my-today card`);
     check(await noOverflow(page), `${who} ${device}: no sideways scroll`);
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
@@ -301,6 +354,148 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   check(submitted?.course_ids?.join() === 'c-b' && submitted.email === 'test@example.com', 'form submits to Supabase with the course id');
   check(submitted?.courses_text === 'B - Jumping Stretching Board', 'form keeps the course text as picked');
   check(errors.length === 0, `form: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 9. Daily Income: instructor on a phone records payments
+{
+  calls.length = 0;
+  const { page, context, errors } = await open('INSTRUCTOR', 393, 'daily-income/');
+  check((await page.locator('h1').innerText()) === 'Daily Income', 'daily income: title');
+  await page.getByText('Recently paid').waitFor();
+  await page.getByRole('button', { name: 'Save payment' }).click();
+  check(await page.getByText('Choose a student or walk-in.').isVisible() && !calls.length, 'daily income: nothing saved without a student');
+  await page.getByRole('button', { name: /Mina Cho/ }).click();
+  check((await page.getByLabel('Amount ($)').inputValue()) === '100.00', 'daily income: last amount filled in');
+  check((await page.getByRole('button', { name: 'Zelle', exact: true }).getAttribute('aria-pressed')) === 'true', 'daily income: last method picked');
+  check(await page.getByText(/Last time: \$100\.00 Zelle/).isVisible(), 'daily income: shows what was paid last time');
+  await shot(page, 'phone-record');
+  const save = page.getByRole('button', { name: 'Received $100.00 · Zelle · Save' });
+  const box = await save.boundingBox();
+  check(box && box.y + box.height <= 852, 'daily income: save button visible on the phone without scrolling');
+  check(await noOverflow(page), 'daily income: no sideways scroll on the form');
+  await save.click();
+  await page.getByText('Payment saved').waitFor();
+  await shot(page, 'phone-saved');
+  const first = calls.find(([n]) => n === 'record_payment')?.[1];
+  check(first?.p_amount_cents === 10000 && first.p_method === 'ZELLE' && first.p_student_id === 's-mina' && /^[0-9a-f-]{36}$/.test(first.p_client_request_id),
+    'daily income: sends cents, method, student and a request id');
+  check(!('p_recorded_by' in first) && !('p_business_date' in first), 'daily income: browser never sends who or which day');
+  await page.getByRole('button', { name: 'Record another' }).click();
+
+  // Duplicate warning: same request id is resent with the confirmation
+  duplicateOnce = true;
+  calls.length = 0;
+  await page.getByPlaceholder('Search name or phone').fill('leo');
+  await page.getByRole('button', { name: /Leo Park/ }).click();
+  await page.getByLabel('Amount ($)').fill('$1,250.5');
+  await page.getByRole('button', { name: 'Cash', exact: true }).click();
+  await page.getByRole('button', { name: 'Received $1,250.50 · Cash · Save' }).click();
+  await page.getByText('Possible duplicate').waitFor();
+  await page.getByRole('button', { name: 'Save anyway' }).click();
+  await page.getByText('Payment saved').waitFor();
+  const [a, b] = calls.filter(([n]) => n === 'record_payment').map(([, body]) => body);
+  check(a?.p_amount_cents === 125050 && b?.p_confirm_duplicate === true && a.p_client_request_id === b.p_client_request_id,
+    'daily income: duplicate warning, then saved once with the same request id');
+  check(first.p_client_request_id !== a.p_client_request_id, 'daily income: a new payment gets a new request id');
+  await page.getByRole('button', { name: 'Record another' }).click();
+
+  // Walk-in
+  calls.length = 0;
+  await page.getByRole('button', { name: 'Walk-in', exact: true }).click();
+  await page.getByLabel('Name (optional)').fill('Drop-in Jo');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByLabel('Amount ($)').fill('25');
+  await page.getByRole('button', { name: 'Cash', exact: true }).click();
+  await page.getByLabel('Amount ($)').fill('abc');
+  await page.getByRole('button', { name: 'Save payment' }).click();
+  check(await page.getByText('Enter an amount').isVisible() && !calls.length, 'daily income: bad amount is caught on the screen');
+  await page.getByLabel('Amount ($)').fill('25');
+  await page.getByRole('button', { name: 'Received $25.00 · Cash · Save' }).click();
+  await page.getByText('Payment saved').waitFor();
+  const walk = calls.find(([n]) => n === 'record_payment')?.[1];
+  check(walk?.p_student_id === null && walk.p_payer_name === 'Drop-in Jo' && walk.p_amount_cents === 2500, 'daily income: walk-in with a name');
+  await page.getByRole('button', { name: 'Record another' }).click();
+
+  // New student from the search box
+  calls.length = 0;
+  await page.getByPlaceholder('Search name or phone').fill('Zed Quinn');
+  await page.getByText('No student found').waitFor();
+  await page.getByRole('button', { name: 'New student' }).click();
+  check((await page.getByLabel('Full name').inputValue()) === 'Zed Quinn', 'daily income: new student takes the searched name');
+  await page.getByLabel('Phone (optional)').fill('213-555-0199');
+  await page.getByRole('button', { name: 'Add student' }).click();
+  await page.getByRole('button', { name: 'Change' }).waitFor();
+  const added = calls.find(([n]) => n === 'add_student')?.[1];
+  check(added?.p_full_name === 'Zed Quinn' && added.p_phone === '213-555-0199', 'daily income: new student saved');
+  check(await page.getByText('···0199').isVisible(), 'daily income: new student selected');
+
+  // My history: own rows only; today's can be fixed, yesterday's cannot
+  await shot(page, 'phone-new-student');
+  await page.getByRole('tab', { name: 'My history' }).click();
+  await page.getByText('My total').waitFor();
+  check(await page.getByRole('button', { name: /Mina Cho/ }).isVisible() && !(await page.getByText('Leo Park').count()), 'history: instructor sees only own payments');
+  check(await page.locator('dd').first().innerText() === '$100.00', 'history: my total for today');
+  await shot(page, 'phone-history');
+  await page.getByRole('button', { name: /Mina Cho/ }).click();
+  const dialog = page.locator('dialog[open]');
+  await shot(page, 'phone-dialog');
+  check(await dialog.getByRole('button', { name: 'Correct' }).isVisible() && !(await dialog.getByRole('button', { name: 'Refund' }).count()), 'history: correct today, no refund for staff');
+  calls.length = 0;
+  await dialog.getByRole('button', { name: 'Void' }).click();
+  await dialog.getByRole('button', { name: 'Void' }).click();
+  check(await dialog.getByText('Enter a reason.').isVisible() && !calls.length, 'history: void needs a reason');
+  await dialog.getByLabel('Reason').fill('entered twice');
+  await dialog.getByRole('button', { name: 'Void' }).click();
+  await page.getByText('Payment voided.').waitFor();
+  check(calls[0]?.[0] === 'void_payment' && calls[0][1].p_id === 'p-1' && calls[0][1].p_reason === 'entered twice', 'history: void sent with reason');
+  await page.getByLabel('Period').selectOption('week');
+  const old = page.getByRole('button', { name: /Old Friend/ });
+  if (await old.count()) {
+    await old.click();
+    check(await dialog.getByText('Only the owner can change').isVisible() && !(await dialog.getByRole('button', { name: 'Correct' }).count()), 'history: yesterday is owner-only');
+    await dialog.getByRole('button', { name: 'Close' }).click();
+  } else check(true, 'history: (today is Monday, yesterday is outside this week)');
+  check(await noOverflow(page), 'history: no sideways scroll on the phone');
+  check(errors.length === 0, `daily income: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 10. Daily Income: owner transactions, filters, totals, refund
+for (const [device, width] of Object.entries(WIDTHS)) {
+  calls.length = 0;
+  const { page, context, errors } = await open('OWNER', width, 'daily-income/?tab=history');
+  await page.getByText('Net revenue').waitFor();
+  await page.getByText('Leo Park').waitFor();
+  const stats = await page.locator('dl dd').allInnerTexts();
+  // valid payments $100 + $150, refund $20, void $99 left out
+  check(stats.join('|') === '$230.00|$250.00|−$20.00|2', `${device} owner: totals ${stats.join('|')}`);
+  await shot(page, `${device}-owner-history`);
+  check(await page.locator('main li').getByText(/Ben Yoo/).first().isVisible(), `${device} owner: sees who recorded`);
+  await page.getByLabel('Recorded by').selectOption({ label: 'Ben Yoo' });
+  check(!(await page.getByText('Mina Cho').count()) && (await page.locator('dl dd').first().innerText()) === '$150.00', `${device} owner: filter by recorder`);
+  await page.getByLabel('Recorded by').selectOption({ label: 'Everyone' });
+  check(await noOverflow(page), `${device} owner: no sideways scroll on transactions`);
+  if (device === 'desktop') {
+    await page.getByRole('button', { name: /Mina Cho.*\$100\.00/ }).click();
+    const dialog = page.locator('dialog[open]');
+    await dialog.getByRole('button', { name: 'Refund' }).click();
+    await dialog.getByText('Up to $100.00 can be refunded').waitFor();
+    await dialog.getByLabel('Amount ($)').fill('150');
+    await dialog.getByLabel('Reason').fill('class cancelled');
+    await dialog.getByRole('button', { name: 'Save refund' }).click();
+    check(await dialog.getByText('More than what is left to refund.').isVisible() && !calls.some(([n]) => n === 'record_refund'), 'owner: refund above the payment is stopped');
+    await dialog.getByLabel('Amount ($)').fill('40');
+    await dialog.getByRole('button', { name: 'Save refund' }).click();
+    await page.getByText('Refund saved.').waitFor();
+    const refund = calls.find(([n]) => n === 'record_refund')?.[1];
+    check(refund?.p_original_id === 'p-1' && refund.p_amount_cents === 4000 && refund.p_reason === 'class cancelled' && refund.p_method === 'CASH', 'owner: refund sent');
+    await page.goto(ROOT);
+    await page.getByText('$230.00').waitFor({ timeout: 5000 }).catch(() => {});
+    await shot(page, 'desktop-owner-dashboard');
+    check(await page.getByText('Today', { exact: true }).isVisible() && await page.getByText('$230.00').isVisible() && await page.getByText('2 payments · Refunds −$20.00').isVisible(), 'owner dashboard: today card');
+  }
+  check(errors.length === 0, `${device} owner daily income: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 
