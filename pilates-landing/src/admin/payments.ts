@@ -126,17 +126,24 @@ export function totals(rows: Payment[]): Totals {
   return { gross, refunds, net: gross - refunds, count };
 }
 
-/** Payments the caller may see (RLS: staff their own, owners all), newest first. */
+/** Payments the caller may see (RLS: staff their own, owners all), newest first.
+ *  Supabase returns at most 1000 rows per request, so read in pages; the totals
+ *  must cover every row to match Reports. */
 export async function loadPayments(from: string, to: string): Promise<Payment[]> {
-  const { data, error } = await supabase!
-    .from('payment_transactions')
-    .select('*')
-    .gte('business_date', from)
-    .lte('business_date', to)
-    .order('recorded_at', { ascending: false })
-    .limit(5000);
-  if (error) throw error;
-  return data as Payment[];
+  const all: Payment[] = [];
+  for (let start = 0; ; start += 1000) {
+    const { data, error } = await supabase!
+      .from('payment_transactions')
+      .select('*')
+      .gte('business_date', from)
+      .lte('business_date', to)
+      .order('recorded_at', { ascending: false })
+      .order('id')
+      .range(start, start + 999);
+    if (error) throw error;
+    all.push(...(data as Payment[]));
+    if (data.length < 1000) return all;
+  }
 }
 
 export async function loadMethods(): Promise<Method[]> {
