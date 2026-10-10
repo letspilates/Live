@@ -65,8 +65,8 @@ select t.check('search: by name', (select count(*) = 1 and min(full_name) = 'Min
   from public.search_students('min')));
 select t.check('search: by phone digits', (select count(*) = 1 from public.search_students('555-01')));
 select t.check('search: short query lists recently paid (none yet)', (select count(*) = 0 from public.search_students('')));
--- S9: staff cannot read the students table itself
-select t.check('S9 instructor: students table reads 0 rows', (select count(*) = 0 from public.students));
+-- S9 (updated 2026-10-10, Calvin): the students table follows the Clients menu switch (on by default)
+select t.check('S9 instructor: Clients menu on, reads students', (select count(*) = 2 from public.students));
 select t.expect_error('instructor: no direct insert', '42501', $$insert into public.students (full_name) values ('x')$$);
 reset role;
 

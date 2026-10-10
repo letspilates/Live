@@ -8,18 +8,19 @@ export default {
         display: ['Outfit', 'Pretendard', 'ui-sans-serif', 'sans-serif'],
       },
       colors: {
-        // Warm Editorial palette — single sage accent
-        cream: '#FBF8F2',
-        sand: '#F2EBDD',
-        paper: '#FFFFFF',
-        ink: '#1C1A16',
-        mute: '#6E6A60',
+        // Warm Editorial palette — single sage accent. Values live in src/index.css
+        // (:root) so the admin portal can swap them for dark mode; same colors.
+        cream: 'rgb(var(--c-cream) / <alpha-value>)',
+        sand: 'rgb(var(--c-sand) / <alpha-value>)',
+        paper: 'rgb(var(--c-paper) / <alpha-value>)',
+        ink: 'rgb(var(--c-ink) / <alpha-value>)',
+        mute: 'rgb(var(--c-mute) / <alpha-value>)',
         sage: {
-          DEFAULT: '#5E6B4F',
-          soft: '#7C896C',
-          deep: '#434D38',
+          DEFAULT: 'rgb(var(--c-sage) / <alpha-value>)',
+          soft: 'rgb(var(--c-sage-soft) / <alpha-value>)',
+          deep: 'rgb(var(--c-sage-deep) / <alpha-value>)',
         },
-        clay: '#B08763',
+        clay: 'rgb(var(--c-clay) / <alpha-value>)',
       },
       letterSpacing: {
         tightest: '-0.045em',

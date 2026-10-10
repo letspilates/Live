@@ -182,7 +182,7 @@ select t.expect_error('add staff: unknown email', 'P0002',
 select t.expect_error('add staff: already staff', '23505',
   $$select public.add_staff_account('new.inst@test.local', 'Again')$$);
 select t.expect_error('add staff: bad role', '23514',
-  $$select public.add_staff_account('stranger@test.local', 'X', 'ADMIN')$$);
+  $$select public.add_staff_account('stranger@test.local', 'X', 'MANAGER')$$);
 reset role;
 select t.login('00000000-0000-0000-0000-0000000000b1');
 select t.expect_error('add staff: instructor refused', '42501',
@@ -205,7 +205,7 @@ select t.check('staff role: added', (select role = 'STAFF' and status = 'ACTIVE'
 select t.check('staff role: instructor -> staff', public.set_staff_role('00000000-0000-0000-0000-0000000000b2', 'STAFF'));
 select t.check('staff role: staff -> instructor', public.set_staff_role('00000000-0000-0000-0000-0000000000b2', 'INSTRUCTOR'));
 select t.expect_error('staff role: unknown role', '22023',
-  $$select public.set_staff_role('00000000-0000-0000-0000-0000000000b2', 'ADMIN')$$);
+  $$select public.set_staff_role('00000000-0000-0000-0000-0000000000b2', 'MANAGER')$$);
 reset role;
 select t.login('00000000-0000-0000-0000-0000000000f1');
 select t.check('staff role: active staff', app.is_active_staff());

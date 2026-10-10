@@ -4,7 +4,7 @@
 // (record_payment / correct_payment / void_payment / record_refund).
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { CircleCheck, Plus, RefreshCw, Search, X } from 'lucide-react';
-import { useStaff } from '../auth';
+import { isAdmin, useStaff } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
 import {
@@ -50,7 +50,7 @@ function errorText(t: T, error: DbError): string {
 
 export default function DailyIncome() {
   const { t } = useT();
-  const owner = useStaff().role === 'OWNER';
+  const owner = isAdmin(useStaff());
   const [tab, setTab] = useState<'record' | 'history'>(() =>
     new URLSearchParams(window.location.search).get('tab') === 'history' ? 'history' : 'record',
   );
@@ -618,7 +618,7 @@ const RANGES: { id: Range; label: TextKey }[] = [
 function History({ methods, collectors }: { methods: Method[]; collectors: Collector[] }) {
   const { t, lang } = useT();
   const me = useStaff();
-  const owner = me.role === 'OWNER';
+  const owner = isAdmin(me);
   // Any dates can be picked; the period menu fills in common ranges.
   const [[from, to], setDates] = useState<[string, string]>(() => rangeDates('today'));
   const range: Range =
@@ -882,7 +882,7 @@ function PaymentDialog({
 }) {
   const { t, lang } = useT();
   const me = useStaff();
-  const owner = me.role === 'OWNER';
+  const owner = isAdmin(me);
   const [mode, setMode] = useState<'view' | 'correct' | 'void' | 'refund'>(refundFirst ? 'refund' : 'view');
   const [amount, setAmount] = useState(centsInput(p.amount_cents));
   const [method, setMethod] = useState(p.method);

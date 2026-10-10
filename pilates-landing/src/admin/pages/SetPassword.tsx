@@ -44,7 +44,8 @@ export default function SetPassword() {
       return;
     }
     refresh();
-    navigate('', { replace: true });
+    // New people check the details the owner entered for them (phone, address, certifications).
+    navigate(isInvite ? 'account' : '', { replace: true, search: isInvite ? '?welcome=1' : '' });
   };
 
   return (

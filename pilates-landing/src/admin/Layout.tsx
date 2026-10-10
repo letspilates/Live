@@ -10,9 +10,12 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   Receipt,
+  ShieldCheck,
+  Sun,
   UserRound,
   Users,
   Wallet,
@@ -20,37 +23,41 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import LogoIcon from '../components/LogoIcon';
-import { ROLES, useAuth, useStaff, type Role } from './auth';
+import { canOpen, useAuth, useStaff } from './auth';
 import { setLang, useT, type TextKey } from './i18n';
 import { Link, useRoute } from './router';
 import type { AdminPath } from './routes';
 import { IS_STAGING } from './supabase';
+import { toggleTheme, useTheme } from './theme';
 import { Initials } from './ui';
 
-type NavItem = { to: AdminPath; label: TextKey; Icon: LucideIcon; roles: Role[] };
-const OWNER: Role[] = ['OWNER'];
-const NAV: { group: TextKey; items: NavItem[] }[] = [
+// Who sees an item: the route's rule in routes.ts (Settings → Admin for menus).
+type NavItem = { to: AdminPath; label: TextKey; Icon: LucideIcon };
+// Settings → Admin lists the same menus.
+// eslint-disable-next-line react-refresh/only-export-components
+export const NAV: { group: TextKey; items: NavItem[] }[] = [
   {
     group: 'navGroupStudio',
     items: [
-      { to: '', label: 'navDashboard', Icon: LayoutDashboard, roles: ROLES },
-      { to: 'clients', label: 'navClients', Icon: Contact, roles: OWNER },
-      { to: 'trainings', label: 'navTrainings', Icon: ClipboardList, roles: OWNER },
+      { to: '', label: 'navDashboard', Icon: LayoutDashboard },
+      { to: 'clients', label: 'navClients', Icon: Contact },
+      { to: 'trainings', label: 'navTrainings', Icon: ClipboardList },
     ],
   },
   {
     group: 'navGroupAdmin',
     items: [
-      { to: 'payments', label: 'navPayments', Icon: Wallet, roles: ROLES },
-      { to: 'expenses', label: 'navExpenses', Icon: Receipt, roles: OWNER },
-      { to: 'reports', label: 'navReports', Icon: BarChart3, roles: OWNER },
+      { to: 'payments', label: 'navPayments', Icon: Wallet },
+      { to: 'expenses', label: 'navExpenses', Icon: Receipt },
+      { to: 'reports', label: 'navReports', Icon: BarChart3 },
     ],
   },
   {
     group: 'navGroupSettings',
     items: [
-      { to: 'users', label: 'navUsers', Icon: Users, roles: OWNER },
-      { to: 'notifications', label: 'navNotifications', Icon: Bell, roles: OWNER },
+      { to: 'users', label: 'navUsers', Icon: Users },
+      { to: 'notifications', label: 'navNotifications', Icon: Bell },
+      { to: 'access', label: 'navAccess', Icon: ShieldCheck },
     ],
   },
 ];
@@ -142,11 +149,16 @@ export default function Layout({
               {t('staging')}
             </span>
           )}
+          <ThemeToggle />
           <LangToggle />
           <AccountMenu />
         </header>
 
-        <main id="main" tabIndex={-1} className="mx-auto w-full outline-none max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="mx-auto w-full outline-none max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+        >
           {actions && <div className="mb-6 flex flex-wrap justify-end gap-3">{actions}</div>}
           {children}
         </main>
@@ -189,13 +201,16 @@ function SidebarContent({
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
         {NAV.map(({ group, items }) => {
-          const mine = items.filter((item) => item.roles.includes(staff.role));
+          const mine = items.filter((item) => canOpen(staff, item.to));
           if (!mine.length) return null;
           return (
             <div key={group} className="flex flex-col gap-1 [&+&]:mt-3">
               {/* Group name in the wide sidebar; a thin line in the icon rail. */}
               <p className={`px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-mute ${label}`}>{t(group)}</p>
-              <span aria-hidden="true" className={`mx-3 mb-1 border-t border-ink/10 ${alwaysWide ? 'hidden' : wide ? 'lg:hidden' : ''}`} />
+              <span
+                aria-hidden="true"
+                className={`mx-3 mb-1 border-t border-ink/10 ${alwaysWide ? 'hidden' : wide ? 'lg:hidden' : ''}`}
+              />
               {mine.map(({ to, label: key, Icon }) => {
                 const active = route === to;
                 return (
@@ -232,7 +247,7 @@ function SidebarContent({
           <Initials name={staff.full_name} className="h-8 w-8 text-xs" />
           <span className={`min-w-0 ${label}`}>
             <span className="block truncate text-sm font-medium">{staff.full_name}</span>
-            <span className="block text-xs text-mute">{t(staff.role)}</span>
+            <span className="block text-xs text-mute">{staff.roles.map((r) => t(r)).join(' · ')}</span>
           </span>
         </Link>
         <button
@@ -261,6 +276,24 @@ function SidebarContent({
         )}
       </div>
     </div>
+  );
+}
+
+/** Sun / moon: light or dark portal (remembered on this device). */
+function ThemeToggle() {
+  const { t } = useT();
+  const dark = useTheme() === 'dark';
+  const Icon = dark ? Sun : Moon;
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      title={t(dark ? 'lightMode' : 'darkMode')}
+      aria-label={t(dark ? 'lightMode' : 'darkMode')}
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-mute transition-colors hover:bg-ink/[0.05] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
+    >
+      <Icon {...ICON} size={18} />
+    </button>
   );
 }
 
@@ -316,7 +349,7 @@ function AccountMenu() {
         <div className="px-3 py-2">
           <p className="truncate text-sm font-medium">{staff.full_name}</p>
           <p className="truncate text-xs text-mute">{staff.email}</p>
-          <p className="mt-1 text-xs text-mute">{t(staff.role)}</p>
+          <p className="mt-1 text-xs text-mute">{staff.roles.map((r) => t(r)).join(' · ')}</p>
         </div>
         <div className="my-1 border-t border-ink/10" />
         <Link

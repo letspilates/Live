@@ -1,0 +1,30 @@
+/* Admin portal only: dark mode (html.dark, set by theme.ts). The homepage never
+   gets the class. Same token names, darker values; text tokens get lighter. */
+html.dark {
+  color-scheme: dark;
+  --c-cream: 21 20 17;
+  --c-sand: 43 40 34;
+  --c-paper: 30 28 24;
+  --c-ink: 238 233 223;
+  --c-mute: 168 163 151;
+  --c-sage: 138 154 118;
+  --c-sage-soft: 157 172 137;
+  --c-sage-deep: 180 194 159;
+  --c-clay: 201 160 122;
+}
+html.dark,
+html.dark body {
+  background-color: rgb(var(--c-cream));
+  color: rgb(var(--c-ink));
+}
+/* Error colors readable on the dark background. */
+html.dark .text-red-700,
+html.dark .text-red-800 {
+  color: #f1a196;
+}
+html.dark .bg-red-50 {
+  background-color: rgb(185 28 28 / 0.18);
+}
+html.dark dialog::backdrop {
+  background-color: rgb(0 0 0 / 0.55);
+}

@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Site palette (tailwind.config.js reads these). #FBF8F2 #F2EBDD #FFFFFF #1C1A16
+   #6E6A60 #5E6B4F #7C896C #434D38 #B08763 */
+:root {
+  --c-cream: 251 248 242;
+  --c-sand: 242 235 221;
+  --c-paper: 255 255 255;
+  --c-ink: 28 26 22;
+  --c-mute: 110 106 96;
+  --c-sage: 94 107 79;
+  --c-sage-soft: 124 137 108;
+  --c-sage-deep: 67 77 56;
+  --c-clay: 176 135 99;
+}
+
 html {
   scroll-behavior: smooth;
   /* Anchor jumps land below the fixed navbar so each section shows from its top */

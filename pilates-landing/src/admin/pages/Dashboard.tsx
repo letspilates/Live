@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useStaff } from '../auth';
+import { isAdmin, useStaff } from '../auth';
 import { addMonths } from '../expenses';
 import { loadReport, thisMonth, type Report } from '../finance';
 import { useT, type TextKey } from '../i18n';
@@ -30,7 +30,7 @@ export default function Dashboard() {
       <p className="mb-6 font-display text-2xl font-semibold tracking-tightest sm:text-3xl">
         {t(greetingKey())}, {firstName}
       </p>
-      {staff.role === 'OWNER' ? (
+      {isAdmin(staff) ? (
         <div className="grid gap-4 md:grid-cols-2">
           <TodayCard />
           <FinanceCards />
@@ -39,7 +39,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          <TodayCard />
+          {staff.menus.includes('payments') && <TodayCard />}
           <ProfileCard />
         </div>
       )}
@@ -103,7 +103,7 @@ function TeamCard() {
 // owners every payment, everyone else only the ones they recorded.
 function TodayCard() {
   const { t } = useT();
-  const owner = useStaff().role === 'OWNER';
+  const owner = isAdmin(useStaff());
   const [sum, setSum] = useState<Totals | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -216,10 +216,11 @@ function ProfileCard() {
   const { t } = useT();
   const staff = useStaff();
   const rows: [TextKey, string][] = [
-    ['role', t(staff.role)],
+    ['role', staff.roles.map((r) => t(r)).join(' · ')],
     ['email', staff.email],
   ];
-  if (staff.role === 'INSTRUCTOR') rows.push(['tier', staff.pricing_tier ? t(staff.pricing_tier) : t('tierNotSet')]);
+  if (staff.roles.includes('INSTRUCTOR'))
+    rows.push(['tier', staff.pricing_tier ? t(staff.pricing_tier) : t('tierNotSet')]);
   return (
     <Card>
       <h2 className="mb-4 text-sm font-medium text-mute">{t('myProfile')}</h2>

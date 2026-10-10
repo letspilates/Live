@@ -3,10 +3,15 @@
 // comes from the database (current_staff), never from the browser.
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
+import { ADMIN_ROUTES, type AdminPath } from './routes';
 import { supabase } from './supabase';
 
-export type Role = 'OWNER' | 'INSTRUCTOR' | 'STAFF';
-export const ROLES: Role[] = ['OWNER', 'INSTRUCTOR', 'STAFF'];
+export type Role = 'OWNER' | 'ADMIN' | 'STAFF' | 'INSTRUCTOR';
+/** Highest first, the order the database keeps them in. */
+export const ROLES: Role[] = ['OWNER', 'ADMIN', 'STAFF', 'INSTRUCTOR'];
+/** Menus Settings → Admin can switch on for STAFF / INSTRUCTOR. */
+export type Menu = 'schedule' | 'clients' | 'payments';
+export const MENUS: Menu[] = ['schedule', 'clients', 'payments'];
 export type StaffStatus = 'INVITED' | 'ACTIVE' | 'INACTIVE';
 export type PricingTier = 'CERTIFIED' | 'MASTER';
 
@@ -15,8 +20,26 @@ export interface Staff {
   full_name: string;
   email: string;
   role: Role;
+  roles: Role[];
   status: StaffStatus;
   pricing_tier: PricingTier | null;
+  phone: string;
+  address: string;
+  certifications: string;
+  notes: string;
+  /** Menus this person may open (from Settings → Admin). Every menu for OWNER / ADMIN. */
+  menus: Menu[];
+}
+
+/** Owner or admin: every menu, editing, deleting, managing users. */
+export const isAdmin = (s: Pick<Staff, 'roles'>) => s.roles.some((r) => r === 'OWNER' || r === 'ADMIN');
+
+/** Whether this active user may open a portal page (the database enforces the same rules). */
+export function canOpen(s: Staff, path: AdminPath): boolean {
+  const need = ADMIN_ROUTES[path];
+  if (need === 'public' || need === 'staff') return true;
+  if (need === 'owner') return isAdmin(s);
+  return s.menus.includes(need);
 }
 
 export type AuthState =
@@ -62,14 +85,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!supabase || !userId) return;
     let stale = false;
-    supabase.rpc('current_staff').then(({ data, error }) => {
-      if (stale) return;
-      setProfile(
-        error
-          ? { userId, failed: true }
-          : { userId, staff: (data as Staff | null)?.user_id ? (data as Staff) : null },
-      );
-    });
+    Promise.all([supabase.rpc('current_staff'), supabase.from('role_menu_access').select('role, menu')]).then(
+      ([me, access]) => {
+        if (stale) return;
+        const row = me.data as Omit<Staff, 'menus'> | null;
+        if (me.error || access.error) return setProfile({ userId, failed: true });
+        if (!row?.user_id) return setProfile({ userId, staff: null });
+        const roles = row.roles?.length ? row.roles : [row.role];
+        const granted = (access.data as { role: Role; menu: Menu }[]).filter((a) => roles.includes(a.role));
+        const menus = isAdmin({ roles }) ? MENUS : MENUS.filter((m) => granted.some((a) => a.menu === m));
+        setProfile({ userId, staff: { ...row, roles, menus } });
+      },
+    );
     return () => {
       stale = true;
     };

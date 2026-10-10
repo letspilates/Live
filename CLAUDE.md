@@ -128,4 +128,7 @@ Live/                          ← 저장소 루트
 - **관리자 포털 (진행 중):** `ADMIN-PORTAL-MASTER-PLAN.md`. Phase 2(인증·직원 계정)가 Staging에 있음.
   Supabase `studio` 프로젝트 = 스테이징 전용. 운영용 프로젝트는 아직 없음 →
   **운영용 프로젝트를 만들기 전에는 Staging → main 반영 금지** (반영 시 프로덕션 /admin/이 "연결 안 됨" 화면이 됨).
+- **포털 권한 규칙:** 역할은 복수(`staff_profiles.roles`: OWNER/ADMIN/STAFF/INSTRUCTOR). DB에서 전체 권한은 `app.is_owner()`
+  (Owner 또는 Admin), 메뉴 접근은 `app.can('clients'|'payments'|'schedule')` (Settings › Admin access 표 `role_menu_access`).
+  `role = 'OWNER'` 직접 비교 금지. 화면에서는 `isAdmin(staff)`, `canOpen(staff, path)` + `routes.ts`의 규칙. 계획: `docs/admin/USERS-PERMISSIONS-PLAN.md`.
 - 비밀값(secret/service_role 키, DB 비밀번호, ADMIN_KEY)은 저장소·데일리 로그에 절대 쓰지 않는다. Publishable 키만 코드에 둔다.

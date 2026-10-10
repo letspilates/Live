@@ -10,10 +10,19 @@ const STORAGE_KEY = 'sb-prklzkcrhfnnlefvmxhb-auth-token';
 const WIDTHS = { phone: 393, tablet: 820, desktop: 1280 };
 
 const PEOPLE = {
-  OWNER: { user_id: 'u-owner', full_name: 'Calvin Kim', email: 'owner@example.com', role: 'OWNER', status: 'ACTIVE', pricing_tier: null },
-  INSTRUCTOR: { user_id: 'u-ins', full_name: 'Ana Park', email: 'ana@example.com', role: 'INSTRUCTOR', status: 'ACTIVE', pricing_tier: 'MASTER' },
-  STAFF: { user_id: 'u-staff', full_name: 'Sam Lee', email: 'sam@example.com', role: 'STAFF', status: 'ACTIVE', pricing_tier: null },
+  OWNER: { user_id: 'u-owner', full_name: 'Calvin Kim', email: 'owner@example.com', role: 'OWNER', roles: ['OWNER'], status: 'ACTIVE', pricing_tier: null },
+  INSTRUCTOR: { user_id: 'u-ins', full_name: 'Ana Park', email: 'ana@example.com', role: 'INSTRUCTOR', roles: ['INSTRUCTOR'], status: 'ACTIVE', pricing_tier: 'MASTER' },
+  STAFF: { user_id: 'u-staff', full_name: 'Sam Lee', email: 'sam@example.com', role: 'STAFF', roles: ['STAFF'], status: 'ACTIVE', pricing_tier: null },
+  ADMIN: { user_id: 'u-admin', full_name: 'Ada Admin', email: 'ada@example.com', role: 'ADMIN', roles: ['ADMIN', 'INSTRUCTOR'], status: 'ACTIVE', pricing_tier: 'CERTIFIED', phone: '213-555-0100', address: '', certifications: 'GYROTONIC® Level 1', notes: '' },
 };
+// Settings → Admin defaults (role_menu_access rows).
+let ACCESS = [];
+const resetAccess = () => {
+  ACCESS = [{ role: 'STAFF', menu: 'schedule' }, { role: 'STAFF', menu: 'clients' }, { role: 'STAFF', menu: 'payments' },
+    { role: 'INSTRUCTOR', menu: 'clients' }, { role: 'INSTRUCTOR', menu: 'payments' }];
+};
+resetAccess();
+const adminCalls = []; // staff-admin function bodies
 
 let failures = 0;
 const check = (ok, name) => {
@@ -140,8 +149,27 @@ async function open(who, width, path = '') {
   await context.route(`${SUPABASE}/auth/v1/logout**`, (r) => r.fulfill({ status: 204 }));
   await context.route(`${SUPABASE}/rest/v1/rpc/current_staff`, (r) => r.fulfill({ json: staff ?? null }));
   await context.route(`${SUPABASE}/rest/v1/rpc/list_staff`, (r) =>
-    r.fulfill({ json: Object.values(PEOPLE).map((p) => ({ ...p, last_sign_in_at: null })) }),
+    r.fulfill({ json: Object.values(PEOPLE).map((p) => ({ phone: '', address: '', certifications: '', notes: '', ...p, last_sign_in_at: null })) }),
   );
+  await context.route(`${SUPABASE}/rest/v1/role_menu_access?**`, (r) => r.fulfill({ json: ACCESS }));
+  await context.route(`${SUPABASE}/rest/v1/rpc/set_role_menu_access`, (r) => {
+    const b = r.request().postDataJSON();
+    calls.push(['set_role_menu_access', b]);
+    ACCESS = b.p_on ? [...ACCESS, { role: b.p_role, menu: b.p_menu }] : ACCESS.filter((a) => a.role !== b.p_role || a.menu !== b.p_menu);
+    return r.fulfill({ status: 204, body: '' });
+  });
+  await context.route(`${SUPABASE}/rest/v1/rpc/update_staff_user`, (r) => {
+    calls.push(['update_staff_user', r.request().postDataJSON()]);
+    return r.fulfill({ status: 204, body: '' });
+  });
+  await context.route(`${SUPABASE}/functions/v1/staff-admin`, (r) => {
+    const b = r.request().postDataJSON();
+    adminCalls.push(b);
+    if (b.action === 'delete' && b.userId === 'u-ins') {
+      return r.fulfill({ status: 400, json: { error: 'This person has records.', code: 'LPREF' } });
+    }
+    return r.fulfill({ json: {} });
+  });
   for (const [table, rows] of [['training_courses', COURSES], ['training_registrations', REGS]]) {
     await context.route(`${SUPABASE}/rest/v1/${table}?**`, (r) =>
       loadMode === 'fail' ? r.fulfill({ status: 500, json: { message: 'boom' } }) : r.fulfill({ json: rows }),
@@ -271,7 +299,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Trainings' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Payments,Expenses,Reports,Users,Notifications', `${device}: owner menu`);
+    check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Payments,Expenses,Reports,Users,Notifications,Admin access', `${device}: owner menu`);
     if (device === 'desktop') check(await page.locator('aside').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
@@ -339,13 +367,13 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(await page.locator('main').getByText(PEOPLE[who].email).isVisible(), `${who} ${device}: shows own email`);
     check(!(await page.getByText('Team', { exact: true }).count()), `${who} ${device}: no team card`);
     check((await page.getByText('Master').count()) === (who === 'INSTRUCTOR' ? 1 : 0), `${who} ${device}: tier only for instructors`);
-    if (device === 'desktop') check((await navLabels(page)).join() === 'Dashboard,Payments', `${who}: menu is Dashboard + Payments`);
+    if (device === 'desktop') check((await navLabels(page)).join() === 'Dashboard,Clients,Payments', `${who}: menu is Dashboard + Clients + Payments (Settings → Admin defaults)`);
     check(await page.getByText('My payments today').isVisible(), `${who} ${device}: my-today card`);
     check(await noOverflow(page), `${who} ${device}: no sideways scroll`);
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
   }
-  for (const path of ['trainings/', 'users/', 'clients/', 'expenses/', 'reports/', 'notifications/']) {
+  for (const path of ['trainings/', 'users/', 'access/', 'expenses/', 'reports/', 'notifications/']) {
     const { page, context } = await open(who, 1280, path);
     await page.waitForURL(/\/admin\/$/);
     check(!(await page.getByRole('tab').count()), `${who}: /${path} redirects to dashboard`);
@@ -907,6 +935,127 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   await main.getByText(/can be closed after it ends\.$/).waitFor();
   check(await main.getByRole('button', { name: /^Close / }).isDisabled(), `${device} closing: this month cannot be closed`);
   check(errors.length === 0, `${device} closing: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 16. Users: add with details + several roles (invite or password), edit, delete rules
+{
+  adminCalls.length = 0;
+  calls.length = 0;
+  const { page, context, errors } = await open('OWNER', 393, 'users/');
+  await page.getByText('Ana Park').waitFor();
+  check(await page.getByRole('button', { name: 'Add user' }).isVisible(), 'users: button says Add user');
+  check(await page.locator('main ul').getByText('Admin', { exact: true }).isVisible(), 'users: role chips include Admin');
+  await page.getByRole('button', { name: 'Add user' }).click();
+  const dlg = page.locator('dialog[open]');
+  for (const label of ['Email', 'Full name', 'Phone', 'Address', 'Certifications']) {
+    check(await dlg.getByLabel(label, { exact: true }).isVisible(), `add user: ${label} field`);
+  }
+  await dlg.getByLabel('Email', { exact: true }).fill('new@example.com');
+  await dlg.getByLabel('Full name', { exact: true }).fill('Nina New');
+  await dlg.getByLabel('Phone', { exact: true }).fill('310-555-0111');
+  await dlg.getByLabel('Certifications', { exact: true }).fill('Pilates Level 2');
+  await dlg.getByLabel('Staff', { exact: true }).check();
+  check(await dlg.getByLabel('Pricing tier').isVisible(), 'add user: tier shows while Instructor is ticked');
+  check(await dlg.getByLabel('Send an invitation email').isChecked(), 'add user: invitation is the default');
+  check(await noOverflow(page), 'add user: dialog fits the phone');
+  await dlg.getByRole('button', { name: 'Send invitation' }).click();
+  await page.getByText('Invitation sent to Nina New.').waitFor();
+  const inv = adminCalls.at(-1);
+  check(inv?.action === 'invite' && inv.email === 'new@example.com' && inv.profile.roles.join() === 'STAFF,INSTRUCTOR'
+    && inv.profile.phone === '310-555-0111' && /\/staging\/admin\/set-password\/$/.test(inv.redirectTo), 'add user: invite carries details, both roles, return link');
+
+  await page.getByRole('button', { name: 'Add user' }).click();
+  await dlg.getByLabel('Email', { exact: true }).fill('pw@example.com');
+  await dlg.getByLabel('Full name', { exact: true }).fill('Pat Password');
+  await dlg.getByLabel('Set a password now').check();
+  await dlg.getByRole('button', { name: 'Add user' }).click();
+  check(await dlg.getByText('Use a password of at least 8 characters').isVisible() || await dlg.getByText(/at least 8/).first().isVisible(), 'add user: password mode needs a password');
+  await dlg.getByLabel('First password').fill('Temp-pass-123');
+  await dlg.getByRole('button', { name: 'Add user' }).click();
+  await page.getByText('Pat Password can now sign in to the portal.').waitFor();
+  check(adminCalls.at(-1)?.action === 'create' && adminCalls.at(-1)?.password === 'Temp-pass-123', 'add user: password mode creates the login');
+
+  await page.getByRole('button', { name: 'Edit user: Ana Park' }).click();
+  check(await dlg.getByText('ana@example.com').isVisible(), 'edit user: email shown, not editable');
+  await dlg.getByLabel('Address', { exact: true }).fill('1 Main St, Los Angeles');
+  await dlg.getByLabel('Admin', { exact: true }).check();
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByText('Saved.').waitFor();
+  const upd = calls.find(([n]) => n === 'update_staff_user')?.[1];
+  check(upd?.p_user_id === 'u-ins' && upd.p.roles.join() === 'ADMIN,INSTRUCTOR' && upd.p.address === '1 Main St, Los Angeles', 'edit user: saves details and roles');
+
+  await page.getByRole('button', { name: 'Edit user: Ana Park' }).click();
+  await dlg.getByRole('button', { name: 'Delete user' }).click();
+  await page.locator('dialog[open]').last().getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByText(/has records in the studio books/).waitFor();
+  check(true, 'delete: user with records is told to deactivate instead');
+  check(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).isVisible(), 'owner can edit own row');
+  check(errors.length === 0, `users: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 17. Admin: every menu, but owners are off limits
+{
+  const { page, context, errors } = await open('ADMIN', 1280, 'users/');
+  await page.getByText('Ana Park').waitFor();
+  check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Payments,Expenses,Reports,Users,Notifications,Admin access', 'admin: full menu');
+  check(!(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).count()), 'admin: cannot edit the owner');
+  check(await page.getByRole('button', { name: 'Edit user: Ana Park' }).isVisible(), 'admin: can edit others');
+  await page.getByRole('button', { name: 'Add user' }).click();
+  check(await page.locator('dialog[open]').getByLabel('Owner', { exact: true }).isDisabled(), 'admin: cannot hand out the owner role');
+  check(errors.length === 0, `admin: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 18. Settings → Admin: switching a menu off for instructors
+{
+  resetAccess();
+  calls.length = 0;
+  const { page, context, errors } = await open('OWNER', 393, 'access/');
+  await page.getByRole('switch', { name: 'Instructor: Payments' }).waitFor();
+  check(await page.getByRole('switch', { name: 'Staff: Schedule' }).isChecked(), 'access: staff schedule on by default');
+  check(!(await page.getByRole('switch', { name: 'Instructor: Schedule' }).isChecked()), 'access: instructor schedule off by default');
+  check(!(await page.getByRole('switch', { name: /Expenses/ }).count()), 'access: expenses is owners/admins only');
+  check(await noOverflow(page), 'access: table fits the phone');
+  await page.getByRole('switch', { name: 'Instructor: Payments' }).uncheck();
+  await page.getByText(/applies the next time/).waitFor();
+  const c = calls.find(([n]) => n === 'set_role_menu_access')?.[1];
+  check(c?.p_role === 'INSTRUCTOR' && c.p_menu === 'payments' && c.p_on === false, 'access: switch saved');
+  check(errors.length === 0, `access: no page errors ${errors.join(' | ')}`);
+  await context.close();
+
+  const ins = await open('INSTRUCTOR', 1280);
+  check((await navLabels(ins.page)).join() === 'Dashboard,Clients', 'access: instructor loses Payments');
+  check(!(await ins.page.getByText('My payments today').count()), 'access: no payments card without Payments');
+  await ins.context.close();
+  const pay = await open('INSTRUCTOR', 1280, 'payments/');
+  await pay.page.waitForURL(/\/admin\/$/);
+  check(true, 'access: payments page redirects when switched off');
+  await pay.context.close();
+  resetAccess();
+
+  // Clients is view-only for instructors
+  const cl = await open('INSTRUCTOR', 1280, 'clients/');
+  await cl.page.getByText('Mina Cho').first().waitFor();
+  check(!(await cl.page.getByRole('button', { name: /Add client|Import/ }).count()), 'clients: no add or import for instructors');
+  await cl.context.close();
+}
+
+// 19. Dark mode: toggle in the top bar, remembered
+{
+  const { page, context, errors } = await open('OWNER', 393);
+  await page.getByRole('button', { name: 'Dark mode' }).click();
+  check(await page.evaluate(() => document.documentElement.classList.contains('dark')), 'dark: class on <html>');
+  const bg = await page.evaluate(() => getComputedStyle(document.querySelector('main').parentElement.parentElement).backgroundColor);
+  check(bg === 'rgb(21, 20, 17)', `dark: page background is dark (${bg})`);
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  check(await page.getByRole('button', { name: 'Light mode' }).isVisible(), 'dark: remembered after reload');
+  check(await noOverflow(page), 'dark: no sideways scroll');
+  await page.getByRole('button', { name: 'Light mode' }).click();
+  check(!(await page.evaluate(() => document.documentElement.classList.contains('dark'))), 'dark: back to light');
+  check(errors.length === 0, `dark: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 

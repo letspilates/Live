@@ -105,12 +105,16 @@ select t.expect_error('edit: unknown member', 'P0002',
   $$select public.update_member('00000000-0000-0000-0000-00000000ffff', 'X', '', '', '', '', 'ACTIVE')$$);
 reset role;
 
--- Instructors cannot import, edit or read members ---------------------------------------------
+-- Instructors cannot import or edit members; reading follows Settings → Admin (Clients) ------------
 select t.login('00000000-0000-0000-0000-0000000000b1');
 select t.expect_error('instructor: no import', '42501', $$select public.import_members('MINDBODY', '[]')$$);
 select t.expect_error('instructor: no edit', '42501', format($$select public.update_member('%s', 'X', '', '', '', '', 'ACTIVE')$$,
   current_setting('t.mina')));
-select t.check('instructor: members table reads 0 rows', (select count(*) = 0 from public.students));
+select t.check('instructor: Clients menu on by default, reads members', (select count(*) > 0 from public.students));
+reset role;
+delete from public.role_menu_access where role = 'INSTRUCTOR' and menu = 'clients';
+select t.login('00000000-0000-0000-0000-0000000000b1');
+select t.check('instructor: Clients menu off, members table reads 0 rows', (select count(*) = 0 from public.students));
 select t.check('instructor: finds an imported member in search', (select count(*) = 1 and min(phone_last4) = '0100'
   from public.search_students('hannah')));
 reset role;

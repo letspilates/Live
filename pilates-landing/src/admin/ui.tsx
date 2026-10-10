@@ -7,6 +7,7 @@ import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
+  type TextareaHTMLAttributes,
 } from 'react';
 import { CircleAlert, CircleCheck, Info } from 'lucide-react';
 import LogoIcon from '../components/LogoIcon';
@@ -73,6 +74,33 @@ export function TextField({
       {(error || hint) && (
         <p id={noteId} className={`text-sm ${error ? 'text-red-700' : 'text-mute'}`}>
           {error || hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function TextArea({
+  label,
+  hint,
+  ...input
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; hint?: string }) {
+  const id = useId();
+  return (
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="text-sm font-medium text-ink">
+        {label}
+      </label>
+      <textarea
+        id={id}
+        rows={3}
+        aria-describedby={hint ? `${id}-note` : undefined}
+        className={`${inputCls} resize-y`}
+        {...input}
+      />
+      {hint && (
+        <p id={`${id}-note`} className="text-sm text-mute">
+          {hint}
         </p>
       )}
     </div>

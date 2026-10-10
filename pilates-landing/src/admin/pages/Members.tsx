@@ -4,6 +4,7 @@
 // owner-only database functions (import_members / update_member).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Plus, RefreshCw, Search, Upload, X } from 'lucide-react';
+import { isAdmin, useStaff } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
 import { membersFromCsv, type Member, type MemberSource } from '../members';
@@ -44,7 +45,13 @@ const SOURCE_FILTERS: { id: SourceFilter; label: TextKey }[] = [
 function matchesSource(m: Member, f: SourceFilter) {
   const mb = Boolean(m.mindbody_id);
   const sc = Boolean(m.schedulista_key);
-  return f === 'all' || (f === 'mindbody' && mb) || (f === 'schedulista' && sc) || (f === 'both' && mb && sc) || (f === 'portal' && !mb && !sc);
+  return (
+    f === 'all' ||
+    (f === 'mindbody' && mb) ||
+    (f === 'schedulista' && sc) ||
+    (f === 'both' && mb && sc) ||
+    (f === 'portal' && !mb && !sc)
+  );
 }
 
 /** "2026-10-13 18:30:00" (studio time, as exported) → "Tue, Oct 13" */
@@ -52,6 +59,8 @@ const visitDay = (ts: string | null, lang: 'en' | 'ko') => (ts ? formatDay(ts.sl
 
 export default function Members() {
   const { t, lang } = useT();
+  // Staff and instructors with the Clients menu (Settings → Admin) only look; owners/admins edit and import.
+  const admin = isAdmin(useStaff());
   const [members, setMembers] = useState<Member[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [version, setVersion] = useState(0);
@@ -93,7 +102,10 @@ export default function Members() {
   }, [members, query, source, status]);
 
   const counts = useMemo(
-    () => Object.fromEntries(SOURCE_FILTERS.map((f) => [f.id, (members ?? []).filter((m) => matchesSource(m, f.id)).length])),
+    () =>
+      Object.fromEntries(
+        SOURCE_FILTERS.map((f) => [f.id, (members ?? []).filter((m) => matchesSource(m, f.id)).length]),
+      ),
     [members],
   );
 
@@ -108,7 +120,10 @@ export default function Members() {
   const runImport = async () => {
     if (!pending?.rows || busy) return;
     setBusy(true);
-    const { data, error } = await supabase!.rpc('import_members', { p_source: pending.source, p_rows: pending.rows.rows });
+    const { data, error } = await supabase!.rpc('import_members', {
+      p_source: pending.source,
+      p_rows: pending.rows.rows,
+    });
     setBusy(false);
     const name = t(pending.source === 'MINDBODY' ? 'mindbody' : 'schedulista');
     setPending(null);
@@ -116,7 +131,12 @@ export default function Members() {
     const r = data as ImportResult;
     setMessage({
       tone: 'success',
-      text: t('membersImported', { source: name, added: String(r.added), linked: String(r.linked), updated: String(r.updated) }),
+      text: t('membersImported', {
+        source: name,
+        added: String(r.added),
+        linked: String(r.linked),
+        updated: String(r.updated),
+      }),
     });
     setVersion((v) => v + 1);
   };
@@ -130,11 +150,13 @@ export default function Members() {
             <RefreshCw {...ICON} size={16} />
             <span className="sr-only sm:not-sr-only">{t('refresh')}</span>
           </Button>
-          <CsvPicker onText={pickFile} />
-          <Button onClick={() => setOpen({ member: null })}>
-            <Plus {...ICON} size={16} />
-            {t('addStudent')}
-          </Button>
+          {admin && <CsvPicker onText={pickFile} />}
+          {admin && (
+            <Button onClick={() => setOpen({ member: null })}>
+              <Plus {...ICON} size={16} />
+              {t('addStudent')}
+            </Button>
+          )}
         </>
       }
     >
@@ -310,7 +332,11 @@ function CsvPicker({ onText }: { onText: (text: string) => void }) {
 }
 
 function Badge({ tone, children }: { tone: 'mindbody' | 'schedulista' | 'plain'; children: ReactNode }) {
-  const cls = { mindbody: 'bg-sage/15 text-sage-deep', schedulista: 'bg-clay/20 text-ink', plain: 'bg-ink/[0.06] text-mute' }[tone];
+  const cls = {
+    mindbody: 'bg-sage/15 text-sage-deep',
+    schedulista: 'bg-clay/20 text-ink',
+    plain: 'bg-ink/[0.06] text-mute',
+  }[tone];
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>;
 }
 
@@ -325,8 +351,17 @@ function SourceBadges({ m }: { m: Member }) {
   );
 }
 
-function MemberDialog({ member: m, onClose, onSaved }: { member: Member | null; onClose: () => void; onSaved: () => void }) {
+function MemberDialog({
+  member: m,
+  onClose,
+  onSaved,
+}: {
+  member: Member | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const { t, lang } = useT();
+  const admin = isAdmin(useStaff());
   const [form, setForm] = useState({
     full_name: m?.full_name ?? '',
     phone: m?.phone ?? '',
@@ -355,7 +390,9 @@ function MemberDialog({ member: m, onClose, onSaved }: { member: Member | null; 
     if (!form.full_name.trim() || busy) return setError(form.full_name.trim() ? '' : t('enterName'));
     setBusy(true);
     // A new client: add_student creates them (or finds the same name + phone), then the rest is saved.
-    const created = m ? null : await supabase!.rpc('add_student', { p_full_name: form.full_name.trim(), p_phone: form.phone.trim() });
+    const created = m
+      ? null
+      : await supabase!.rpc('add_student', { p_full_name: form.full_name.trim(), p_phone: form.phone.trim() });
     if (created?.error) {
       setBusy(false);
       return setError(t('somethingWrong'));
@@ -442,26 +479,30 @@ function MemberDialog({ member: m, onClose, onSaved }: { member: Member | null; 
           void save();
         }}
       >
-        <TextField label={t('fullName')} maxLength={120} value={form.full_name} onChange={set('full_name')} />
-        <TextField label={t('phone')} type="tel" maxLength={30} value={form.phone} onChange={set('phone')} />
-        <TextField label={t('email')} type="email" maxLength={254} value={form.email} onChange={set('email')} />
-        <TextField label={t('address')} maxLength={300} value={form.address} onChange={set('address')} />
-        <TextField label={t('memberNotes')} maxLength={2000} value={form.notes} onChange={set('notes')} />
-        <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-ink">{t('status')}</span>
-          <select value={form.status} onChange={set('status')} className={inputCls}>
-            <option value="ACTIVE">{t('ACTIVE')}</option>
-            <option value="INACTIVE">{t('INACTIVE')}</option>
-          </select>
-        </label>
+        <fieldset disabled={!admin} className="contents">
+          <TextField label={t('fullName')} maxLength={120} value={form.full_name} onChange={set('full_name')} />
+          <TextField label={t('phone')} type="tel" maxLength={30} value={form.phone} onChange={set('phone')} />
+          <TextField label={t('email')} type="email" maxLength={254} value={form.email} onChange={set('email')} />
+          <TextField label={t('address')} maxLength={300} value={form.address} onChange={set('address')} />
+          <TextField label={t('memberNotes')} maxLength={2000} value={form.notes} onChange={set('notes')} />
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-ink">{t('status')}</span>
+            <select value={form.status} onChange={set('status')} className={inputCls}>
+              <option value="ACTIVE">{t('ACTIVE')}</option>
+              <option value="INACTIVE">{t('INACTIVE')}</option>
+            </select>
+          </label>
+        </fieldset>
         {error && <Notice tone="error">{error}</Notice>}
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>
-            {t('cancel')}
+            {t(admin ? 'cancel' : 'close')}
           </Button>
-          <Button type="submit" disabled={busy}>
-            {busy ? t('saving') : m ? t('save') : t('addStudent')}
-          </Button>
+          {admin && (
+            <Button type="submit" disabled={busy}>
+              {busy ? t('saving') : m ? t('save') : t('addStudent')}
+            </Button>
+          )}
         </div>
       </form>
     </Dialog>

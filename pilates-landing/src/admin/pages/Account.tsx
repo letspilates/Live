@@ -3,7 +3,7 @@ import { useAuth, useStaff } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import Layout, { LangToggle } from '../Layout';
 import { supabase } from '../supabase';
-import { Button, Card, Notice, TextField } from '../ui';
+import { Button, Card, Notice, TextArea, TextField } from '../ui';
 
 type Result = { tone: 'success' | 'error'; key: TextKey } | null;
 
@@ -13,6 +13,11 @@ export default function Account() {
   const { refresh, signOut } = useAuth();
 
   const [name, setName] = useState(staff.full_name);
+  const [phone, setPhone] = useState(staff.phone ?? '');
+  const [address, setAddress] = useState(staff.address ?? '');
+  const [certs, setCerts] = useState(staff.certifications ?? '');
+  // Arrived from an invitation: ask them to check what the owner entered.
+  const welcome = new URLSearchParams(window.location.search).has('welcome');
   const [nameBusy, setNameBusy] = useState(false);
   const [nameResult, setNameResult] = useState<Result>(null);
 
@@ -25,9 +30,11 @@ export default function Account() {
     e.preventDefault();
     if (!name.trim()) return setNameResult({ tone: 'error', key: 'enterName' });
     setNameBusy(true);
-    const { error } = await supabase!.rpc('update_my_name', { p_full_name: name });
+    const { error } = await supabase!.rpc('update_my_profile', {
+      p: { full_name: name, phone, address, certifications: certs },
+    });
     setNameBusy(false);
-    setNameResult(error ? { tone: 'error', key: 'somethingWrong' } : { tone: 'success', key: 'nameSaved' });
+    setNameResult(error ? { tone: 'error', key: 'somethingWrong' } : { tone: 'success', key: 'profileSaved' });
     if (!error) refresh();
   };
 
@@ -50,6 +57,7 @@ export default function Account() {
         <Card>
           <h2 className="mb-4 font-display text-lg font-semibold">{t('profile')}</h2>
           <form onSubmit={saveName} className="flex flex-col gap-4" noValidate>
+            {welcome && !nameResult && <Notice tone="info">{t('welcomeCheckDetails')}</Notice>}
             {nameResult && <Notice tone={nameResult.tone}>{t(nameResult.key)}</Notice>}
             <TextField
               label={t('fullName')}
@@ -58,6 +66,28 @@ export default function Account() {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
+            <TextField
+              label={t('phone')}
+              type="tel"
+              autoComplete="tel"
+              maxLength={50}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            <TextField
+              label={t('address')}
+              autoComplete="street-address"
+              maxLength={300}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+            <TextArea
+              label={t('certifications')}
+              hint={t('certificationsHint')}
+              maxLength={1000}
+              value={certs}
+              onChange={(e) => setCerts(e.target.value)}
+            />
             <dl className="grid gap-1 text-sm">
               <div className="flex gap-2">
                 <dt className="text-mute">{t('email')}:</dt>
@@ -65,11 +95,11 @@ export default function Account() {
               </div>
               <div className="flex gap-2">
                 <dt className="text-mute">{t('role')}:</dt>
-                <dd>{t(staff.role)}</dd>
+                <dd>{staff.roles.map((r) => t(r)).join(' · ')}</dd>
               </div>
             </dl>
             <Button type="submit" variant="secondary" className="self-start" disabled={nameBusy}>
-              {nameBusy ? t('saving') : t('saveName')}
+              {nameBusy ? t('saving') : t('saveProfile')}
             </Button>
           </form>
         </Card>
