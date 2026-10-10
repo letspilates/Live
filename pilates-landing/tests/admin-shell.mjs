@@ -1184,6 +1184,22 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await context.close();
 }
 
+// 20. Sidebar stands apart from the page (light and dark)
+{
+  const { page, context } = await open('OWNER', 1280);
+  for (const mode of ['light', 'dark']) {
+    if (mode === 'dark') await page.getByRole('button', { name: 'Dark mode' }).click();
+    const [side, canvas] = await page.evaluate(() => [
+      getComputedStyle(document.querySelector('aside')).backgroundColor,
+      getComputedStyle(document.querySelector('main').parentElement.parentElement).backgroundColor,
+    ]);
+    check(side !== canvas, `sidebar ${mode}: own background (${side} vs ${canvas})`);
+    await shot(page, `desktop-sidebar-${mode}`);
+  }
+  await page.getByRole('button', { name: 'Light mode' }).click();
+  await context.close();
+}
+
 check(!browserCalledSheet, 'staging never calls the Google Sheet');
 
 await browser.close();

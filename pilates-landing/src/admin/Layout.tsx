@@ -109,7 +109,7 @@ export default function Layout({
       </a>
       {/* Tablet rail (md) / desktop sidebar (lg) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden w-[72px] flex-col bg-canvas md:flex ${
+        className={`fixed inset-y-0 left-0 z-30 hidden w-[72px] flex-col border-r border-ink/[0.08] bg-paper md:flex ${
           collapsed ? '' : 'lg:w-60'
         }`}
       >
@@ -223,7 +223,7 @@ function SidebarContent({
                     aria-current={active ? 'page' : undefined}
                     title={t(key)}
                     className={`flex h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-3 text-sm font-medium transition-colors ${
-                      active ? 'bg-paper text-ink shadow-card ring-1 ring-ink/[0.05]' : 'text-mute hover:bg-ink/[0.04] hover:text-ink'
+                      active ? 'bg-canvas text-ink ring-1 ring-ink/[0.06]' : 'text-mute hover:bg-ink/[0.04] hover:text-ink'
                     }`}
                   >
                     <Icon {...ICON} className={`shrink-0 ${active ? 'text-sage' : ''}`} />
