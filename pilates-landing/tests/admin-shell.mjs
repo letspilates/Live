@@ -426,8 +426,8 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   const { page, context, errors } = await open('INSTRUCTOR', 393, 'payments/');
   check((await page.locator('h1').innerText()) === 'Payments', 'payments: title');
   await page.getByText('Type at least 2 letters').waitFor();
-  check(!(await page.getByRole('button', { name: /New client|New student|Walk-in/ }).count()) && !(await page.getByText('Recently paid').count()),
-    'payments: no new-client, walk-in or recently-paid list');
+  check(await page.getByRole('button', { name: 'Add client' }).isVisible() && !(await page.getByRole('button', { name: /New student|Walk-in/ }).count()) && !(await page.getByText('Recently paid').count()),
+    'payments: staff can add a client; no walk-in or recently-paid list');
   await page.getByRole('button', { name: 'Save payment' }).click();
   check(await page.getByText('Choose a client.').isVisible() && !calls.length, 'payments: nothing saved without a client');
   await page.getByPlaceholder('Search name or phone').fill('mina');
@@ -488,8 +488,20 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   check(other?.p_collected_by === 'u-ben', 'payments: another staff member as the receiver');
   await page.getByRole('button', { name: 'Record another' }).click();
   await page.getByPlaceholder('Search name or phone').fill('Zed Quinn');
-  await page.getByText('No client found. Add them in Clients first').waitFor();
-  check(true, 'payments: unknown name points to Clients');
+  await page.getByText('No client found. Check the spelling, or add them as a new client.').waitFor();
+  calls.length = 0;
+  await page.getByRole('button', { name: 'Add client' }).click();
+  check((await page.getByLabel('Full name').inputValue()) === 'Zed Quinn', 'payments: new client starts with the searched name');
+  await page.getByRole('button', { name: 'Add client' }).click();
+  check(await page.getByText('Enter a phone number.').isVisible() && !calls.length, 'payments: new client needs a phone');
+  await page.getByLabel('Phone').fill('(310) 555-0199');
+  await shot(page, 'phone-add-client');
+  await page.getByRole('button', { name: 'Add client' }).click();
+  await page.getByRole('button', { name: 'Change' }).waitFor();
+  const made = calls.find(([n]) => n === 'add_student')?.[1];
+  check(made?.p_full_name === 'Zed Quinn' && made.p_phone === '(310) 555-0199' && await page.getByText('Zed Quinn').first().isVisible(),
+    'payments: instructor adds a new client and it is selected');
+  check(await noOverflow(page), 'payments: no sideways scroll on add client');
 
   // My history: own rows only; today's can be fixed, yesterday's cannot
     await page.getByRole('tab', { name: 'My history' }).click();
