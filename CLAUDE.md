@@ -91,7 +91,7 @@ Live/                          ← 저장소 루트
 ├── docs/admin/SETUP-KO.md     ← Supabase 설정 가이드 (사장님용)
 ├── supabase/                  ← 관리자 포털 백엔드
 │   ├── migrations/            ← `<타임스탬프>_이름.sql`. Staging push 시 GitHub 연동이 스테이징 DB에 자동 적용
-│   ├── functions/             ← Edge Functions (staff-admin). 같은 연동이 자동 배포
+│   ├── functions/             ← Edge Functions (staff-admin, enrollments-admin). 같은 연동이 자동 배포
 │   ├── config.toml            ← 함수 설정 (verify_jwt=false). Auth 설정은 대시보드에서
 │   └── tests/run-local.sh     ← 임시 Postgres로 마이그레이션 + 권한 테스트
 └── pilates-landing/           ← ★ 사이트 소스 (Vite 앱)
@@ -101,7 +101,7 @@ Live/                          ← 저장소 루트
     │   ├── admin/             ← 관리자 포털 (/admin/*, 별도 진입점, 공개 사이트와 번들 분리)
     │   └── media.ts           ← 이미지 경로 (BASE_URL 기준)
     ├── admin/index.html       ← 관리자 포털 진입 HTML (noindex, CSP)
-    ├── public/admin/legacy/   ← 기존 코스·등록자 관리 페이지 (Apps Script, ADMIN_KEY). 포털 /admin/enrollments/ 안에 iframe으로 표시
+    ├── public/admin/legacy/   ← 기존 코스·등록자 관리 페이지 (Apps Script, ADMIN_KEY). 예비용. 포털 /admin/enrollments/가 대체 (enrollments-admin 함수가 키를 서버에서 붙임)
     ├── tests/admin-shell.mjs  ← 관리자 포털 화면 확인 (Playwright, Supabase 모의). 실행법은 파일 첫 줄
     ├── public/media/          ← 이미지 (webp)
     └── index.html             ← 메타/SEO/구조화 데이터(JSON-LD)

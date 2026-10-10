@@ -123,11 +123,28 @@ Claude가 `Staging`에 push할 때 `supabase/migrations/`의 새 SQL이 **자동
 Claude Code 클라우드 환경 설정 → Network access → **Allowed domains**에 `*.supabase.co` 추가.
 그러면 실제 로그인 토큰으로 "강사가 남의 기록·합계를 못 보는지"를 API에 직접 시험할 수 있다.
 
+## 9단계 — 등록 관리 연결 (비밀 값 1개, 한 번만)
+
+포털의 **등록 관리**(코스 관리·등록자)는 비밀번호를 다시 묻지 않는다. 대신 Supabase 함수 `enrollments-admin`이
+"로그인한 사람이 활성 오너인지" 확인한 뒤, 서버에서 Apps Script 관리자 비밀번호를 붙여 구글 시트에 요청한다.
+그래서 그 비밀번호를 Supabase에 한 번 저장해 두어야 한다 (브라우저에는 절대 내려가지 않음).
+
+1. Supabase 대시보드 → `studio` 프로젝트 → **Edge Functions → Secrets** (또는 Project Settings → Edge Functions).
+2. **Add new secret**
+   - Name: `APPS_SCRIPT_ADMIN_KEY`
+   - Value: 기존 관리자 페이지 비밀번호 (= Apps Script → 프로젝트 설정 → 스크립트 속성의 `ADMIN_KEY` 값)
+3. 저장. 재배포는 필요 없다. 함수 자체는 `Staging` push 때 GitHub 연동이 자동 배포한다.
+4. 확인: https://letspilatesla.com/staging/admin/enrollments/ → 코스 목록이 바로 보이면 완료.
+   - "설정이 한 단계 남았습니다" → 2번 이름 철자 확인.
+   - "비밀번호와 다릅니다" → 값이 Apps Script의 `ADMIN_KEY`와 같은지 확인.
+
+⚠️ 이 값은 채팅·저장소·로그에 쓰지 않는다. 나중에 `ADMIN_KEY`를 바꾸면 여기 값도 같이 바꾼다.
+
 ---
 
 ## 기존 관리자 페이지
 
-- 스테이징: https://letspilatesla.com/staging/admin/legacy/ (기존 비밀번호 그대로).
+- 스테이징: 포털 **등록 관리**가 대신한다 (9단계). 예전 화면 파일 `/staging/admin/legacy/`는 비상용으로만 남아 있다.
 - 프로덕션 https://letspilatesla.com/admin/ 은 main에 반영하기 전까지 **기존 그대로**다.
 - ⚠️ **운영용 Supabase 프로젝트를 만들기 전에는 Staging → main 반영 금지.**
   반영하면 `/admin/`이 "연결되지 않음" 화면이 되고 기존 페이지는 `/admin/legacy/`로 옮겨진다.
