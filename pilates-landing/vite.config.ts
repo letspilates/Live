@@ -33,7 +33,9 @@ function adminPortal(): Plugin {
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
         const [path, query] = (req.url ?? '').split('?')
-        if (/^\/admin\/[\w-]+(\/[\w-]+)*\/?$/.test(path)) {
+        // Only portal routes: /admin/legacy/ is a static page and must stay one.
+        const route = path.match(/^\/admin\/([\w-]+)\/?$/)?.[1]
+        if (route && Object.hasOwn(ADMIN_ROUTES, route)) {
           req.url = '/admin/index.html' + (query ? `?${query}` : '')
         }
         next()

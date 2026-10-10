@@ -29,11 +29,12 @@ export default function Dashboard() {
       {staff.role === 'OWNER' ? (
         <div className="grid gap-4 md:grid-cols-2">
           <TeamCard />
+          <EnrollmentsCard />
         </div>
       ) : (
-        <Card>
-          <p className="text-mute">{t('instructorSoon')}</p>
-        </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <ProfileCard />
+        </div>
       )}
     </Layout>
   );
@@ -89,3 +90,43 @@ function TeamCard() {
   );
 }
 
+// No numbers here yet: enrollment data still lives in the Google Sheet (Phase 4A).
+function EnrollmentsCard() {
+  const { t } = useT();
+  return (
+    <Card className="flex flex-col">
+      <h2 className="mb-4 text-sm font-medium text-mute">{t('navEnrollments')}</h2>
+      <p className="flex-1 text-ink">{t('enrollmentsCardBody')}</p>
+      <Button variant="secondary" className="mt-6 self-start" onClick={() => navigate('enrollments')}>
+        {t('openEnrollments')}
+      </Button>
+    </Card>
+  );
+}
+
+function ProfileCard() {
+  const { t } = useT();
+  const staff = useStaff();
+  const rows: [TextKey, string][] = [
+    ['role', t(staff.role)],
+    ['email', staff.email],
+  ];
+  if (staff.role === 'INSTRUCTOR') rows.push(['tier', staff.pricing_tier ? t(staff.pricing_tier) : t('tierNotSet')]);
+  return (
+    <Card>
+      <h2 className="mb-4 text-sm font-medium text-mute">{t('myProfile')}</h2>
+      <dl className="grid gap-3">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex justify-between gap-4">
+            <dt className="text-sm text-mute">{t(label)}</dt>
+            <dd className="min-w-0 truncate text-sm font-medium">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-5 text-sm text-mute">{t('instructorSoon')}</p>
+      <Button variant="secondary" className="mt-6" onClick={() => navigate('account')}>
+        {t('navAccount')}
+      </Button>
+    </Card>
+  );
+}

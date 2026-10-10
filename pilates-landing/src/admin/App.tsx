@@ -8,12 +8,14 @@ import { ADMIN_ROUTES, type AdminPath } from './routes';
 import { Button, CenteredCard, Notice, Splash } from './ui';
 import Account from './pages/Account';
 import Dashboard from './pages/Dashboard';
+import Enrollments from './pages/Enrollments';
 import Login from './pages/Login';
 import SetPassword from './pages/SetPassword';
 import StaffPage from './pages/Staff';
 
 const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType> = {
   '': Dashboard,
+  enrollments: Enrollments,
   staff: StaffPage,
   account: Account,
 };

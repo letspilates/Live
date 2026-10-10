@@ -3,11 +3,13 @@
 // but the database is what actually enforces access.
 import { useRef, useState, type ReactNode } from 'react';
 import {
+  ClipboardList,
   LayoutDashboard,
   LogOut,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  UserRound,
   Users,
   X,
   type LucideIcon,
@@ -22,6 +24,7 @@ import { Initials } from './ui';
 
 const NAV: { to: AdminPath; label: TextKey; Icon: LucideIcon; roles: Role[] }[] = [
   { to: '', label: 'navDashboard', Icon: LayoutDashboard, roles: ROLES },
+  { to: 'enrollments', label: 'navEnrollments', Icon: ClipboardList, roles: ['OWNER'] },
   { to: 'staff', label: 'navStaff', Icon: Users, roles: ['OWNER'] },
 ];
 
@@ -95,7 +98,7 @@ export default function Layout({
           <button
             type="button"
             onClick={() => drawer.current?.showModal()}
-            className="-ml-2 inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-ink/[0.05] md:hidden"
+            className="-ml-2 inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-ink/[0.05] lg:hidden"
             aria-label={t('menu')}
           >
             <Menu {...ICON} />
@@ -107,7 +110,7 @@ export default function Layout({
             </span>
           )}
           <LangToggle />
-          <AccountButton />
+          <AccountMenu />
         </header>
 
         <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -239,13 +242,59 @@ export function LangToggle() {
   );
 }
 
-function AccountButton() {
+/** Initials in the header open a small menu: who is signed in, account, sign out. */
+function AccountMenu() {
   const { t } = useT();
   const staff = useStaff();
+  const { signOut } = useAuth();
+  const menu = useRef<HTMLDivElement>(null);
+  const close = () => menu.current?.hidePopover();
+
   return (
-    <Link to="account" title={t('navAccount')} className="rounded-full focus-visible:ring-2 focus-visible:ring-sage/40">
-      <Initials name={staff.full_name} className="h-9 w-9 text-xs" />
-      <span className="sr-only">{t('navAccount')}</span>
-    </Link>
+    <>
+      <button
+        type="button"
+        popoverTarget="account-menu"
+        title={t('accountMenu')}
+        className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
+      >
+        <Initials name={staff.full_name} className="h-9 w-9 text-xs" />
+        <span className="sr-only">{t('accountMenu')}</span>
+      </button>
+      {/* Native popover: light dismiss (outside click, Escape) comes from the browser. */}
+      <div
+        ref={menu}
+        id="account-menu"
+        popover="auto"
+        style={{ inset: 'auto 1rem auto auto', top: '4.25rem' }}
+        className="m-0 w-64 rounded-2xl bg-paper p-2 text-ink shadow-[0_12px_32px_rgba(28,26,22,0.12)] ring-1 ring-ink/10"
+      >
+        <div className="px-3 py-2">
+          <p className="truncate text-sm font-medium">{staff.full_name}</p>
+          <p className="truncate text-xs text-mute">{staff.email}</p>
+          <p className="mt-1 text-xs text-mute">{t(staff.role)}</p>
+        </div>
+        <div className="my-1 border-t border-ink/10" />
+        <Link
+          to="account"
+          onNavigate={close}
+          className="flex h-11 items-center gap-3 rounded-xl px-3 text-sm hover:bg-ink/[0.04]"
+        >
+          <UserRound {...ICON} className="shrink-0 text-mute" />
+          {t('navAccount')}
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            close();
+            void signOut();
+          }}
+          className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-ink/[0.04]"
+        >
+          <LogOut {...ICON} className="shrink-0 text-mute" />
+          {t('signOut')}
+        </button>
+      </div>
+    </>
   );
 }

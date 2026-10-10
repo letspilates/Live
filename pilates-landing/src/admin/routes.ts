@@ -5,6 +5,7 @@ export const ADMIN_ROUTES = {
   '': 'staff',
   login: 'public',
   'set-password': 'public',
+  enrollments: 'owner',
   staff: 'owner',
   account: 'staff',
 } as const;
