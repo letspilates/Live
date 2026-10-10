@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLang } from '../i18n/LanguageContext';
+import { HAS_SUPABASE, publicRpc } from '../supabaseProject';
 
 const SHEETS_URL =
   'https://script.google.com/macros/s/AKfycbxGzSZjRnZybJX-kqwsiPAp9UTOLmc4fxx2JKUxIWZgXnJ96c_YRYdMN3M2dgKxWUM4zQ/exec';
@@ -14,10 +15,13 @@ const COURSE_VALUES: Record<string, string> = {
   E: 'E - Gyrotonic® Level 2 Program 1 – Foundation Course',
 };
 
-// Course list managed in the "Courses" tab of the registration spreadsheet
-// (see pilates-landing/apps-script/). Fetched at page load; falls back to the
-// bundled list in translations.ts whenever the endpoint is unreachable.
+// Course list: from Supabase (training_courses, edited in the admin portal) when
+// this build has a Supabase project (staging), otherwise from the "Courses" tab
+// of the registration spreadsheet (see pilates-landing/apps-script/). Fetched at
+// page load; falls back to the bundled list in translations.ts whenever the
+// endpoint is unreachable.
 interface RemoteCourse {
+  uid?: string; // Supabase only
   id: string;
   name_en: string;
   name_kr: string;
@@ -33,7 +37,8 @@ interface RemoteCourse {
   conducted_by?: string;
 }
 
-const COURSES_CACHE_KEY = 'lp-courses-v1';
+// Staging and production share one origin (and so localStorage): separate keys.
+const COURSES_CACHE_KEY = HAS_SUPABASE ? 'lp-courses-sb1' : 'lp-courses-v1';
 
 // "1225" / "$1,050" / "1050.5" 등 어떤 형태로 입력돼도 "$1,225" 형식으로 표시.
 // 숫자로 해석 안 되는 값(예: "TBD")은 입력 그대로 보여준다.
@@ -156,13 +161,19 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
     if (!open && remoteCourses !== null) return; // 페이지 로드 시 1회 + 폼 열 때마다
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => ctrl.abort(), 8000);
-    fetch(`${SHEETS_URL}?t=${Date.now()}`, { signal: ctrl.signal })
-      .then((r) => r.json())
-      .then((j: { result?: string; courses?: RemoteCourse[] }) => {
-        if (j?.result === 'success' && Array.isArray(j.courses) && j.courses.length > 0) {
-          setRemoteCourses(j.courses);
+    const load: Promise<RemoteCourse[] | undefined> = HAS_SUPABASE
+      ? publicRpc<RemoteCourse[]>('public_training_courses', {}, ctrl.signal)
+      : fetch(`${SHEETS_URL}?t=${Date.now()}`, { signal: ctrl.signal })
+          .then((r) => r.json())
+          .then((j: { result?: string; courses?: RemoteCourse[] }) =>
+            j?.result === 'success' ? j.courses : undefined,
+          );
+    load
+      .then((list) => {
+        if (Array.isArray(list) && list.length > 0) {
+          setRemoteCourses(list);
           try {
-            window.localStorage.setItem(COURSES_CACHE_KEY, JSON.stringify(j.courses));
+            window.localStorage.setItem(COURSES_CACHE_KEY, JSON.stringify(list));
           } catch {
             /* storage full/blocked — live data still in state */
           }
@@ -305,12 +316,33 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
       anythingElse: fields.anythingElse.trim(),
     };
     try {
-      await fetch(SHEETS_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(data).toString(),
-      });
+      if (HAS_SUPABASE) {
+        // Saved to training_registrations; the owner sees it in the portal. No emails.
+        await publicRpc('submit_training_registration', {
+          p: {
+            course_ids: courses.map((id) => remoteCourses?.find((c) => c.id === id)?.uid).filter(Boolean),
+            courses_text: data.courses,
+            full_name: data.fullName,
+            email: data.email,
+            phone: data.phone,
+            certification: data.certification,
+            studio: data.studio,
+            city_state: data.cityState,
+            questions: data.questions,
+            stage: data.stage,
+            prereq: data.prereq,
+            availability: data.availability,
+            anything_else: data.anythingElse,
+          },
+        });
+      } else {
+        await fetch(SHEETS_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams(data).toString(),
+        });
+      }
       setSubmitted(true);
       wrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch {

@@ -123,28 +123,28 @@ Claude가 `Staging`에 push할 때 `supabase/migrations/`의 새 SQL이 **자동
 Claude Code 클라우드 환경 설정 → Network access → **Allowed domains**에 `*.supabase.co` 추가.
 그러면 실제 로그인 토큰으로 "강사가 남의 기록·합계를 못 보는지"를 API에 직접 시험할 수 있다.
 
-## 9단계 — 등록 관리 연결 (비밀 값 1개, 한 번만)
+## 9단계 — 구글 시트 내용 옮기기 (한 번만)
 
-포털의 **등록 관리**(코스 관리·등록자)는 비밀번호를 다시 묻지 않는다. 대신 Supabase 함수 `enrollments-admin`이
-"로그인한 사람이 활성 오너인지" 확인한 뒤, 서버에서 Apps Script 관리자 비밀번호를 붙여 구글 시트에 요청한다.
-그래서 그 비밀번호를 Supabase에 한 번 저장해 두어야 한다 (브라우저에는 절대 내려가지 않음).
+지도자 과정 코스·신청은 이제 구글 시트가 아니라 Supabase에 저장된다. 비밀 값 설정은 필요 없다.
+스테이징 신청 폼(https://letspilatesla.com/staging/#register)도 Supabase에 바로 저장하며, 메일은 보내지 않는다.
+기존 시트 내용은 아래처럼 한 번만 옮긴다.
 
-1. Supabase 대시보드 → `studio` 프로젝트 → **Edge Functions → Secrets** (또는 Project Settings → Edge Functions).
-2. **Add new secret**
-   - Name: `APPS_SCRIPT_ADMIN_KEY`
-   - Value: 기존 관리자 페이지 비밀번호 (= Apps Script → 프로젝트 설정 → 스크립트 속성의 `ADMIN_KEY` 값)
-3. 저장. 재배포는 필요 없다. 함수 자체는 `Staging` push 때 GitHub 연동이 자동 배포한다.
-4. 확인: https://letspilatesla.com/staging/admin/enrollments/ → 코스 목록이 바로 보이면 완료.
-   - "설정이 한 단계 남았습니다" → 2번 이름 철자 확인.
-   - "비밀번호와 다릅니다" → 값이 Apps Script의 `ADMIN_KEY`와 같은지 확인.
+1. 구글 시트에서 **Courses 탭**을 연 상태로 **파일 → 다운로드 → 쉼표로 구분된 값(.csv)**.
+2. https://letspilatesla.com/staging/admin/enrollments/ → **코스 관리 → CSV 가져오기** → 1번 파일 선택.
+   코스 카드가 추가된다. 확인한 뒤 **저장**.
+3. 시트의 **신청 탭**(제출시각·신청 과정·이름… 열)도 같은 방법으로 CSV 다운로드.
+4. **등록자 → CSV 가져오기** → 3번 파일 선택. 신청이 코스와 연결되어 목록에 나온다.
+   같은 파일을 두 번 가져와도 중복되지 않는다 (같은 이메일·같은 제출시각은 건너뜀).
 
-⚠️ 이 값은 채팅·저장소·로그에 쓰지 않는다. 나중에 `ADMIN_KEY`를 바꾸면 여기 값도 같이 바꾼다.
+⚠️ CSV 파일에는 신청자 개인정보가 있으니 가져온 뒤 내 컴퓨터에서 지운다. 채팅·저장소에 올리지 않는다.
+예전에 설명한 `APPS_SCRIPT_ADMIN_KEY` 비밀 값은 필요 없다 (저장했다면 지워도 된다).
 
 ---
 
 ## 기존 관리자 페이지
 
-- 스테이징: 포털 **등록 관리**가 대신한다 (9단계). 예전 화면 파일 `/staging/admin/legacy/`는 비상용으로만 남아 있다.
+- 스테이징: 포털 **등록 관리**가 대신한다 (Supabase, 9단계). 예전 화면 파일 `/staging/admin/legacy/`는 구글 시트를 보는 화면이라 스테이징에서는 더 이상 쓰지 않는다.
+- 프로덕션 홈페이지 신청 폼은 main에 반영하기 전까지 계속 구글 시트로 저장한다.
 - 프로덕션 https://letspilatesla.com/admin/ 은 main에 반영하기 전까지 **기존 그대로**다.
 - ⚠️ **운영용 Supabase 프로젝트를 만들기 전에는 Staging → main 반영 금지.**
   반영하면 `/admin/`이 "연결되지 않음" 화면이 되고 기존 페이지는 `/admin/legacy/`로 옮겨진다.

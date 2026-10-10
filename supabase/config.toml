@@ -7,6 +7,3 @@ project_id = "letspilates"
 # function verifies the caller itself (see the comment in its index.ts).
 [functions.staff-admin]
 verify_jwt = false
-
-[functions.enrollments-admin]
-verify_jwt = false

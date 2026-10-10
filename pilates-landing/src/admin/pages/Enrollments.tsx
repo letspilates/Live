@@ -1,38 +1,42 @@
-// Enrollments (owner): training courses and their sign-ups. The data still
-// lives in the Google Sheet behind Apps Script; the enrollments-admin function
-// checks that the caller is an owner and adds the Apps Script key server-side,
-// so there is no second password here.
-import { useEffect, useId, useState, type ReactNode } from 'react';
-import { ChevronDown, Mail, Phone, Plus, RefreshCw, Trash2 } from 'lucide-react';
+// Enrollments (owner): teacher-training courses and their sign-ups, stored in
+// Supabase (training_courses / training_registrations). Owners read the tables
+// directly (RLS); saving and the one-time sheet import go through owner-only
+// database functions. No emails are sent.
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { ChevronDown, Mail, Phone, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import {
   CONDUCTORS,
-  EXPECTED_SCRIPT_VERSION,
   autoOrder,
-  courseIds,
+  coursesFromCsv,
   daysOf,
   earlyState,
+  fromRow,
   money,
-  tagsFor,
-  unmatchedParts,
+  registrationsFromCsv,
+  studioDateTime,
   type Course,
+  type CourseRow,
   type Registration,
 } from '../enrollments';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
-import { functionError, supabase } from '../supabase';
+import { supabase } from '../supabase';
 import { Button, Card, Dialog, Notice, Skeleton, TextField, inputCls } from '../ui';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 
-type Problem = { key: TextKey; detail?: string };
+type Status = { tone: 'ok' | 'error'; text: string } | null;
 
-async function call<T>(body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase!.functions.invoke('enrollments-admin', { body });
-  if (!error) return data as T;
-  const { code, error: detail } = await functionError(error);
-  const key: TextKey =
-    code === 'not_configured' ? 'enrollNotConfigured' : code === 'wrong_key' ? 'enrollWrongKey' : 'sheetLoadFailed';
-  throw { key, detail } satisfies Problem;
+/** Both tables at once: registrations give each course its sign-up count. */
+async function loadAll(): Promise<{ courses: Course[]; regs: Registration[] }> {
+  const [c, r] = await Promise.all([
+    supabase!.from('training_courses').select('*'),
+    supabase!.from('training_registrations').select('*').order('submitted_at', { ascending: false }),
+  ]);
+  if (c.error) throw c.error;
+  if (r.error) throw r.error;
+  const regs = r.data as Registration[];
+  return { courses: (c.data as CourseRow[]).map((row) => fromRow(row, regs)), regs };
 }
 
 /** A course as edited on screen: early-bird switch and day count are form-only. */
@@ -48,6 +52,7 @@ const toDraft = (c: Course): Draft => ({
 });
 
 const BLANK: Course = {
+  uid: '',
   id: '',
   name_en: '',
   name_kr: '',
@@ -67,26 +72,27 @@ const BLANK: Course = {
   desc_kr: '',
 };
 
-/** What Apps Script saves: empty cards dropped, early bird blanked when switched off. */
-function toSheet(drafts: Draft[]) {
+/** What save_training_courses takes: empty cards dropped, early bird blanked when switched off. */
+function toRows(drafts: Draft[]) {
   const filled = drafts.filter((c) => c.name_en.trim() || c.name_kr.trim() || c.dates.trim());
   return autoOrder(filled).map((c) => ({
-    id: c.id,
+    id: c.uid,
+    code: c.id,
     name_en: c.name_en.trim(),
     name_kr: c.name_kr.trim(),
     dates: c.dates.trim(),
-    ...tagsFor(c.days),
-    active: c.active,
+    length_days: /^\d+$/.test(c.days.trim()) ? c.days.trim() : '',
     capacity: String(c.capacity ?? '').trim(),
-    time: c.time.trim(),
+    class_time: c.time.trim(),
     price: c.price.trim(),
     fee: c.fee.trim(),
     fee_early: c.early_on ? c.fee_early.trim() : '',
     early_until: c.early_on ? c.early_until.trim() : '',
     conducted_by: c.conducted_by,
     desc_en: c.desc_en.trim(),
-    // Not editable here, but kept so saving does not wipe it from the sheet.
+    // Not editable here, but kept so saving does not wipe it.
     desc_kr: c.desc_kr,
+    active: c.active,
   }));
 }
 
@@ -95,39 +101,24 @@ export default function Enrollments() {
   const [tab, setTab] = useState<'courses' | 'registrants'>(() =>
     new URLSearchParams(window.location.search).get('tab') === 'registrants' ? 'registrants' : 'courses',
   );
-  const [courses, setCourses] = useState<Course[] | null>(null);
-  const [version, setVersion] = useState('');
-  const [problem, setProblem] = useState<Problem | null>(null);
-  const [regs, setRegs] = useState<Registration[] | null>(null);
+  const [data, setData] = useState<{ courses: Course[]; regs: Registration[] } | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  const fetchCourses = () =>
-    call<{ courses: Course[]; version?: string }>({ action: 'courses' }).then((out) => {
-      setCourses(out.courses);
-      setVersion(out.version ?? '');
-      return out.courses;
+  const reload = () =>
+    loadAll().then((out) => {
+      setData(out);
+      return out;
     });
-  const fetchRegs = () =>
-    call<{ registrations: Registration[] }>({ action: 'registrations' })
-      .then((out) => setRegs(out.registrations ?? []))
-      .catch((p: Problem) => setProblem(p));
 
-  // Courses are needed on both tabs (registrants are matched to them).
   useEffect(() => {
-    fetchCourses().catch((p: Problem) => setProblem(p));
-    if (tab === 'registrants') fetchRegs();
-    // Once, for the tab the page opened on.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadAll()
+      .then(setData)
+      .catch(() => setFailed(true));
   }, []);
-
-  const loadRegs = () => {
-    setRegs(null);
-    fetchRegs();
-  };
 
   const show = (next: typeof tab) => {
     setTab(next);
     window.history.replaceState(null, '', next === 'courses' ? '?' : '?tab=registrants');
-    if (next === 'registrants' && regs === null) loadRegs();
   };
 
   return (
@@ -145,41 +136,39 @@ export default function Enrollments() {
             }`}
           >
             {t(id === 'courses' ? 'tabCourses' : 'tabRegistrants')}
-            {id === 'registrants' && regs && <span className="ml-1.5 tabular-nums opacity-70">{regs.length}</span>}
+            {id === 'registrants' && data && <span className="ml-1.5 tabular-nums opacity-70">{data.regs.length}</span>}
           </button>
         ))}
       </div>
 
-      {problem ? (
+      {failed ? (
         <div className="max-w-2xl">
-          <Notice tone="error">
-            {t(problem.key)}
-            {problem.key === 'sheetLoadFailed' && problem.detail && (
-              <span className="block opacity-80">{problem.detail}</span>
-            )}
-          </Notice>
+          <Notice tone="error">{t('enrollLoadFailed')}</Notice>
           <Button
             variant="secondary"
             className="mt-4"
             onClick={() => {
-              setProblem(null);
-              fetchCourses().catch((p: Problem) => setProblem(p));
-              if (tab === 'registrants') loadRegs();
+              setFailed(false);
+              reload().catch(() => setFailed(true));
             }}
           >
             {t('tryAgain')}
           </Button>
         </div>
-      ) : tab === 'courses' ? (
-        courses ? (
-          <CourseEditor initial={courses} version={version} reload={fetchCourses} />
-        ) : (
-          <ListSkeleton />
-        )
-      ) : regs && courses ? (
-        <Registrants regs={regs} courses={courses} onRefresh={loadRegs} />
-      ) : (
+      ) : !data ? (
         <ListSkeleton />
+      ) : tab === 'courses' ? (
+        <CourseEditor initial={data.courses} reload={() => reload().then((out) => out.courses)} />
+      ) : (
+        <Registrants
+          regs={data.regs}
+          courses={data.courses}
+          onRefresh={() => {
+            setData(null);
+            reload().catch(() => setFailed(true));
+          }}
+          reload={reload}
+        />
       )}
     </Layout>
   );
@@ -199,23 +188,40 @@ function Chip({ tone = 'plain', children }: { tone?: 'plain' | 'sage' | 'clay'; 
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${cls}`}>{children}</span>;
 }
 
+/** Opens the file picker and hands over the chosen CSV file's text. */
+function CsvButton({ onText }: { onText: (text: string) => void }) {
+  const { t } = useT();
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        accept=".csv,text/csv"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          file?.text().then(onText);
+        }}
+      />
+      <Button variant="secondary" onClick={() => input.current?.click()} aria-label={t('importCsv')}>
+        <Upload {...ICON} />
+        <span className="hidden sm:inline">{t('importCsv')}</span>
+      </Button>
+    </>
+  );
+}
+
 /* ───────────── Courses ───────────── */
 
-function CourseEditor({
-  initial,
-  version,
-  reload,
-}: {
-  initial: Course[];
-  version: string;
-  reload: () => Promise<Course[]>;
-}) {
+function CourseEditor({ initial, reload }: { initial: Course[]; reload: () => Promise<Course[]> }) {
   const { t } = useT();
   const [drafts, setDrafts] = useState(() => autoOrder(initial).map(toDraft));
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<{ tone: 'ok' | 'error'; text: string } | null>(() => {
-    // The sheet's letters differ from the schedule order: saving fixes the site.
+  const [status, setStatus] = useState<Status>(() => {
+    // The saved letters differ from the schedule order: saving fixes the site.
     const ordered = autoOrder(initial);
     return ordered.some((c, i) => c.id !== initial[i].id || c.name_en !== initial[i].name_en)
       ? { tone: 'ok', text: t('reordered') }
@@ -243,19 +249,32 @@ function CourseEditor({
     setDirty(true);
   };
 
+  // Old sheet's Courses tab → new cards (names already on screen are skipped). Kept by Save.
+  const importCsv = (text: string) => {
+    const have = new Set(drafts.map((c) => c.name_en.trim().toLowerCase()));
+    const found = coursesFromCsv(text).filter((c) => !have.has(c.name_en.trim().toLowerCase()));
+    if (found.length === 0) {
+      setStatus({ tone: 'error', text: t('nothingImported') });
+      return;
+    }
+    setDrafts((list) => autoOrder([...list, ...found.map(toDraft)]));
+    setDirty(true);
+    setStatus({ tone: 'ok', text: t('coursesImported', { n: String(found.length) }) });
+  };
+
   const save = async () => {
     setBusy(true);
     setStatus(null);
     try {
-      await call({ action: 'saveCourses', courses: toSheet(drafts) });
-      // Read the sheet back: that is what the site now shows.
+      const { error } = await supabase!.rpc('save_training_courses', { p_courses: toRows(drafts) });
+      if (error) throw error;
+      // Read the table back: that is what the site now shows.
       const fresh = await reload();
       setDrafts(autoOrder(fresh).map(toDraft));
       setDirty(false);
       setStatus({ tone: 'ok', text: t('coursesSaved') });
-    } catch (p) {
-      const problem = p as Problem;
-      setStatus({ tone: 'error', text: t('saveFailed', { reason: t(problem.key) }) });
+    } catch (e) {
+      setStatus({ tone: 'error', text: t('saveFailed', { reason: (e as { message?: string }).message ?? '' }) });
     } finally {
       setBusy(false);
     }
@@ -264,7 +283,8 @@ function CourseEditor({
   return (
     <>
       <div className="max-w-3xl">
-        <div className="mb-4 flex justify-end">
+        <div className="mb-4 flex justify-end gap-3">
+          <CsvButton onText={importCsv} />
           <Button variant="secondary" onClick={add}>
             <Plus {...ICON} />
             {t('addCourse')}
@@ -274,6 +294,7 @@ function CourseEditor({
         {drafts.length === 0 ? (
           <Card>
             <p className="text-mute">{t('noCourses')}</p>
+            <p className="mt-2 text-sm text-mute">{t('importCoursesHint')}</p>
           </Card>
         ) : (
           <div className="grid gap-4">
@@ -298,12 +319,6 @@ function CourseEditor({
               >
                 {t('openSignupForm')}
               </a>
-            </li>
-            <li>
-              {t('scriptVersion', { v: version || '?' })}
-              {version !== EXPECTED_SCRIPT_VERSION && (
-                <span className="mt-1 block text-ink">{t('scriptOld', { v: EXPECTED_SCRIPT_VERSION })}</span>
-              )}
             </li>
           </ul>
         </aside>
@@ -526,7 +541,7 @@ function CourseCard({
             onChange={(e) => set({ conducted_by: e.target.value })}
           >
             <option value="">{t('notSelected')}</option>
-            {/* Keep a value typed in the sheet even if it is not one of the usual names. */}
+            {/* Keep a saved value even if it is not one of the usual names. */}
             {[...new Set([...CONDUCTORS, c.conducted_by].filter(Boolean))].map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -534,12 +549,7 @@ function CourseCard({
             ))}
           </select>
         </div>
-        <TextField
-          label={t('descEn')}
-          placeholder="Course description shown in the welcome email"
-          value={c.desc_en}
-          onChange={(e) => set({ desc_en: e.target.value })}
-        />
+        <TextField label={t('descEn')} value={c.desc_en} onChange={(e) => set({ desc_en: e.target.value })} />
         <label className="flex min-h-11 cursor-pointer items-center gap-3 border-t border-ink/10 pt-4 text-sm font-medium">
           <input
             type="checkbox"
@@ -560,26 +570,60 @@ function CourseCard({
 /* ───────────── Registrants ───────────── */
 
 const DETAIL_ROWS: [keyof Registration, TextKey][] = [
-  ['courses', 'regCourses'],
+  ['courses_text', 'regCourses'],
   ['certification', 'certification'],
   ['studio', 'studio'],
-  ['cityState', 'cityState'],
+  ['city_state', 'cityState'],
   ['stage', 'stage'],
   ['prereq', 'prereq'],
   ['availability', 'availability'],
   ['questions', 'questions'],
-  ['anythingElse', 'anythingElse'],
+  ['anything_else', 'anythingElse'],
 ];
 
-function Registrants({ regs, courses, onRefresh }: { regs: Registration[]; courses: Course[]; onRefresh: () => void }) {
+function Registrants({
+  regs,
+  courses,
+  onRefresh,
+  reload,
+}: {
+  regs: Registration[];
+  courses: Course[];
+  onRefresh: () => void;
+  reload: () => Promise<unknown>;
+}) {
   const { t } = useT();
   const [filter, setFilter] = useState('');
-  const ids = [...new Set(regs.flatMap((r) => courseIds(r.courses, courses)))].sort();
-  const current = ids.includes(filter) ? filter : '';
-  const list = current ? regs.filter((r) => courseIds(r.courses, courses).includes(current)) : regs;
-  const label = (cid: string) => {
-    const c = courses.find((x) => x.id === cid);
-    return c ? `${cid} · ${c.name_en}` : cid;
+  const [status, setStatus] = useState<Status>(null);
+  const byUid = new Map(courses.map((c) => [c.uid, c]));
+  const countOf = (uid: string) => regs.filter((r) => r.course_ids.includes(uid)).length;
+  const used = [...courses]
+    .sort((a, b) => a.id.length - b.id.length || a.id.localeCompare(b.id))
+    .filter((c) => countOf(c.uid) > 0);
+  const current = used.some((c) => c.uid === filter) ? filter : '';
+  const list = current ? regs.filter((r) => r.course_ids.includes(current)) : regs;
+  const label = (c: Course) => `${c.id} · ${c.name_en || c.name_kr}`;
+
+  // Old sheet's sign-ups tab → import_training_registrations. Rows already there are skipped.
+  const importCsv = async (text: string) => {
+    if (courses.length === 0) {
+      setStatus({ tone: 'error', text: t('saveCoursesFirst') });
+      return;
+    }
+    const { rows, skipped } = registrationsFromCsv(text, courses);
+    let added = 0;
+    if (rows.length) {
+      const { data, error } = await supabase!.rpc('import_training_registrations', { p_rows: rows });
+      if (error) {
+        setStatus({ tone: 'error', text: t('importFailed', { reason: error.message }) });
+        return;
+      }
+      added = Number(data) || 0;
+    }
+    const parts = [added ? t('regsImported', { n: String(added) }) : t('nothingImported')];
+    if (skipped) parts.push(t('rowsSkipped', { n: String(skipped) }));
+    setStatus({ tone: added ? 'ok' : 'error', text: parts.join(' ') });
+    if (added) await reload();
   };
 
   return (
@@ -594,41 +638,50 @@ function Registrants({ regs, courses, onRefresh }: { regs: Registration[]; cours
           <option value="">
             {t('allCourses')} ({t('peopleCount', { n: String(regs.length) })})
           </option>
-          {ids.map((cid) => (
-            <option key={cid} value={cid}>
-              {label(cid)} (
-              {t('peopleCount', { n: String(regs.filter((r) => courseIds(r.courses, courses).includes(cid)).length) })})
+          {used.map((c) => (
+            <option key={c.uid} value={c.uid}>
+              {label(c)} ({t('peopleCount', { n: String(countOf(c.uid)) })})
             </option>
           ))}
         </select>
+        <CsvButton onText={importCsv} />
         <Button variant="secondary" onClick={onRefresh} aria-label={t('refresh')}>
           <RefreshCw {...ICON} />
           <span className="hidden sm:inline">{t('refresh')}</span>
         </Button>
       </div>
 
+      {status && (
+        <p role="status" className={`mb-4 text-sm ${status.tone === 'error' ? 'text-red-700' : 'text-sage-deep'}`}>
+          {status.text}
+        </p>
+      )}
+
       {list.length === 0 ? (
         <Card>
           <p className="text-mute">{t('noRegistrants')}</p>
+          {regs.length === 0 && <p className="mt-2 text-sm text-mute">{t('importRegsHint')}</p>}
         </Card>
       ) : (
         <ul className="grid gap-3">
-          {list.map((r, i) => {
-            const bad = unmatchedParts(r.courses, courses);
+          {list.map((r) => {
+            const matched = r.course_ids.flatMap((uid) => byUid.get(uid) ?? []);
+            // Not matched to a course (or one was deleted since): show what the applicant picked.
+            const lost = matched.length === 0 || matched.length < r.course_ids.length;
             return (
-              <li key={`${r.timestamp}-${r.email}-${i}`}>
+              <li key={r.id}>
                 <Card className="!p-4 sm:!p-5">
                   <div className="flex items-baseline justify-between gap-3">
-                    <p className="min-w-0 truncate font-medium">{r.fullName || t('noName')}</p>
-                    <p className="shrink-0 text-xs tabular-nums text-mute">{r.timestamp}</p>
+                    <p className="min-w-0 truncate font-medium">{r.full_name || t('noName')}</p>
+                    <p className="shrink-0 text-xs tabular-nums text-mute">{studioDateTime(r.submitted_at)}</p>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {courseIds(r.courses, courses).map((cid) => (
-                      <Chip key={cid} tone="sage">
-                        {label(cid)}
+                    {matched.map((c) => (
+                      <Chip key={c.uid} tone="sage">
+                        {label(c)}
                       </Chip>
                     ))}
-                    {bad.length > 0 && <Chip tone="clay">{t('unmatched', { list: bad.join(', ') })}</Chip>}
+                    {lost && r.courses_text && <Chip tone="clay">{t('unmatched', { list: r.courses_text })}</Chip>}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {r.phone && (
@@ -653,7 +706,7 @@ function Registrants({ regs, courses, onRefresh }: { regs: Registration[]; cours
                       {DETAIL_ROWS.filter(([f]) => r[f]).map(([f, key]) => (
                         <div key={f} className="grid gap-0.5 sm:grid-cols-[9rem_1fr] sm:gap-3">
                           <dt className="text-mute">{t(key)}</dt>
-                          <dd className="whitespace-pre-line break-words">{r[f]}</dd>
+                          <dd className="whitespace-pre-line break-words">{String(r[f])}</dd>
                         </div>
                       ))}
                     </dl>

@@ -68,3 +68,16 @@ iframe 방식은 화면 안의 화면 + 두 번째 비밀번호 + 별도 로그�
   Apps Script와 라이브 사이트의 `ADMIN_KEY`는 그대로.
 - 예전 화면은 한국어 설명(`desc_kr`)을 저장 때 지웠는데, 새 화면은 유지한다.
 - 사장님 할 일: SETUP-KO.md 9단계 (비밀 값 1개 저장).
+
+## 8. 변경 (2026-10-10, Calvin: "구글 시트로 운영 안 함", "메일 없이")
+
+7번의 시트 연결 함수(`enrollments-admin`, 비밀 값)는 삭제했다. 지도자 과정 데이터는 Supabase로 옮겼다.
+- 테이블 `training_courses`, `training_registrations` (마이그레이션 `20261010155554_training_enrollments.sql`).
+  오너만 읽기(RLS). 쓰기는 오너 전용 함수 `save_training_courses`(목록 통째 저장), `import_training_registrations`(시트 CSV 1회 가져오기).
+- 공개 함수 2개만 로그인 없이 실행 가능: `public_training_courses`(열린 코스 + 신청 수), `submit_training_registration`(신청 1건, 열린 코스만).
+  `app.check_api_exposure()`가 이 둘 외의 노출을 계속 막는다. 테스트: `supabase/tests/training.test.sql`.
+- 포털 등록 관리: 테이블을 바로 읽고 함수로 저장. 신청은 코스 id(uuid)로 연결되어 글자(A, B…)가 바뀌어도 따라간다.
+  매칭 안 된 신청은 신청 당시 문구(`courses_text`)를 보여 준다. 시트 CSV 가져오기 버튼 (코스 → 편집기에 추가 후 저장, 신청 → 바로 저장, 중복 건너뜀).
+- 홈페이지 신청 폼: Supabase 프로젝트가 있는 빌드(스테이징)는 Supabase로, 프로덕션은 운영 프로젝트가 생길 때까지 구글 시트 그대로.
+  화면 변경 없음. 메일 발송 없음 (스테이징 신청은 포털에서만 확인).
+- 공통 설정 `src/supabaseProject.ts` (URL·publishable 키, 라이브러리 없이 fetch) → 홈페이지 번들에 supabase-js가 들어가지 않는다.
