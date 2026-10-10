@@ -4,6 +4,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import {
   ClipboardList,
+  Contact,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -26,6 +27,7 @@ import { Initials } from './ui';
 const NAV: { to: AdminPath; label: TextKey; Icon: LucideIcon; roles: Role[] }[] = [
   { to: '', label: 'navDashboard', Icon: LayoutDashboard, roles: ROLES },
   { to: 'daily-income', label: 'navDailyIncome', Icon: Wallet, roles: ROLES },
+  { to: 'members', label: 'navMembers', Icon: Contact, roles: ['OWNER'] },
   { to: 'enrollments', label: 'navEnrollments', Icon: ClipboardList, roles: ['OWNER'] },
   { to: 'staff', label: 'navStaff', Icon: Users, roles: ['OWNER'] },
 ];

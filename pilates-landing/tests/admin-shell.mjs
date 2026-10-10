@@ -63,6 +63,20 @@ const PAYMENTS = [
   pay({ id: 'p-5', amount_cents: 4000, method: 'VENMO', payer_name: 'Old Friend', business_date: LA_YESTERDAY, recorded_by: 'u-ins', recorded_by_name: 'Ana Park', recorded_at: new Date(Date.now() - 864e5).toISOString() }),
 ];
 const calls = []; // [rpc name, body]
+
+// Members (fake people)
+const member = (m) => ({ phone: '', email: '', address: '', notes: '', status: 'ACTIVE', created_at: '2026-10-10T00:00:00Z', mindbody_id: null,
+  mindbody_imported_at: null, schedulista_key: null, schedulista_imported_at: null, schedulista_last_visit: null, schedulista_next_visit: null,
+  schedulista_visits: null, schedulista_services: [], schedulista_notes: '', ...m });
+const MEMBERS = [
+  member({ id: 's-mina', full_name: 'Mina Cho', phone: '(213) 555-0142', email: 'mina@example.com', mindbody_id: '165', mindbody_imported_at: '2026-10-10T19:00:00Z',
+    schedulista_key: 'mina cho|2135550142', schedulista_imported_at: '2026-10-10T19:00:00Z', schedulista_last_visit: '2026-09-18 18:30:00',
+    schedulista_next_visit: '2026-10-13 18:30:00', schedulista_visits: 44, schedulista_services: ['Private with Sunnie'], schedulista_notes: 'Knee' }),
+  member({ id: 's-leo', full_name: 'Leo Park', phone: '3105550199', mindbody_id: '46', mindbody_imported_at: '2026-10-10T19:00:00Z' }),
+  member({ id: 's-sara', full_name: 'Sara Kim', phone: '3105550100', schedulista_key: 'sara kim|3105550100', schedulista_visits: 3 }),
+  member({ id: 's-zed', full_name: 'Zed Quinn', status: 'INACTIVE' }),
+  member({ id: 's-new', full_name: 'Walk Newman' }),
+];
 let duplicateOnce = false;
 
 /** A page signed in as `who` (or signed out when null) at the given width. */
@@ -114,6 +128,7 @@ async function open(who, width, path = '') {
   await context.route(`${SUPABASE}/rest/v1/payment_transactions?**`, (r) => {
     const q = new URL(r.request().url()).searchParams;
     if (q.get('related_transaction_id')) return r.fulfill({ json: [] });
+    if (q.get('student_id')) return r.fulfill({ json: PAYMENTS.filter((p) => `eq.${p.student_id}` === q.get('student_id')) });
     const [from, to] = q.getAll('business_date').map((v) => v.slice(4));
     // RLS stand-in: staff see only what they recorded.
     const rows = PAYMENTS.filter((p) => (who === 'OWNER' || p.recorded_by === staff?.user_id)
@@ -127,6 +142,13 @@ async function open(who, width, path = '') {
     const q = (r.request().postDataJSON().p_query ?? '').toLowerCase();
     return r.fulfill({ json: q.length < 2 ? HITS.filter((h) => h.last_paid_on) : HITS.filter((h) => h.full_name.toLowerCase().includes(q)) });
   });
+  await context.route(`${SUPABASE}/rest/v1/students?**`, (r) => r.fulfill({ json: MEMBERS }));
+  for (const name of ['import_members', 'update_member']) {
+    await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
+      calls.push([name, r.request().postDataJSON()]);
+      return r.fulfill({ json: name === 'import_members' ? { added: 2, linked: 1, updated: 0, skipped: 0 } : null });
+    });
+  }
   for (const name of ['add_student', 'record_payment', 'correct_payment', 'void_payment', 'record_refund']) {
     await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
       const body = r.request().postDataJSON();
@@ -174,7 +196,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Enrollments' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Daily Income,Enrollments,Staff', `${device}: owner menu`);
+    check((await navLabels(page)).join() === 'Dashboard,Daily Income,Members,Enrollments,Staff', `${device}: owner menu`);
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
     } else {
@@ -247,7 +269,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
   }
-  for (const path of ['enrollments/', 'staff/']) {
+  for (const path of ['enrollments/', 'staff/', 'members/']) {
     const { page, context } = await open(who, 1280, path);
     await page.waitForURL(/\/admin\/$/);
     check(!(await page.getByRole('tab').count()), `${who}: /${path} redirects to dashboard`);
@@ -503,6 +525,71 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     check(await page.getByText('Today', { exact: true }).isVisible() && await page.getByText('$230.00').isVisible() && await page.getByText('2 payments · Refunds −$20.00').isVisible(), 'owner dashboard: today card');
   }
   check(errors.length === 0, `${device} owner daily income: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 11. Members: one list from Mindbody + Schedulista, source shown, CSV import
+for (const [device, width] of Object.entries(WIDTHS)) {
+  calls.length = 0;
+  const { page, context, errors } = await open('OWNER', width, 'members/');
+  await page.getByText('Mina Cho').waitFor();
+  check((await page.locator('h1').innerText()) === 'Members', `${device} members: title`);
+  const mina = page.getByRole('button', { name: /Mina Cho/ });
+  check(await mina.getByText('Mindbody').isVisible() && await mina.getByText('Schedulista').isVisible(), `${device} members: both sources shown on a member`);
+  check(!(await page.getByText('Zed Quinn').count()), `${device} members: inactive hidden by default`);
+  check(await page.getByRole('button', { name: /^Mindbody/ }).innerText() === 'Mindbody2', `${device} members: Mindbody count`);
+  await page.getByRole('button', { name: /^Schedulista/ }).click();
+  check(!(await page.getByText('Leo Park').count()) && await page.getByText('Sara Kim').isVisible(), `${device} members: Schedulista filter`);
+  await page.getByRole('button', { name: /^Added here/ }).click();
+  check(await page.getByText('Walk Newman').isVisible() && !(await page.getByText('Mina Cho').count()), `${device} members: added-here filter`);
+  await page.getByRole('button', { name: /^All/ }).click();
+  await page.getByPlaceholder('Search name, phone or email').fill('555-0199');
+  check(await page.getByText('Leo Park').isVisible() && !(await page.getByText('Mina Cho').count()), `${device} members: search by phone`);
+  await page.getByPlaceholder('Search name, phone or email').fill('');
+  check(await noOverflow(page), `${device} members: no sideways scroll`);
+  await shot(page, `${device}-members`);
+
+  if (device === 'phone') {
+    await page.getByRole('button', { name: /Mina Cho/ }).click();
+    const dialog = page.locator('dialog[open]');
+    check(await dialog.getByText('From Mindbody').isVisible() && await dialog.getByText('165').isVisible(), 'member: Mindbody section with ID');
+    check(await dialog.getByText('From Schedulista').isVisible() && await dialog.getByText('Private with Sunnie').isVisible() && await dialog.getByText('44').isVisible(), 'member: Schedulista visits and services');
+    await shot(page, 'phone-member');
+    await dialog.getByLabel('Notes').fill('Prefers mornings');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await page.getByText('Member saved.').waitFor();
+    const upd = calls.find(([n]) => n === 'update_member')?.[1];
+    check(upd?.p_id === 's-mina' && upd.p_notes === 'Prefers mornings' && upd.p_status === 'ACTIVE', 'member: edit saved');
+  }
+
+  if (device === 'desktop') {
+    const file = page.locator('input[type="file"]');
+    // Mindbody: column numbers above the header, footer at the end
+    const mb = '﻿0,1,2,3,4,5,6,7,8,9,10,11,12\nLast name,First name,Nickname,ID,Address,City,State,Postal code,Country,Mobile phone,Home phone,Work phone,Email\n' +
+      'Cho,Mina,,165,1 Main St,Los Angeles,CA,90010,US,2135550142,,,mina@example.com\n,Ana Woo,,46,,,,,US,,3105550000,,\n' +
+      'Total records: 2,Total records: 2,Total records: 2,Total records: 2,,,,,,,,,\n';
+    await file.setInputFiles({ name: 'mindbody_clients.csv', mimeType: 'text/csv', buffer: Buffer.from(mb) });
+    await page.getByText('This is a Mindbody client export with 2 people').waitFor();
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByText('Mindbody import done: 2 new, 1 joined').waitFor();
+    const mbCall = calls.find(([n]) => n === 'import_members')?.[1];
+    check(mbCall?.p_source === 'MINDBODY' && mbCall.p_rows.length === 2, 'import: Mindbody detected, footer left out');
+    check(mbCall?.p_rows[0].mindbody_id === '165' && mbCall.p_rows[0].full_name === 'Mina Cho' && mbCall.p_rows[0].address === '1 Main St, Los Angeles, CA, 90010', 'import: Mindbody fields');
+    check(mbCall?.p_rows[1].full_name === 'Ana Woo' && mbCall.p_rows[1].phone === '3105550000', 'import: name in first-name column, home phone fallback');
+    calls.length = 0;
+    const sc = 'First Name,Last Name,Email,Phone,Last Appointment,Next Appointment,Appointment Count,Services,Client Notes\n' +
+      'Mina,Cho,,2135550142,2026-09-18 18:30:00,,44,"[""All"", ""Private with Sunnie ""]",Knee\n';
+    await file.setInputFiles({ name: 'schedulista_clients.csv', mimeType: 'text/csv', buffer: Buffer.from(sc) });
+    await page.getByText('This is a Schedulista client export with 1 people').waitFor();
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByText('Schedulista import done').waitFor();
+    const scRow = calls.find(([n]) => n === 'import_members')?.[1];
+    check(scRow?.p_source === 'SCHEDULISTA' && scRow.p_rows[0].visits === '44' && scRow.p_rows[0].last_visit === '2026-09-18 18:30:00'
+      && scRow.p_rows[0].services.join() === 'Private with Sunnie' && scRow.p_rows[0].notes === 'Knee', 'import: Schedulista fields, "All" dropped');
+    await file.setInputFiles({ name: 'other.csv', mimeType: 'text/csv', buffer: Buffer.from('a,b\n1,2\n') });
+    check(await page.getByText('not a Mindbody or Schedulista client export').isVisible(), 'import: other files refused');
+  }
+  check(errors.length === 0, `${device} members: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 

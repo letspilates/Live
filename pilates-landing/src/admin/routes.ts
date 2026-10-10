@@ -6,6 +6,7 @@ export const ADMIN_ROUTES = {
   login: 'public',
   'set-password': 'public',
   'daily-income': 'staff',
+  members: 'owner',
   enrollments: 'owner',
   staff: 'owner',
   account: 'staff',

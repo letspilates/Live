@@ -11,12 +11,14 @@ import DailyIncome from './pages/DailyIncome';
 import Dashboard from './pages/Dashboard';
 import Enrollments from './pages/Enrollments';
 import Login from './pages/Login';
+import Members from './pages/Members';
 import SetPassword from './pages/SetPassword';
 import StaffPage from './pages/Staff';
 
 const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType> = {
   '': Dashboard,
   'daily-income': DailyIncome,
+  members: Members,
   enrollments: Enrollments,
   staff: StaffPage,
   account: Account,
