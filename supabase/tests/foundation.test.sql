@@ -1,4 +1,4 @@
--- Tests for 0001_foundation (run with supabase/tests/run-local.sh).
+-- Tests for the foundation migration (run with supabase/tests/run-local.sh).
 -- Everything happens inside one transaction that is rolled back at the end.
 
 \set ON_ERROR_STOP 1
@@ -168,4 +168,4 @@ reset role;
 select app.check_api_exposure();
 
 rollback;
-\echo 0001_foundation: all checks passed
+\echo foundation: all checks passed

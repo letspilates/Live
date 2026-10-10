@@ -1,5 +1,5 @@
 -- ============================================================================
--- Let's Pilates Admin Portal · 0001 foundation
+-- Let's Pilates Admin Portal · foundation migration
 -- Staff accounts (OWNER / INSTRUCTOR), audit log, permission helpers.
 --
 -- Applied by the Supabase GitHub integration when this file reaches the
