@@ -11,7 +11,7 @@ export const EMAIL_LINK = new URLSearchParams(window.location.hash.slice(1));
 const PROJECTS = {
   staging: {
     url: 'https://prklzkcrhfnnlefvmxhb.supabase.co',
-    publishableKey: '',
+    publishableKey: 'sb_publishable_f8xs6ixyPvqZGjf3nGl_1Q_7dj0CQZL',
   },
   // Created before real payments are recorded (master plan, Phase 5).
   production: { url: '', publishableKey: '' },
