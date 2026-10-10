@@ -5,6 +5,7 @@ import { useRef, useState, type ReactNode } from 'react';
 import {
   BarChart3,
   Bell,
+  BookOpen,
   ClipboardList,
   Contact,
   LayoutDashboard,
@@ -42,6 +43,7 @@ export const NAV: { group: TextKey; items: NavItem[] }[] = [
       { to: '', label: 'navDashboard', Icon: LayoutDashboard },
       { to: 'clients', label: 'navClients', Icon: Contact },
       { to: 'trainings', label: 'navTrainings', Icon: ClipboardList },
+      { to: 'knowledge', label: 'navKnowledge', Icon: BookOpen },
     ],
   },
   {

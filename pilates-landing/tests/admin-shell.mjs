@@ -126,6 +126,17 @@ function report(from, to) {
     months };
 }
 
+// Knowledge library: a YouTube link, an uploaded PDF, a Vimeo video.
+const KNOWLEDGE = [
+  { id: 'k-1', category: 'PILATES', kind: 'VIDEO', title: 'Reformer footwork', description: 'Week 1 basics', link_url: 'https://www.youtube.com/watch?v=abcDEF12345',
+    file_path: null, file_name: null, file_size: null, created_at: '2026-10-10T20:00:00Z' },
+  { id: 'k-2', category: 'GYROTONIC', kind: 'DOCUMENT', title: 'Gyrotonic Level 1 manual', description: '', link_url: null,
+    file_path: 'f1/manual.pdf', file_name: 'manual.pdf', file_size: 2400000, created_at: '2026-10-09T20:00:00Z' },
+  { id: 'k-3', category: 'GYROTONIC', kind: 'VIDEO', title: 'Arch and curl', description: '', link_url: 'https://vimeo.com/123456789/abcdef1234',
+    file_path: null, file_name: null, file_size: null, created_at: '2026-10-08T20:00:00Z' },
+];
+const knowledgeCalls = [];
+
 /** A page signed in as `who` (or signed out when null) at the given width. */
 async function open(who, width, path = '') {
   const context = await browser.newContext({ viewport: { width, height: width < 768 ? 852 : 900 } });
@@ -141,7 +152,8 @@ async function open(who, width, path = '') {
       user,
     };
     await context.addInitScript(
-      ([key, value]) => window.localStorage.setItem(key, value),
+      // Also runs in embedded players, where storage is blocked.
+      ([key, value]) => { try { window.localStorage.setItem(key, value); } catch { /* other origin */ } },
       [STORAGE_KEY, JSON.stringify(session)],
     );
     await context.route(`${SUPABASE}/auth/v1/user`, (r) => r.fulfill({ json: user }));
@@ -263,6 +275,22 @@ async function open(who, width, path = '') {
       closed_at: '2026-10-03T16:12:00Z', reopened_at: periodClosed ? null : '2026-10-04T16:12:00Z', reopen_reason: periodClosed ? '' : 'Fix a typo' };
     return r.fulfill({ json: month === `eq.${LAST_MONTH}` && finance.some(([f]) => f !== 'finance_report') ? [row] : [] });
   });
+  await context.route(`${SUPABASE}/rest/v1/knowledge_items?**`, (r) => r.fulfill({ json: KNOWLEDGE }));
+  await context.route(`${SUPABASE}/storage/v1/object/sign/knowledge`, (r) =>
+    r.fulfill({ json: r.request().postDataJSON().paths.map((path) => ({ path, signedURL: `/object/sign/knowledge/${path}?token=t`, error: null })) }),
+  );
+  await context.route(`${SUPABASE}/storage/v1/object/knowledge**`, (r) => {
+    knowledgeCalls.push(['storage', r.request().method(), decodeURIComponent(r.request().url())]);
+    return r.fulfill({ json: { Key: 'knowledge/x', Id: 'x' } });
+  });
+  for (const name of ['save_knowledge_item', 'delete_knowledge_item']) {
+    await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
+      knowledgeCalls.push([name, r.request().postDataJSON()]);
+      return r.fulfill({ json: name === 'save_knowledge_item' ? 'k-new' : 'f1/manual.pdf' });
+    });
+  }
+  await context.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }));
+  await context.route('https://www.youtube-nocookie.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<p>player</p>' }));
   // Staging no longer uses the Google Sheet at all.
   await context.route('https://script.google.com/**', (r) => {
     browserCalledSheet = true;
@@ -299,7 +327,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Trainings' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Payments,Expenses,Reports,Users,Notifications,Admin access', `${device}: owner menu`);
+    check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access', `${device}: owner menu`);
     if (device === 'desktop') check(await page.locator('aside').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
@@ -367,7 +395,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(await page.locator('main').getByText(PEOPLE[who].email).isVisible(), `${who} ${device}: shows own email`);
     check(!(await page.getByText('Team', { exact: true }).count()), `${who} ${device}: no team card`);
     check((await page.getByText('Master').count()) === (who === 'INSTRUCTOR' ? 1 : 0), `${who} ${device}: tier only for instructors`);
-    if (device === 'desktop') check((await navLabels(page)).join() === 'Dashboard,Clients,Payments', `${who}: menu is Dashboard + Clients + Payments (Settings → Admin defaults)`);
+    if (device === 'desktop') check((await navLabels(page)).join() === 'Dashboard,Clients,Knowledge,Payments', `${who}: menu is Dashboard + Clients + Knowledge + Payments (Settings → Admin defaults)`);
     check(await page.getByText('My payments today').isVisible(), `${who} ${device}: my-today card`);
     check(await noOverflow(page), `${who} ${device}: no sideways scroll`);
     check(errors.length === 0, `${who} ${device}: no page errors`);
@@ -999,7 +1027,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 {
   const { page, context, errors } = await open('ADMIN', 1280, 'users/');
   await page.getByText('Ana Park').waitFor();
-  check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Payments,Expenses,Reports,Users,Notifications,Admin access', 'admin: full menu');
+  check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access', 'admin: full menu');
   check(!(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).count()), 'admin: cannot edit the owner');
   check(await page.getByRole('button', { name: 'Edit user: Ana Park' }).isVisible(), 'admin: can edit others');
   await page.getByRole('button', { name: 'Add user' }).click();
@@ -1026,7 +1054,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   await context.close();
 
   const ins = await open('INSTRUCTOR', 1280);
-  check((await navLabels(ins.page)).join() === 'Dashboard,Clients', 'access: instructor loses Payments');
+  check((await navLabels(ins.page)).join() === 'Dashboard,Clients,Knowledge', 'access: instructor loses Payments');
   check(!(await ins.page.getByText('My payments today').count()), 'access: no payments card without Payments');
   await ins.context.close();
   const pay = await open('INSTRUCTOR', 1280, 'payments/');
@@ -1072,6 +1100,87 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await page.getByRole('button', { name: 'Light mode' }).click();
   check(!(await page.evaluate(() => document.documentElement.classList.contains('dark'))), 'dark: back to light');
   check(errors.length === 0, `dark: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 21. Knowledge library: everyone reads, owners/admins add, edit, remove
+for (const [device, width] of Object.entries(WIDTHS)) {
+  const { page, context, errors } = await open('INSTRUCTOR', width, 'knowledge/');
+  await page.getByText('Reformer footwork').waitFor();
+  check((await page.locator('h1').innerText()) === 'Knowledge', `${device} knowledge: instructor opens the library`);
+  check((await page.locator('main li').count()) === 3, `${device} knowledge: three items`);
+  check(!(await page.getByRole('button', { name: /Add item|Edit item/ }).count()), `${device} knowledge: instructor cannot add or edit`);
+  const pdf = page.getByRole('link', { name: 'Open', exact: true });
+  check((await pdf.getAttribute('href'))?.includes('/storage/v1/object/sign/knowledge/f1/manual.pdf?token='), `${device} knowledge: file opens through a signed link`);
+  await page.getByRole('button', { name: 'Gyrotonic' }).click();
+  check((await page.locator('main li').count()) === 2 && !(await page.getByText('Reformer footwork').count()), `${device} knowledge: category filter`);
+  await page.getByLabel('Type').selectOption('VIDEO');
+  check((await page.locator('main li').count()) === 1, `${device} knowledge: type filter`);
+  await page.getByRole('button', { name: 'Gyrotonic' }).click();
+  await page.getByRole('button', { name: /^All\s*\d/ }).click();
+  await page.getByLabel('Search title or description').fill('week 1');
+  check((await page.locator('main li').count()) === 1, `${device} knowledge: search finds description`);
+  await page.getByRole('button', { name: 'Watch', exact: true }).click();
+  const player = page.locator('dialog[open] iframe');
+  check((await player.getAttribute('src')) === 'https://www.youtube-nocookie.com/embed/abcDEF12345?rel=0', `${device} knowledge: YouTube plays inside the portal`);
+  check(await noOverflow(page), `${device} knowledge: no sideways scroll`);
+  await shot(page, `${device}-knowledge-player`);
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByLabel('Search title or description').fill('');
+  await shot(page, `${device}-knowledge`);
+  check(errors.length === 0, `${device} knowledge: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+{
+  knowledgeCalls.length = 0;
+  const { page, context, errors } = await open('ADMIN', 1280, 'knowledge/');
+  await page.getByText('Arch and curl').waitFor();
+  await page.getByRole('button', { name: 'Watch: Arch and curl' }).click();
+  check((await page.locator('dialog[open] iframe').getAttribute('src')) === 'https://player.vimeo.com/video/123456789?h=abcdef1234', 'knowledge: unlisted Vimeo link plays');
+  await page.keyboard.press('Escape');
+  // Add a link
+  await page.getByRole('button', { name: 'Add item' }).click();
+  const dlg = page.locator('dialog[open]');
+  await dlg.getByRole('button', { name: 'Save' }).click();
+  check(await dlg.getByText('Enter a title.').isVisible() && await dlg.getByText('Enter a link that starts with https://').isVisible(), 'knowledge: title and link required');
+  await dlg.getByLabel('Title').fill('Spine stretch');
+  await dlg.getByLabel('Link').fill('https://youtu.be/xyz987654');
+  await dlg.getByRole('button', { name: 'Save' }).click();
+  await page.getByText('Saved to the library.').waitFor();
+  const add = knowledgeCalls.find(([n]) => n === 'save_knowledge_item')?.[1].p;
+  check(add?.title === 'Spine stretch' && add.link_url === 'https://youtu.be/xyz987654' && add.category === 'PILATES' && add.kind === 'VIDEO' && add.id === null, 'knowledge: link saved');
+  // Upload a file
+  knowledgeCalls.length = 0;
+  await page.getByRole('button', { name: 'Add item' }).click();
+  await dlg.getByRole('button', { name: 'Upload a file' }).click();
+  await dlg.getByLabel('Category').selectOption('GYROTONIC');
+  await dlg.getByLabel('File').setInputFiles({ name: 'Level 2 handout.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
+  check((await dlg.getByLabel('Title').inputValue()) === 'Level 2 handout' && (await dlg.getByLabel('Type').inputValue()) === 'DOCUMENT', 'knowledge: file name fills title and type');
+  await dlg.getByRole('button', { name: 'Save' }).click();
+  await page.getByText('Saved to the library.').waitFor();
+  const up = knowledgeCalls.find(([n]) => n === 'storage');
+  const saved = knowledgeCalls.find(([n]) => n === 'save_knowledge_item')?.[1].p;
+  check(up?.[1] === 'POST' && /\/object\/knowledge\/[\w-]{36}\/Level-2-handout\.pdf$/.test(up[2]), `knowledge: file uploaded to the private bucket (${up?.[2]})`);
+  check(saved?.file_path && up[2].endsWith(saved.file_path) && saved.file_name === 'Level 2 handout.pdf' && saved.category === 'GYROTONIC', `knowledge: file item saved ${JSON.stringify(saved)}`);
+  // Too big
+  await page.getByRole('button', { name: 'Add item' }).click();
+  await dlg.getByRole('button', { name: 'Upload a file' }).click();
+  const big = `${(await import('node:os')).tmpdir()}/long.mp4`;
+  (await import('node:fs')).writeFileSync(big, Buffer.alloc(50 * 1024 * 1024 + 1));
+  await dlg.getByLabel('File').setInputFiles(big);
+  await dlg.getByRole('button', { name: 'Save' }).click();
+  check(await dlg.getByText(/over 50 MB/).isVisible(), 'knowledge: over 50 MB asks for a link');
+  await dlg.getByRole('button', { name: 'Cancel' }).click();
+  // Edit and remove
+  knowledgeCalls.length = 0;
+  await page.getByRole('button', { name: 'Edit item: Gyrotonic Level 1 manual' }).click();
+  check(await dlg.getByText(/stays the same/).isVisible(), 'knowledge: edit says the source stays');
+  await dlg.getByRole('button', { name: 'Remove', exact: true }).click();
+  await dlg.getByRole('button', { name: 'Remove for good' }).click();
+  await page.getByText('"Gyrotonic Level 1 manual" removed.').waitFor();
+  check(knowledgeCalls[0]?.[0] === 'delete_knowledge_item' && knowledgeCalls[0][1].p_id === 'k-2', 'knowledge: remove calls the database');
+  check(knowledgeCalls.some(([n, m]) => n === 'storage' && m === 'DELETE'), 'knowledge: removing deletes the file');
+  check(errors.length === 0, `knowledge admin: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 

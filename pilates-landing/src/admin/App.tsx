@@ -11,6 +11,7 @@ import DailyIncome from './pages/DailyIncome';
 import Dashboard from './pages/Dashboard';
 import Enrollments from './pages/Enrollments';
 import Expenses from './pages/Expenses';
+import Knowledge from './pages/Knowledge';
 import Login from './pages/Login';
 import Members from './pages/Members';
 import Notifications from './pages/Notifications';
@@ -23,6 +24,7 @@ const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType>
   '': Dashboard,
   clients: Members,
   trainings: Enrollments,
+  knowledge: Knowledge,
   payments: DailyIncome,
   expenses: Expenses,
   reports: Reports,
