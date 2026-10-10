@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useStaff } from '../auth';
+import { addMonths } from '../expenses';
+import { loadReport, thisMonth, type Report } from '../finance';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
+import MonthChart from '../MonthChart';
 import { formatCents, laToday, loadPayments, totals, type Totals } from '../payments';
 import { navigate } from '../router';
 import { supabase } from '../supabase';
-import { Button, Card, Notice, Skeleton } from '../ui';
+import { Button, Card, Notice, Skeleton, Stat } from '../ui';
 
 function greetingKey(): TextKey {
   // Studio time, not the viewer's device time.
@@ -30,6 +33,7 @@ export default function Dashboard() {
       {staff.role === 'OWNER' ? (
         <div className="grid gap-4 md:grid-cols-2">
           <TodayCard />
+          <FinanceCards />
           <TeamCard />
           <EnrollmentsCard />
         </div>
@@ -137,6 +141,60 @@ function TodayCard() {
         )}
       </div>
     </Card>
+  );
+}
+
+// Owner: this month's money and the last 12 months. Recurring expenses are
+// created first so this month's rent is already counted (master plan J.3).
+function FinanceCards() {
+  const { t } = useT();
+  const [data, setData] = useState<{ month: Report; year: Report } | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const today = laToday();
+    Promise.resolve(supabase!.rpc('generate_recurring_expenses'))
+      .then(() => Promise.all([loadReport(thisMonth(), today), loadReport(addMonths(thisMonth(), -11), today)]))
+      .then(([month, year]) => setData({ month, year }))
+      .catch(() => setFailed(true));
+  }, []);
+
+  const m = data?.month;
+  return (
+    <>
+      <Card className="flex flex-col">
+        <h2 className="mb-4 text-sm font-medium text-mute">{t('thisMonth')}</h2>
+        {failed ? (
+          <div className="mb-6">
+            <Notice tone="error">{t('somethingWrong')}</Notice>
+          </div>
+        ) : !m ? (
+          <Skeleton className="mb-6 h-14 w-full" />
+        ) : (
+          <dl className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Stat label={t('netRevenue')} value={formatCents(m.net)} />
+            <Stat
+              label={m.unpaid_count ? t('expensesUnpaid', { amount: formatCents(m.expenses_outstanding) }) : t('operatingExpenses')}
+              value={formatCents(m.expenses)}
+            />
+            <Stat label={t('estProfit')} value={formatCents(m.profit)} />
+          </dl>
+        )}
+        <Button variant="secondary" className="mt-auto self-start" onClick={() => navigate('reports')}>
+          {t('navReports')}
+        </Button>
+      </Card>
+      <Card className="md:col-span-2">
+        <h2 className="mb-4 text-sm font-medium text-mute">{t('last12Months')}</h2>
+        {failed ? (
+          <Notice tone="error">{t('somethingWrong')}</Notice>
+        ) : !data ? (
+          <Skeleton className="h-52 w-full" />
+        ) : (
+          <MonthChart months={data.year.months} />
+        )}
+      </Card>
+    </>
   );
 }
 

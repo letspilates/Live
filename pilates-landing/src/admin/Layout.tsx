@@ -3,6 +3,7 @@
 // but the database is what actually enforces access.
 import { useRef, useState, type ReactNode } from 'react';
 import {
+  BarChart3,
   Bell,
   ClipboardList,
   Contact,
@@ -42,6 +43,7 @@ const NAV: { group: TextKey; items: NavItem[] }[] = [
     items: [
       { to: 'payments', label: 'navPayments', Icon: Wallet, roles: ROLES },
       { to: 'expenses', label: 'navExpenses', Icon: Receipt, roles: OWNER },
+      { to: 'reports', label: 'navReports', Icon: BarChart3, roles: OWNER },
     ],
   },
   {

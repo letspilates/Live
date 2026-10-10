@@ -9,6 +9,7 @@ export const ADMIN_ROUTES = {
   trainings: 'owner',
   payments: 'staff',
   expenses: 'owner',
+  reports: 'owner',
   users: 'owner',
   notifications: 'owner',
   account: 'staff',

@@ -191,3 +191,26 @@ export function Initials({ name, className = '' }: { name: string; className?: s
     </span>
   );
 }
+
+/** A labelled number for summary cards (inside a <dl>). */
+export function Stat({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex min-w-0 flex-col-reverse">
+      <dt className="text-sm text-mute">{label}</dt>
+      <dd className={`truncate font-display font-semibold tabular-nums ${strong ? 'text-2xl sm:text-3xl' : 'text-xl'}`}>{value}</dd>
+    </div>
+  );
+}
+
+export function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-ink/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
+    >
+      {children}
+    </button>
+  );
+}

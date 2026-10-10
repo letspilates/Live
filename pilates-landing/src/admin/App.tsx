@@ -14,6 +14,7 @@ import Expenses from './pages/Expenses';
 import Login from './pages/Login';
 import Members from './pages/Members';
 import Notifications from './pages/Notifications';
+import Reports from './pages/Reports';
 import SetPassword from './pages/SetPassword';
 import StaffPage from './pages/Staff';
 
@@ -23,6 +24,7 @@ const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType>
   trainings: Enrollments,
   payments: DailyIncome,
   expenses: Expenses,
+  reports: Reports,
   users: StaffPage,
   notifications: Notifications,
   account: Account,

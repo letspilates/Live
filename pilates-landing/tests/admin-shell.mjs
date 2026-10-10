@@ -97,6 +97,26 @@ const RULES = [{ id: 'r-rent', category: 'RENT', description: 'Monthly studio re
   start_month: MONTH, end_month: null, is_estimate: false, payee_staff_id: null, active: true }];
 const writes = []; // [table, method, body, url]
 
+// Reports: finance_report() answers with fixed numbers; months follow the asked range.
+const LAST_MONTH = (() => { const d = new Date(`${MONTH}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 10); })();
+let periodClosed = false;
+const finance = []; // [rpc, body]
+function report(from, to) {
+  const months = [];
+  for (const d = new Date(`${from.slice(0, 7)}-01T12:00:00Z`); d.toISOString().slice(0, 10) <= to; d.setUTCMonth(d.getUTCMonth() + 1)) {
+    const month = d.toISOString().slice(0, 10);
+    months.push({ month, net: 1850000, expenses: 800000, profit: 1050000, payment_count: 120,
+      status: month === LAST_MONTH && periodClosed ? 'CLOSED' : 'OPEN', closed_at: null, version: null });
+  }
+  return { from, to, gross: 2000000, refunds: 20000, net: 1980000, payment_count: 131, refund_count: 1, void_count: 2,
+    expenses: 800000, expenses_paid: 500000, expenses_outstanding: 300000, expense_count: 9, unpaid_count: 2, estimate_count: 1,
+    expense_void_count: 0, profit: 1180000,
+    by_method: [{ method: 'ZELLE', gross: 1200000, refunds: 20000, net: 1180000, count: 80 }, { method: 'CASH', gross: 800000, refunds: 0, net: 800000, count: 51 }],
+    by_collector: [{ name: 'Ana Park', gross: 1200000, count: 80 }, { name: 'Calvin Kim', gross: 800000, count: 51 }],
+    by_category: [{ category: 'INSTRUCTOR_PAY', amount: 350000, count: 2 }, { category: 'RENT', amount: 300000, count: 1 }],
+    months };
+}
+
 /** A page signed in as `who` (or signed out when null) at the given width. */
 async function open(who, width, path = '') {
   const context = await browser.newContext({ viewport: { width, height: width < 768 ? 852 : 900 } });
@@ -197,6 +217,24 @@ async function open(who, width, path = '') {
       return r.fulfill({ json: month ? rows.filter((x) => `eq.${x.period_month}` === month) : rows });
     });
   }
+  await context.route(`${SUPABASE}/rest/v1/rpc/finance_report`, (r) => {
+    const body = r.request().postDataJSON();
+    finance.push(['finance_report', body]);
+    return r.fulfill({ json: report(body.p_from, body.p_to) });
+  });
+  for (const [fn, closed] of [['close_period', true], ['reopen_period', false]]) {
+    await context.route(`${SUPABASE}/rest/v1/rpc/${fn}`, (r) => {
+      finance.push([fn, r.request().postDataJSON()]);
+      periodClosed = closed;
+      return r.fulfill({ json: {} });
+    });
+  }
+  await context.route(`${SUPABASE}/rest/v1/accounting_periods?**`, (r) => {
+    const month = new URL(r.request().url()).searchParams.get('month');
+    const row = { month: LAST_MONTH, status: periodClosed ? 'CLOSED' : 'OPEN', version: 1, closed_by: 'u-owner',
+      closed_at: '2026-10-03T16:12:00Z', reopened_at: periodClosed ? null : '2026-10-04T16:12:00Z', reopen_reason: periodClosed ? '' : 'Fix a typo' };
+    return r.fulfill({ json: month === `eq.${LAST_MONTH}` && finance.some(([f]) => f !== 'finance_report') ? [row] : [] });
+  });
   // Staging no longer uses the Google Sheet at all.
   await context.route('https://script.google.com/**', (r) => {
     browserCalledSheet = true;
@@ -233,7 +271,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Trainings' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Payments,Expenses,Users,Notifications', `${device}: owner menu`);
+    check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Payments,Expenses,Reports,Users,Notifications', `${device}: owner menu`);
     if (device === 'desktop') check(await page.locator('aside').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
@@ -307,7 +345,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
   }
-  for (const path of ['trainings/', 'users/', 'clients/', 'expenses/', 'notifications/']) {
+  for (const path of ['trainings/', 'users/', 'clients/', 'expenses/', 'reports/', 'notifications/']) {
     const { page, context } = await open(who, 1280, path);
     await page.waitForURL(/\/admin\/$/);
     check(!(await page.getByRole('tab').count()), `${who}: /${path} redirects to dashboard`);
@@ -776,6 +814,99 @@ for (const [device, width] of Object.entries(WIDTHS)) {
       && thisMonth[3].includes('payment_status=eq.UNPAID'), 'rule: this month\'s unpaid expense follows, past months untouched');
   }
   check(errors.length === 0, `${device} expenses: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 13. Owner dashboard: this month's money and 12 months of revenue vs expenses
+for (const [device, width] of Object.entries(WIDTHS)) {
+  finance.length = 0;
+  const { page, context, errors } = await open('OWNER', width);
+  const month = page.locator('section', { hasText: 'This month' });
+  await month.getByText('$19,800.00').waitFor();
+  check(await month.getByText('Expenses ($3,000.00 unpaid)').isVisible() && await month.getByText('$11,800.00').isVisible(), `${device} dashboard: this month's expenses and profit`);
+  check(finance.some(([, b]) => b.p_from === MONTH && b.p_to === LA_TODAY), `${device} dashboard: this month asked up to today`);
+  check((await page.locator('main figure ul > li').count()) === 12, `${device} dashboard: 12 months in the chart`);
+  check(await page.locator('main figcaption').getByText('Operating expenses').isVisible(), `${device} dashboard: chart legend`);
+  check(await noOverflow(page), `${device} dashboard: no sideways scroll`);
+  await shot(page, `${device}-dashboard`);
+  check(errors.length === 0, `${device} dashboard: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+{
+  finance.length = 0;
+  const { page, context } = await open('INSTRUCTOR', 1280);
+  check(!(await page.getByText('This month', { exact: true }).count()) && finance.length === 0, 'instructor dashboard: no studio finances asked or shown');
+  await context.close();
+}
+
+// 14. Reports overview: statement, breakdowns, year view, CSV
+for (const [device, width] of Object.entries(WIDTHS)) {
+  finance.length = 0;
+  const { page, context, errors } = await open('OWNER', width, 'reports/');
+  const main = page.locator('main');
+  await main.getByText('Gross revenue').waitFor();
+  check((await page.locator('h1').innerText()) === 'Reports', `${device} reports: title`);
+  const statement = await main.locator('dl').first().innerText();
+  check(['$20,000.00', '$200.00', '$19,800.00', '$8,000.00', '$11,800.00', 'paid $5,000.00 · unpaid $3,000.00'].every((x) => statement.includes(x)), `${device} reports: statement`);
+  check(await main.getByText(/management estimate, not your bank balance/).isVisible(), `${device} reports: basis explained`);
+  check(await main.getByText('Zelle').isVisible() && await main.getByText('Instructor Compensation').isVisible() && await main.getByText('Ana Park').isVisible(), `${device} reports: breakdowns named`);
+  check(finance.some(([, b]) => b.p_from === MONTH), `${device} reports: opens on this month`);
+  check(await noOverflow(page), `${device} reports: no sideways scroll`);
+  await shot(page, `${device}-reports`);
+  await page.getByRole('radio', { name: 'Year' }).click();
+  await main.locator('table').waitFor();
+  check((await main.locator('tbody tr').count()) === 13, `${device} reports: year table, 12 months + total`);
+  check(finance.some(([, b]) => b.p_from === `${MONTH.slice(0, 4)}-01-01` && b.p_to === `${MONTH.slice(0, 4)}-12-31`), `${device} reports: year range`);
+  check(await noOverflow(page), `${device} reports: year view no sideways scroll`);
+  await shot(page, `${device}-reports-year`);
+  if (device === 'desktop') {
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export CSV' }).click()]);
+    const csv = (await import('node:fs')).readFileSync(await download.path(), 'utf8');
+    check(download.suggestedFilename() === `report-${MONTH.slice(0, 4)}.csv` && csv.includes('Gross revenue,20000') && csv.includes('Estimated operating profit,11800')
+      && csv.includes('Instructor Compensation,3500,2') && csv.includes('Month,Net revenue'), 'reports: CSV has summary, breakdowns and months');
+  }
+  check(errors.length === 0, `${device} reports: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 15. Monthly closing: last month by default, four checks, close, reopen with a reason
+for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
+  finance.length = 0;
+  periodClosed = false;
+  const { page, context, errors } = await open('OWNER', width, 'reports/?tab=closing');
+  const main = page.locator('main');
+  await main.getByText('Review payments').waitFor();
+  check(finance.some(([, b]) => b.p_from === LAST_MONTH), `${device} closing: last month by default`);
+  check(await main.getByText('131 payments · gross $20,000.00').isVisible(), `${device} closing: payments step`);
+  check(await main.getByText(/^1 estimated amounts/).isVisible() && await main.getByText(/^2 unpaid \(\$3,000\.00\)/).isVisible(), `${device} closing: estimate and unpaid notes`);
+  const closeBtn = main.getByRole('button', { name: /^Close / });
+  check(await closeBtn.isDisabled(), `${device} closing: close needs all four checks`);
+  for (const box of await main.getByRole('checkbox', { name: 'Checked' }).all()) await box.check();
+  check(await closeBtn.isEnabled(), `${device} closing: enabled after four checks`);
+  check(await noOverflow(page), `${device} closing: no sideways scroll`);
+  await shot(page, `${device}-closing`);
+  await closeBtn.click();
+  const dialog = page.locator('dialog[open]');
+  check(await dialog.getByText(/will be locked/).isVisible(), `${device} closing: confirm says what gets locked`);
+  await dialog.getByRole('button', { name: /^Close / }).click();
+  await main.getByText(/is closed\.$/).waitFor();
+  check(finance.find(([f]) => f === 'close_period')?.[1].p_month === LAST_MONTH, `${device} closing: close_period for last month`);
+  await main.getByText(/^Closed by/).waitFor({ timeout: 5000 }).catch(() => {});
+  check(await main.getByText(/^Closed by Calvin Kim · .* · version 1$/).isVisible(), `${device} closing: who closed it`);
+  await main.getByRole('button', { name: 'Reopen' }).click();
+  const reopen = page.locator('dialog[open]');
+  await reopen.getByRole('button', { name: 'Reopen' }).click();
+  check(await reopen.getByText('Enter a reason.').isVisible(), `${device} closing: reopen needs a reason`);
+  await reopen.getByLabel('Reason').fill('Fix a typo');
+  await reopen.getByRole('button', { name: 'Reopen' }).click();
+  await main.getByText(/is open again\.$/).waitFor();
+  check(finance.find(([f]) => f === 'reopen_period')?.[1].p_reason === 'Fix a typo', `${device} closing: reopen reason sent`);
+  await main.getByText(/^Reopened /).waitFor({ timeout: 5000 }).catch(() => {});
+  check(await main.getByText(/^Reopened .*: Fix a typo$/).isVisible(), `${device} closing: last reopen shown`);
+  await main.getByRole('button', { name: 'Next month' }).click();
+  await main.getByText(/can be closed after it ends\.$/).waitFor();
+  check(await main.getByRole('button', { name: /^Close / }).isDisabled(), `${device} closing: this month cannot be closed`);
+  check(errors.length === 0, `${device} closing: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 

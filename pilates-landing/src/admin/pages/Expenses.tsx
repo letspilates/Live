@@ -22,7 +22,7 @@ import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
 import { centsInput, formatCents, formatDay, laToday, parseCents } from '../payments';
 import { supabase } from '../supabase';
-import { Button, Card, Dialog, Notice, Skeleton, TextField, inputCls } from '../ui';
+import { Button, Card, Dialog, IconButton, Notice, Skeleton, Stat, TextField, inputCls } from '../ui';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 const PAY_KEY = (code: string) => `pay${code}` as TextKey;
@@ -799,30 +799,8 @@ function RuleDialog({ rule: r, lists, onClose, onDone }: { rule: Rule | null; li
 
 /* ───────────────────────────── Small parts ───────────────────────────── */
 
-function Stat({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex min-w-0 flex-col-reverse">
-      <dt className="text-sm text-mute">{label}</dt>
-      <dd className={`truncate font-display font-semibold tabular-nums ${strong ? 'text-2xl sm:text-3xl' : 'text-xl'}`}>{value}</dd>
-    </div>
-  );
-}
-
 function Tag({ children }: { children: ReactNode }) {
   return <span className="inline-flex rounded-full bg-clay/20 px-2 py-0.5 text-xs font-medium text-ink">{children}</span>;
-}
-
-function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-ink/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
-    >
-      {children}
-    </button>
-  );
 }
 
 function CloseButton({ onClose }: { onClose: () => void }) {
