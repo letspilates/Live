@@ -37,6 +37,19 @@
 Supabase ↔ GitHub 연동이 **Production branch = `Staging`, Deploy to production = ON** 으로 되어 있으면,
 Claude가 `Staging`에 push할 때 `supabase/migrations/`의 새 SQL이 **자동으로 적용**된다. 직접 붙여넣지 않는다.
 
+연동 화면(Project Settings → Integrations → GitHub)의 올바른 값:
+
+| 항목 | 값 |
+|---|---|
+| GitHub repository | `letspilates/Live` |
+| Working directory | `.` |
+| Deploy to production | ON |
+| Production branch name | **`Staging`** ⚠️ 기본값이 `main`이니 반드시 바꾼다 (`studio`는 스테이징 DB) |
+
+- `main`으로 두면 연동이 `main`만 보므로 아무것도 적용되지 않는다 (지금 `main`에는 `supabase/`가 없다).
+- 설정을 바꾼 **뒤의 push부터** 반응한다. 설정 전에 올라간 커밋은 다시 보지 않는다.
+- 운영용 프로젝트를 만들면 **그 프로젝트**를 `main`에 연결한다.
+
 - 확인: Supabase → **Database → Migrations**(또는 Integrations → GitHub의 배포 기록)에 `0001` 이 보이면 완료.
   SQL Editor에서 `select * from staff_profiles;` 가 오류 없이 빈 결과를 내도 완료.
 - ⚠️ **같은 SQL을 SQL Editor에 다시 붙여넣지 않는다.** 연동은 자기가 적용한 기록만 알기 때문에, 손으로 먼저 실행하면 다음 자동 적용이 "already exists"로 실패한다.
