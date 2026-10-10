@@ -9,7 +9,7 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from 'react';
-import { CircleAlert, CircleCheck, Info } from 'lucide-react';
+import { CircleAlert, CircleCheck, Info, type LucideIcon } from 'lucide-react';
 import LogoIcon from '../components/LogoIcon';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
@@ -23,7 +23,7 @@ const inputErrorCls = 'border-red-700/50 ring-2 ring-red-700/10';
 type Variant = 'primary' | 'secondary' | 'danger';
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-sage text-cream hover:bg-sage-deep',
-  secondary: 'bg-paper text-ink ring-1 ring-ink/15 hover:bg-sand/60',
+  secondary: 'bg-paper text-ink shadow-[0_1px_2px_rgb(var(--c-shadow)/0.06)] ring-1 ring-ink/[0.12] hover:bg-sand/50',
   danger: 'bg-red-700 text-white hover:bg-red-800',
 };
 
@@ -107,10 +107,21 @@ export function TextArea({
   );
 }
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className = '',
+  pad = true,
+  label,
+}: {
+  children: ReactNode;
+  className?: string;
+  pad?: boolean;
+  label?: string;
+}) {
   return (
     <section
-      className={`rounded-2xl bg-paper p-5 shadow-[0_1px_2px_rgba(28,26,22,0.04)] ring-1 ring-ink/10 sm:p-6 ${className}`}
+      aria-label={label}
+      className={`rounded-[20px] bg-paper shadow-card ring-1 ring-ink/[0.05] ${pad ? 'p-5 sm:p-6' : ''} ${className}`}
     >
       {children}
     </section>
@@ -137,7 +148,7 @@ export function Notice({ tone, children }: { tone: keyof typeof NOTICE; children
 /** Full-screen centered card for sign-in and account-state screens. */
 export function CenteredCard({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <main className="flex min-h-[100dvh] items-center justify-center bg-cream px-4 py-10">
+    <main className="flex min-h-[100dvh] items-center justify-center bg-canvas px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex items-center gap-3">
           <LogoIcon className="h-8 w-8 text-sage" />
@@ -157,7 +168,7 @@ export function CenteredCard({ title, children }: { title?: string; children: Re
 
 export function Splash({ label }: { label: string }) {
   return (
-    <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-cream">
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-canvas">
       <LogoIcon className="h-9 w-9 text-sage motion-safe:animate-pulse" />
       <p className="text-sm text-mute">{label}</p>
     </main>
@@ -193,7 +204,7 @@ export function Dialog({
       ref={ref}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
-      className="max-h-[calc(100dvh-2rem)] w-[min(calc(100%-2rem),28rem)] overflow-y-auto rounded-[20px] bg-paper p-0 text-ink shadow-[0_24px_60px_rgba(28,26,22,0.18)] backdrop:bg-ink/30"
+      className="max-h-[calc(100dvh-2rem)] w-[min(calc(100%-2rem),28rem)] overflow-y-auto rounded-[20px] bg-paper p-0 text-ink shadow-pop backdrop:bg-ink/30"
     >
       <div className="p-6">
         <h2 className="mb-4 font-display text-lg font-semibold">{title}</h2>
@@ -240,5 +251,38 @@ export function IconButton({ label, onClick, children }: { label: string; onClic
     >
       {children}
     </button>
+  );
+}
+
+/** Card heading: small icon tile, title, optional link on the right (reference: Nexora / Finance cards). */
+export function CardTitle({ icon: Icon, title, action }: { icon?: LucideIcon; title: string; action?: ReactNode }) {
+  return (
+    <div className="mb-5 flex min-h-8 items-center gap-3">
+      {Icon && (
+        <span aria-hidden="true" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sage/10 text-sage">
+          <Icon size={16} strokeWidth={1.75} />
+        </span>
+      )}
+      <h2 className="min-w-0 flex-1 truncate font-display text-base font-semibold text-ink">{title}</h2>
+      {action}
+    </div>
+  );
+}
+
+const CHIP = {
+  neutral: 'bg-ink/[0.05] text-mute before:bg-mute/60',
+  good: 'bg-sage/10 text-sage-deep before:bg-sage',
+  warn: 'bg-clay/15 text-ink before:bg-clay',
+  bad: 'bg-red-700/10 text-red-800 before:bg-red-700',
+} as const;
+
+/** Status chip with a dot (reference: invoice list). Text always says the status, the dot only repeats it. */
+export function Chip({ tone = 'neutral', children }: { tone?: keyof typeof CHIP; children: ReactNode }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium before:h-1.5 before:w-1.5 before:rounded-full before:content-[''] ${CHIP[tone]}`}
+    >
+      {children}
+    </span>
   );
 }

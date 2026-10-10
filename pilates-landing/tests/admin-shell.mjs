@@ -1048,7 +1048,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   await page.getByRole('button', { name: 'Dark mode' }).click();
   check(await page.evaluate(() => document.documentElement.classList.contains('dark')), 'dark: class on <html>');
   const bg = await page.evaluate(() => getComputedStyle(document.querySelector('main').parentElement.parentElement).backgroundColor);
-  check(bg === 'rgb(21, 20, 17)', `dark: page background is dark (${bg})`);
+  check(bg === 'rgb(18, 17, 15)', `dark: page background is dark (${bg})`);
   await page.reload();
   await page.waitForLoadState('networkidle');
   check(await page.getByRole('button', { name: 'Light mode' }).isVisible(), 'dark: remembered after reload');

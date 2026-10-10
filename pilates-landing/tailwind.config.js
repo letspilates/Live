@@ -21,6 +21,12 @@ export default {
           deep: 'rgb(var(--c-sage-deep) / <alpha-value>)',
         },
         clay: 'rgb(var(--c-clay) / <alpha-value>)',
+        // Admin portal only (values in src/admin/admin.css).
+        canvas: 'rgb(var(--c-canvas) / <alpha-value>)',
+      },
+      boxShadow: {
+        card: '0 1px 2px rgb(var(--c-shadow) / 0.05), 0 8px 24px -12px rgb(var(--c-shadow) / 0.12)',
+        pop: '0 16px 40px -8px rgb(var(--c-shadow) / 0.22), 0 2px 6px rgb(var(--c-shadow) / 0.06)',
       },
       letterSpacing: {
         tightest: '-0.045em',

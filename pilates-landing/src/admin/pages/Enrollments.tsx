@@ -325,7 +325,7 @@ function CourseEditor({ initial, reload }: { initial: Course[]; reload: () => Pr
       </div>
 
       {/* Sticks to the bottom of the screen while editing, like the old Save bar. */}
-      <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-ink/10 bg-cream px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t border-ink/10 bg-canvas px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex max-w-3xl items-center gap-3">
           <p
             role="status"

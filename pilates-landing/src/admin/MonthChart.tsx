@@ -26,36 +26,60 @@ export default function MonthChart({ months }: { months: MonthRow[] }) {
     <figure>
       <figcaption className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-mute">
         <span className="inline-flex items-center gap-2">
-          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm bg-sage" />
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-sage" />
           {t('netRevenue')}
         </span>
         <span className="inline-flex items-center gap-2">
-          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm bg-clay" />
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-clay/80" />
           {t('operatingExpenses')}
         </span>
       </figcaption>
       <div className="relative flex">
-        <div aria-hidden="true" className="flex h-44 w-12 shrink-0 flex-col justify-between pr-2 text-right text-xs tabular-nums text-mute">
+        <div aria-hidden="true" className="flex h-52 w-12 shrink-0 flex-col justify-between pr-2 text-right text-xs tabular-nums text-mute">
           <span className="-translate-y-1/2">{compact.format(top / 100)}</span>
           <span className="-translate-y-1/2">{compact.format(top / 200)}</span>
           <span className="translate-y-1/2">$0</span>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="relative h-44">
-            <div aria-hidden="true" className="absolute inset-x-0 top-0 border-t border-ink/10" />
-            <div aria-hidden="true" className="absolute inset-x-0 top-1/2 border-t border-ink/10" />
-            <ul className="absolute inset-0 flex items-end border-b border-ink/20">
-              {months.map((m) => (
+          <div className="relative h-52">
+            <div aria-hidden="true" className="absolute inset-x-0 top-0 border-t border-dashed border-ink/10" />
+            <div aria-hidden="true" className="absolute inset-x-0 top-1/2 border-t border-dashed border-ink/10" />
+            <ul className="absolute inset-0 flex items-end border-b border-ink/15">
+              {months.map((m, i) => (
                 <li
                   key={m.month}
-                  className="flex h-full min-w-0 flex-1 items-end justify-center gap-[2px] rounded-t-md px-0.5 hover:bg-ink/[0.03]"
-                  title={`${formatMonth(m.month, lang)}\n${t('netRevenue')} ${formatCents(m.net)}\n${t('operatingExpenses')} ${formatCents(m.expenses)}\n${t('estProfit')} ${formatCents(m.profit)}`}
+                  tabIndex={0}
+                  className="group flex h-full min-w-0 flex-1 items-end justify-center gap-[3px] rounded-t-lg px-0.5 outline-none hover:bg-ink/[0.035] focus-visible:bg-ink/[0.035]"
                 >
                   <span className="sr-only">
                     {formatMonth(m.month, lang)}: {t('netRevenue')} {formatCents(m.net)}, {t('operatingExpenses')} {formatCents(m.expenses)}
                   </span>
-                  <span aria-hidden="true" className="w-full max-w-3 rounded-t bg-sage" style={{ height: pct(m.net) }} />
-                  <span aria-hidden="true" className="w-full max-w-3 rounded-t bg-clay" style={{ height: pct(m.expenses) }} />
+                  <span aria-hidden="true" className="w-full max-w-3.5 rounded-t-[4px] bg-sage" style={{ height: pct(m.net) }} />
+                  <span aria-hidden="true" className="w-full max-w-3.5 rounded-t-[4px] bg-clay/80" style={{ height: pct(m.expenses) }} />
+                  {/* Hover / focus tooltip (reference: Company dashboard). Centered on the month, clamped so it never leaves the chart. */}
+                  <span
+                    aria-hidden="true"
+                    style={{ left: `clamp(0px, calc(${((i + 0.5) / months.length) * 100}% - 6.5rem), calc(100% - 13rem))` }}
+                    className={`pointer-events-none invisible absolute bottom-full z-10 mb-2 w-52 rounded-xl bg-paper p-3 text-left text-xs opacity-0 shadow-pop ring-1 ring-ink/10 transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100`}
+                  >
+                    <span className="mb-2 block font-medium text-ink">{formatMonth(m.month, lang)}</span>
+                    {(
+                      [
+                        ['bg-sage', t('netRevenue'), m.net],
+                        ['bg-clay/80', t('operatingExpenses'), m.expenses],
+                      ] as const
+                    ).map(([dot, label, cents]) => (
+                      <span key={label} className="flex items-center gap-2 py-0.5">
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+                        <span className="min-w-0 flex-1 truncate text-mute">{label}</span>
+                        <span className="font-medium tabular-nums text-ink">{formatCents(cents)}</span>
+                      </span>
+                    ))}
+                    <span className="mt-2 flex items-center gap-2 border-t border-ink/10 pt-2">
+                      <span className="min-w-0 flex-1 truncate text-mute">{t('estProfit')}</span>
+                      <span className={`font-semibold tabular-nums ${m.profit < 0 ? 'text-red-700' : 'text-ink'}`}>{formatCents(m.profit)}</span>
+                    </span>
+                  </span>
                 </li>
               ))}
             </ul>

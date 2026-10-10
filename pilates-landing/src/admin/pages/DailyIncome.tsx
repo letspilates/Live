@@ -310,7 +310,7 @@ function RecordPayment({
       {error && <Notice tone="error">{error}</Notice>}
 
       {/* Phone: the save button stays under the thumb. */}
-      <div className="sticky bottom-0 -mx-4 border-t border-ink/10 bg-cream/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+      <div className="sticky bottom-0 -mx-4 border-t border-ink/10 bg-canvas/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         <Button type="submit" disabled={busy} className="w-full sm:w-auto">
           {busy
             ? t('saving')

@@ -98,7 +98,7 @@ export default function Layout({
   };
 
   return (
-    <div className="min-h-[100dvh] bg-cream text-ink">
+    <div className="min-h-[100dvh] bg-canvas text-ink">
       <a
         href="#main"
         className="sr-only z-50 rounded-full bg-ink text-sm text-cream focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:px-4 focus:py-2"
@@ -107,7 +107,7 @@ export default function Layout({
       </a>
       {/* Tablet rail (md) / desktop sidebar (lg) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden w-[72px] flex-col border-r border-ink/10 bg-paper md:flex ${
+        className={`fixed inset-y-0 left-0 z-30 hidden w-[72px] flex-col bg-canvas md:flex ${
           collapsed ? '' : 'lg:w-60'
         }`}
       >
@@ -134,7 +134,7 @@ export default function Layout({
       </dialog>
 
       <div className={`md:pl-[72px] ${collapsed ? '' : 'lg:pl-60'}`}>
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-ink/10 bg-cream/90 px-4 backdrop-blur sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 bg-canvas/85 px-4 backdrop-blur-md sm:px-6 lg:px-8">
           <button
             type="button"
             onClick={() => drawer.current?.showModal()}
@@ -157,7 +157,7 @@ export default function Layout({
         <main
           id="main"
           tabIndex={-1}
-          className="mx-auto w-full outline-none max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+          className="mx-auto w-full max-w-6xl px-4 pb-10 pt-4 outline-none sm:px-6 lg:px-8 lg:pt-6"
         >
           {actions && <div className="mb-6 flex flex-wrap justify-end gap-3">{actions}</div>}
           {children}
@@ -206,7 +206,7 @@ function SidebarContent({
           return (
             <div key={group} className="flex flex-col gap-1 [&+&]:mt-3">
               {/* Group name in the wide sidebar; a thin line in the icon rail. */}
-              <p className={`px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-mute ${label}`}>{t(group)}</p>
+              <p className={`px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-mute/80 ${label}`}>{t(group)}</p>
               <span
                 aria-hidden="true"
                 className={`mx-3 mb-1 border-t border-ink/10 ${alwaysWide ? 'hidden' : wide ? 'lg:hidden' : ''}`}
@@ -221,7 +221,7 @@ function SidebarContent({
                     aria-current={active ? 'page' : undefined}
                     title={t(key)}
                     className={`flex h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-3 text-sm font-medium transition-colors ${
-                      active ? 'bg-sand text-ink' : 'text-mute hover:bg-ink/[0.04] hover:text-ink'
+                      active ? 'bg-paper text-ink shadow-card ring-1 ring-ink/[0.05]' : 'text-mute hover:bg-ink/[0.04] hover:text-ink'
                     }`}
                   >
                     <Icon {...ICON} className={`shrink-0 ${active ? 'text-sage' : ''}`} />
@@ -234,14 +234,14 @@ function SidebarContent({
         })}
       </nav>
 
-      <div className="flex flex-col gap-1 border-t border-ink/10 pt-3">
+      <div className="flex flex-col gap-1 border-t border-ink/[0.08] pt-3">
         <Link
           to="account"
           onNavigate={onNavigate}
           title={t('navAccount')}
           aria-current={route === 'account' ? 'page' : undefined}
           className={`flex min-h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-2 py-1.5 transition-colors ${
-            route === 'account' ? 'bg-sand' : 'hover:bg-ink/[0.04]'
+            route === 'account' ? 'bg-paper shadow-card ring-1 ring-ink/[0.05]' : 'hover:bg-ink/[0.04]'
           }`}
         >
           <Initials name={staff.full_name} className="h-8 w-8 text-xs" />
@@ -344,7 +344,7 @@ function AccountMenu() {
         id="account-menu"
         popover="auto"
         style={{ inset: 'auto 1rem auto auto', top: '4.25rem' }}
-        className="m-0 w-64 rounded-2xl bg-paper p-2 text-ink shadow-[0_12px_32px_rgba(28,26,22,0.12)] ring-1 ring-ink/10"
+        className="m-0 w-64 rounded-2xl bg-paper p-2 text-ink shadow-pop ring-1 ring-ink/10"
       >
         <div className="px-3 py-2">
           <p className="truncate text-sm font-medium">{staff.full_name}</p>
