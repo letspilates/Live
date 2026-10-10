@@ -581,7 +581,7 @@ function History({ methods, collectors }: { methods: Method[]; collectors: Colle
   const selectCls = `${inputCls} py-2.5 sm:w-auto`;
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
         <Select
           label={t('period')}
@@ -780,7 +780,7 @@ function DateInput({
         min={min}
         max={max}
         onChange={(e) => e.target.value && onChange(e.target.value)}
-        className={`${inputCls} py-2.5`}
+        className={`${inputCls} min-w-0 py-2.5`}
       />
     </label>
   );

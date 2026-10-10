@@ -101,7 +101,7 @@ Live/                          ← 저장소 루트
     │   ├── admin/             ← 관리자 포털 (/admin/*, 별도 진입점, 공개 사이트와 번들 분리)
     │   └── media.ts           ← 이미지 경로 (BASE_URL 기준)
     ├── admin/index.html       ← 관리자 포털 진입 HTML (noindex, CSP)
-    ├── public/admin/legacy/   ← 기존 코스·등록자 관리 페이지 (Apps Script, ADMIN_KEY). 프로덕션용. 스테이징은 포털 /admin/enrollments/ (Supabase training_* 테이블)가 대체
+    ├── public/admin/legacy/   ← 기존 코스·등록자 관리 페이지 (Apps Script, ADMIN_KEY). 프로덕션용. 스테이징은 포털 /admin/trainings/ (Supabase training_* 테이블)가 대체
     ├── tests/admin-shell.mjs  ← 관리자 포털 화면 확인 (Playwright, Supabase 모의). 실행법은 파일 첫 줄
     ├── public/media/          ← 이미지 (webp)
     └── index.html             ← 메타/SEO/구조화 데이터(JSON-LD)

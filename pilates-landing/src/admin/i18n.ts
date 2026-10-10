@@ -166,7 +166,7 @@ const en = {
   student: 'Client',
   searchStudent: 'Search name or phone',
   noStudentFound: 'No client found. Add them in Clients first, then search again.',
-  noPaymentsYet: 'no payments yet',
+  noPaymentsYet: 'No payments yet',
   addStudent: 'Add client',
   back: 'Back',
   change: 'Change',
