@@ -50,6 +50,7 @@ const en = {
   // layout
   menu: 'Menu',
   closeMenu: 'Close menu',
+  skipToContent: 'Skip to content',
   collapse: 'Collapse',
   expand: 'Expand',
   navDashboard: 'Dashboard',
@@ -166,6 +167,7 @@ const ko: Dict = {
   signOut: '로그아웃',
   menu: '메뉴',
   closeMenu: '메뉴 닫기',
+  skipToContent: '본문으로 건너뛰기',
   collapse: '접기',
   expand: '펼치기',
   navDashboard: '대시보드',

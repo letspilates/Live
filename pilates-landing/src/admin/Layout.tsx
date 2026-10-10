@@ -65,6 +65,12 @@ export default function Layout({
 
   return (
     <div className="min-h-[100dvh] bg-cream text-ink">
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-full bg-ink text-sm text-cream focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:px-4 focus:py-2"
+      >
+        {t('skipToContent')}
+      </a>
       {/* Tablet rail (md) / desktop sidebar (lg) */}
       <aside
         className={`fixed inset-y-0 left-0 z-30 hidden w-[72px] flex-col border-r border-ink/10 bg-paper md:flex ${
@@ -113,7 +119,7 @@ export default function Layout({
           <AccountMenu />
         </header>
 
-        <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main id="main" tabIndex={-1} className="mx-auto w-full outline-none max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {actions && <div className="mb-6 flex flex-wrap justify-end gap-3">{actions}</div>}
           {children}
         </main>
@@ -147,7 +153,7 @@ function SidebarContent({
       <Link
         to=""
         onNavigate={onNavigate}
-        className="mb-6 flex h-11 items-center gap-3 rounded-xl px-3"
+        className="mb-6 flex h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-3"
         title="Let's Pilates LA"
       >
         <LogoIcon className="h-6 w-6 shrink-0 text-sage" />
@@ -164,7 +170,7 @@ function SidebarContent({
               onNavigate={onNavigate}
               aria-current={active ? 'page' : undefined}
               title={t(key)}
-              className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${
+              className={`flex h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-3 text-sm font-medium transition-colors ${
                 active ? 'bg-sand text-ink' : 'text-mute hover:bg-ink/[0.04] hover:text-ink'
               }`}
             >
@@ -181,7 +187,7 @@ function SidebarContent({
           onNavigate={onNavigate}
           title={t('navAccount')}
           aria-current={route === 'account' ? 'page' : undefined}
-          className={`flex min-h-11 items-center gap-3 rounded-xl px-2 py-1.5 transition-colors ${
+          className={`flex min-h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-2 py-1.5 transition-colors ${
             route === 'account' ? 'bg-sand' : 'hover:bg-ink/[0.04]'
           }`}
         >
@@ -195,7 +201,7 @@ function SidebarContent({
           type="button"
           onClick={() => void signOut()}
           title={t('signOut')}
-          className="flex h-11 items-center gap-3 rounded-xl px-3 text-sm text-mute transition-colors hover:bg-ink/[0.04] hover:text-ink"
+          className="flex h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-3 text-sm text-mute transition-colors hover:bg-ink/[0.04] hover:text-ink"
         >
           <LogOut {...ICON} className="shrink-0" />
           <span className={label}>{t('signOut')}</span>
@@ -205,7 +211,7 @@ function SidebarContent({
             type="button"
             onClick={onToggleCollapsed}
             title={collapsed ? t('expand') : t('collapse')}
-            className="hidden h-11 items-center gap-3 rounded-xl px-3 text-sm text-mute transition-colors hover:bg-ink/[0.04] hover:text-ink lg:flex"
+            className="hidden h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-3 text-sm text-mute transition-colors hover:bg-ink/[0.04] hover:text-ink lg:flex"
           >
             {collapsed ? (
               <PanelLeftOpen {...ICON} className="shrink-0" />
@@ -278,7 +284,7 @@ function AccountMenu() {
         <Link
           to="account"
           onNavigate={close}
-          className="flex h-11 items-center gap-3 rounded-xl px-3 text-sm hover:bg-ink/[0.04]"
+          className="flex h-11 items-center gap-3 rounded-xl px-3 text-sm hover:bg-ink/[0.04] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
         >
           <UserRound {...ICON} className="shrink-0 text-mute" />
           {t('navAccount')}
@@ -289,7 +295,7 @@ function AccountMenu() {
             close();
             void signOut();
           }}
-          className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-ink/[0.04]"
+          className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-ink/[0.04] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
         >
           <LogOut {...ICON} className="shrink-0 text-mute" />
           {t('signOut')}

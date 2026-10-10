@@ -57,18 +57,20 @@ function TeamCard() {
   }, []);
 
   return (
-    <Card>
+    <Card className="flex flex-col">
       <h2 className="mb-4 text-sm font-medium text-mute">{t('team')}</h2>
       {failed ? (
-        <Notice tone="error">{t('somethingWrong')}</Notice>
+        <div className="mb-6">
+          <Notice tone="error">{t('somethingWrong')}</Notice>
+        </div>
       ) : !counts ? (
-        <div className="flex gap-6">
+        <div className="mb-6 flex gap-6">
           <Skeleton className="h-12 w-16" />
           <Skeleton className="h-12 w-16" />
           <Skeleton className="h-12 w-16" />
         </div>
       ) : (
-        <dl className="flex gap-8">
+        <dl className="mb-6 flex gap-8">
           {(
             [
               ['ACTIVE', 'activeCount'],
@@ -83,7 +85,7 @@ function TeamCard() {
           ))}
         </dl>
       )}
-      <Button variant="secondary" className="mt-6" onClick={() => navigate('staff')}>
+      <Button variant="secondary" className="mt-auto self-start" onClick={() => navigate('staff')}>
         {t('manageStaff')}
       </Button>
     </Card>
@@ -96,8 +98,8 @@ function EnrollmentsCard() {
   return (
     <Card className="flex flex-col">
       <h2 className="mb-4 text-sm font-medium text-mute">{t('navEnrollments')}</h2>
-      <p className="flex-1 text-ink">{t('enrollmentsCardBody')}</p>
-      <Button variant="secondary" className="mt-6 self-start" onClick={() => navigate('enrollments')}>
+      <p className="mb-6 max-w-[65ch] text-pretty text-ink">{t('enrollmentsCardBody')}</p>
+      <Button variant="secondary" className="mt-auto self-start" onClick={() => navigate('enrollments')}>
         {t('openEnrollments')}
       </Button>
     </Card>
