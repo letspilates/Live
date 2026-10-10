@@ -236,44 +236,26 @@ function SidebarContent({
         })}
       </nav>
 
-      <div className="flex flex-col gap-1 border-t border-ink/[0.08] pt-3">
-        <Link
-          to="account"
-          onNavigate={onNavigate}
-          title={t('navAccount')}
-          aria-current={route === 'account' ? 'page' : undefined}
-          className={`flex min-h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-2 py-1.5 transition-colors ${
-            route === 'account' ? 'bg-paper shadow-card ring-1 ring-ink/[0.05]' : 'hover:bg-ink/[0.04]'
-          }`}
-        >
-          <Initials name={staff.full_name} className="h-8 w-8 text-xs" />
-          <span className={`min-w-0 ${label}`}>
-            <span className="block truncate text-sm font-medium">{staff.full_name}</span>
-            <span className="block text-xs text-mute">{staff.roles.map((r) => t(r)).join(' · ')}</span>
-          </span>
-        </Link>
+      {/* Sign out + collapse: icons on one line (they stack in the narrow rail). */}
+      <div className="flex flex-wrap gap-1 border-t border-ink/[0.08] pt-3">
         <button
           type="button"
           onClick={() => void signOut()}
           title={t('signOut')}
-          className="flex h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-3 text-sm text-mute transition-colors hover:bg-ink/[0.04] hover:text-ink"
+          aria-label={t('signOut')}
+          className="flex h-11 w-11 items-center justify-center rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 text-mute transition-colors hover:bg-ink/[0.04] hover:text-ink"
         >
-          <LogOut {...ICON} className="shrink-0" />
-          <span className={label}>{t('signOut')}</span>
+          <LogOut {...ICON} />
         </button>
         {onToggleCollapsed && (
           <button
             type="button"
             onClick={onToggleCollapsed}
             title={collapsed ? t('expand') : t('collapse')}
-            className="hidden h-11 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 px-3 text-sm text-mute transition-colors hover:bg-ink/[0.04] hover:text-ink lg:flex"
+            aria-label={collapsed ? t('expand') : t('collapse')}
+            className="hidden h-11 w-11 items-center justify-center rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-sage/40 text-mute transition-colors hover:bg-ink/[0.04] hover:text-ink lg:flex"
           >
-            {collapsed ? (
-              <PanelLeftOpen {...ICON} className="shrink-0" />
-            ) : (
-              <PanelLeftClose {...ICON} className="shrink-0" />
-            )}
-            <span className={label}>{collapsed ? t('expand') : t('collapse')}</span>
+            {collapsed ? <PanelLeftOpen {...ICON} /> : <PanelLeftClose {...ICON} />}
           </button>
         )}
       </div>
