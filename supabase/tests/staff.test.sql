@@ -1,4 +1,4 @@
--- Tests for the foundation migration (run with supabase/tests/run-local.sh).
+-- Tests for staff accounts and roles (run with supabase/tests/run-local.sh).
 -- Everything happens inside one transaction that is rolled back at the end.
 
 \set ON_ERROR_STOP 1
@@ -164,8 +164,38 @@ select t.check('audit: cancelled invite kept as delete', exists (
    where action = 'delete' and entity_id = '00000000-0000-0000-0000-0000000000c1'));
 reset role;
 
+-- Adding staff whose account was created in the dashboard ----------------------
+insert into auth.users (id, email) values
+  ('00000000-0000-0000-0000-0000000000e1', 'new.inst@test.local'),
+  ('00000000-0000-0000-0000-0000000000e2', 'new.owner@test.local');
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select public.add_staff_account(' New.Inst@test.local ', 'New Instructor', 'INSTRUCTOR', 'CERTIFIED');
+select t.check('add staff: instructor active', (select role = 'INSTRUCTOR' and status = 'ACTIVE' and email = 'new.inst@test.local'
+  from public.staff_profiles where user_id = '00000000-0000-0000-0000-0000000000e1'));
+select public.add_staff_account('new.owner@test.local', 'New Owner', 'OWNER');
+select t.check('add staff: owner role', (select role = 'OWNER' from public.staff_profiles
+  where user_id = '00000000-0000-0000-0000-0000000000e2'));
+select t.expect_error('add staff: unknown email', 'P0002',
+  $$select public.add_staff_account('nobody@test.local', 'Nobody')$$);
+select t.expect_error('add staff: already staff', '23505',
+  $$select public.add_staff_account('new.inst@test.local', 'Again')$$);
+select t.expect_error('add staff: bad role', '23514',
+  $$select public.add_staff_account('stranger@test.local', 'X', 'ADMIN')$$);
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b1');
+select t.expect_error('add staff: instructor refused', '42501',
+  $$select public.add_staff_account('stranger@test.local', 'X', 'OWNER')$$);
+reset role;
+select t.as_anon();
+select t.expect_error('add staff: anon refused', '42501',
+  $$select public.add_staff_account('stranger@test.local', 'X', 'OWNER')$$);
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000e1');
+select t.check('added instructor can sign in and is active', (select status = 'ACTIVE' from public.current_staff()));
+reset role;
+
 -- Exposure check still passes ---------------------------------------------------
 select app.check_api_exposure();
 
 rollback;
-\echo foundation: all checks passed
+\echo staff: all checks passed

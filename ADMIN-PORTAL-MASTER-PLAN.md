@@ -780,7 +780,7 @@ audit_logs (
 | **방식** | Supabase Auth 이메일+비밀번호. **공개 가입 끔** (Allow new users to sign up = OFF) |
 | **첫 오너 (bootstrap)** | ① 사장님이 Supabase 대시보드 → Authentication → Add user(본인 이메일, 본인이 정한 비밀번호) ② SQL Editor에서 `select app.bootstrap_owner('본인 이메일');` 한 번 실행. 이 함수는 **OWNER가 아직 없을 때만** 동작하고, anon/authenticated 실행 권한이 없다 (대시보드 SQL Editor = 프로젝트 관리자만). 코드·저장소에 비밀번호 없음 |
 | **두 번째 오너** | 기존 오너가 Staff 화면에서 "Make owner" (DB 함수, 확인 대화상자, 감사로그). 마지막 오너는 강등·비활성화 불가 |
-| **강사 초대** | Staff → Invite → Edge Function `staff-admin`(action=invite): ① 호출자 JWT 검증 ② DB에서 호출자가 활성 OWNER인지 확인 ③ service role로 `inviteUserByEmail(email, redirectTo=/admin/set-password/)` ④ `staff_profiles` INSERT (INSTRUCTOR, INVITED) ⑤ 감사로그 |
+| **강사 초대** (→ 2026-10-10 변경: 아래 결정 참고) | Staff → Invite → Edge Function `staff-admin`(action=invite): ① 호출자 JWT 검증 ② DB에서 호출자가 활성 OWNER인지 확인 ③ service role로 `inviteUserByEmail(email, redirectTo=/admin/set-password/)` ④ `staff_profiles` INSERT (INSTRUCTOR, INVITED) ⑤ 감사로그 |
 | **초대 수락** | 메일 링크 → `/admin/set-password` → 비밀번호 설정 → 첫 로그인 시 `activate_my_account()`가 INVITED→ACTIVE. 링크 만료 시 오너가 [Resend] |
 | **로그인** | `signInWithPassword` → `me()` 호출로 역할·상태 확인 → INACTIVE면 즉시 로그아웃 + 안내 |
 | **로그아웃** | `signOut()` (이 기기 세션 종료). 계정 메뉴와 사이드바 하단 |
@@ -792,6 +792,10 @@ audit_logs (
 | **리다이렉트 허용 목록** | `https://letspilatesla.com/admin/set-password/`, `https://letspilatesla.com/staging/admin/set-password/` (+ 로컬 개발 주소) |
 | **XSS 방어** (토큰이 localStorage에 있으므로) | `dangerouslySetInnerHTML` 금지, 관리자 HTML에 `<meta http-equiv="Content-Security-Policy">`로 스크립트·연결 출처 제한(Supabase 도메인만) |
 | **오너 계정 잠김 대비** | 비밀번호 분실 → 재설정 메일. 메일 접근까지 잃으면 Supabase 대시보드(사장님 Supabase 계정)에서 복구. 오너 2명 운영 권장 |
+
+> **결정 (2026-10-10):** 메일 초대는 쓰지 않는다. 오너가 Supabase 대시보드에서 계정(이메일·비밀번호, Auto Confirm)을 만들고,
+> 포털 **Staff → 직원 추가**(`add_staff_account`, 오너 전용)로 역할을 준다. SMTP는 비밀번호 재설정 메일이 필요할 때만 선택 설정.
+> 신규 가입 끄기도 당장은 보류 (프로필 없는 가입자는 데이터 접근 불가). 실제 운영 전 끈다.
 
 ---
 

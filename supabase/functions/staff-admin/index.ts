@@ -1,5 +1,6 @@
-// staff-admin: owner-only staff account actions that need Supabase Auth admin
-// rights (sending invitations, deleting a pending invite, blocking sign-in).
+// staff-admin: owner-only staff actions that need Supabase Auth admin rights
+// (blocking and restoring sign-in). Staff accounts are created in the Supabase
+// dashboard and linked from the portal (add_staff_account), so no invitations.
 //
 // Deployed by the Supabase GitHub integration on push to the project's production
 // branch; supabase/config.toml turns the platform's "Verify JWT" off. The new sb_
@@ -7,11 +8,9 @@
 // call runs with the caller's own token, and the database functions refuse anyone
 // but an owner.
 //
-// POST JSON { action, ... }:
-//   invite      { email, fullName, pricingTier?, redirectTo }  (also re-sends)
-//   cancel      { userId }    pending invitations only
-//   deactivate  { userId }    blocks data access, then sign-in
-//   reactivate  { userId }
+// POST JSON { action, userId }:
+//   deactivate   blocks data access, then sign-in
+//   reactivate   restores both
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0';
 
 const ALLOWED_ORIGINS = [
@@ -22,7 +21,6 @@ const ALLOWED_ORIGINS = [
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const PUBLISHABLE_KEY = envKey('SUPABASE_PUBLISHABLE_KEYS', 'SUPABASE_ANON_KEY');
 const SECRET_KEY = envKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY');
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // New projects expose keys as JSON {"default": "..."}; older ones as plain strings.
 function envKey(jsonName: string, legacyName: string): string {
@@ -69,57 +67,7 @@ Deno.serve(async (req) => {
   }
   const { action, userId } = body;
 
-  if (action === 'invite') {
-    const email = (body.email ?? '').trim().toLowerCase();
-    const fullName = (body.fullName ?? '').trim();
-    const redirectTo = body.redirectTo ?? '';
-    if (!EMAIL_RE.test(email)) return reply(400, { error: 'Enter a valid email address.' });
-    if (!fullName || fullName.length > 80) return reply(400, { error: 'Enter a name (up to 80 characters).' });
-    if (!ALLOWED_ORIGINS.some((o) => redirectTo.startsWith(o + '/'))) {
-      return reply(400, { error: 'Invalid redirect address.' });
-    }
-
-    const { data: existing } = await asCaller
-      .from('staff_profiles')
-      .select('status')
-      .eq('email', email)
-      .maybeSingle();
-    if (existing && existing.status !== 'INVITED') {
-      return reply(409, { error: 'This person already has a staff account.' });
-    }
-
-    const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo,
-      data: { full_name: fullName },
-    });
-    if (inviteError || !invited.user) {
-      return reply(400, { error: inviteError?.message ?? 'The invitation could not be sent.' });
-    }
-
-    const { error: recordError } = await asCaller.rpc('record_staff_invite', {
-      p_user_id: invited.user.id,
-      p_full_name: fullName,
-      p_email: email,
-      p_pricing_tier: body.pricingTier || null,
-    });
-    if (recordError) {
-      // Do not leave a sign-in account behind without a staff profile.
-      if (!existing) await admin.auth.admin.deleteUser(invited.user.id);
-      return reply(400, { error: recordError.message });
-    }
-    return reply(200, { userId: invited.user.id });
-  }
-
   if (!userId) return reply(400, { error: 'Missing user.' });
-
-  if (action === 'cancel') {
-    const { data: cancelled, error } = await asCaller.rpc('cancel_staff_invite', { p_user_id: userId });
-    if (error) return reply(400, { error: error.message });
-    if (!cancelled) return reply(409, { error: 'Only pending invitations can be cancelled.' });
-    const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
-    if (deleteError) return reply(200, { warning: 'Invitation cancelled, but the sign-in account remains.' });
-    return reply(200, {});
-  }
 
   if (action === 'deactivate' || action === 'reactivate') {
     const active = action === 'reactivate';

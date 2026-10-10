@@ -23,8 +23,8 @@
 
 ## 2단계 — 인증(Authentication) 설정
 
-1. **가입 막기:** Authentication → Sign In / Providers → **Allow new users to sign up → 끄기**.
-   (Email 로그인 자체는 켜둔다. 초대받은 사람만 계정이 생긴다.)
+1. **(나중에) 가입 막기:** Authentication → Sign In / Providers → **Allow new users to sign up → 끄기**.
+   지금은 켜 둬도 된다: 가입해도 직원 프로필이 없으면 데이터에 접근할 수 없다. 실제 운영 전에는 끈다.
 2. **주소 설정:** Authentication → URL Configuration
    - **Site URL:** `https://letspilatesla.com/staging/admin/`
    - **Redirect URLs** (Add URL로 하나씩):
@@ -56,24 +56,29 @@ Claude가 `Staging`에 push할 때 `supabase/migrations/`의 새 SQL이 **자동
 - **Automatic branching(미리보기 브랜치)은 꺼 둔다.** PR마다 DB를 새로 만드는 유료 기능이라 지금은 필요 없다.
 - 연동을 끄고 수동으로 할 때만: 파일 Raw 내용을 SQL Editor에 붙여넣고 Run (한 번만).
 
-## 4단계 — 오너 계정 2개 (Calvin, Sunnie)
+## 4단계 — 첫 오너 계정 (1회)
 
 1. Authentication → **Users** → **Add user** → **Create new user**
-   - 이메일, 비밀번호(각자 정함, 8자 이상), **Auto Confirm User 체크** → Create.
-   - 두 분 각각 만든다.
-2. **SQL Editor**에서 실제 이메일·이름으로 바꿔 실행:
+   - 이메일, 비밀번호(8자 이상), **Auto Confirm User 체크** → Create.
+2. **SQL Editor**에서 실제 이메일·이름으로 실행 (따옴표 안을 실제 값으로 바꾼다):
    ```sql
-   select app.grant_owner('calvin의-이메일@example.com', 'Calvin 이름');
-   select app.grant_owner('sunnie의-이메일@example.com', 'Sunnie Lee');
+   select app.grant_owner('calvin@example.com', 'Calvin');
    ```
-3. 확인:
-   ```sql
-   select full_name, role, status from staff_profiles;
-   ```
-   → `OWNER / ACTIVE` 두 줄.
+   결과 칸이 비어 있으면 **성공**이다 (이 함수는 값을 돌려주지 않는다).
+3. 포털에서 로그인 (이미 로그인 중이면 새로고침).
 
 > `app.grant_owner`는 **SQL Editor(프로젝트 관리자)에서만** 실행된다. 사이트·API로는 호출할 수 없다.
-> 앞으로 오너 추가는 포털의 직원 화면 → "오너로 지정"으로 한다.
+> ⚠️ `auth.users` 전체를 한꺼번에 오너로 지정하는 쿼리는 **계정이 본인 것뿐일 때 한 번만** 쓴다.
+> 신규 가입이 열려 있으면 모르는 계정이 섞일 수 있으므로, 이후 직원은 아래 "직원 추가"로만 넣는다.
+
+## 직원 추가 (강사·두 번째 오너) — 메일 없이
+
+1. Supabase → Authentication → Users → **Add user** → 이메일·비밀번호 입력, **Auto Confirm User 체크** → Create.
+2. 포털 → **Staff → 직원 추가(Add staff)** → 같은 이메일, 이름, 역할(강사/오너), 가격 등급 → 추가.
+3. 그 사람에게 이메일과 비밀번호를 직접 알려준다. 첫 로그인 후 **My account → 비밀번호 변경**을 권한다.
+
+- 비활성화·재활성화·역할 변경도 Staff 화면에서 한다. 비활성화하면 즉시 데이터 접근이 막히고 로그인도 차단된다 (기록은 남는다).
+- 계정을 Supabase에서 **삭제하지 않는다** (지난 기록과 연결되어 있어 DB가 막는다). 그만둔 직원은 비활성화한다.
 
 ## 5단계 — Edge Function `staff-admin` (자동: GitHub 연동)
 
@@ -84,31 +89,26 @@ Claude가 `Staging`에 push할 때 `supabase/migrations/`의 새 SQL이 **자동
 - 이유: 새 키 형식(`sb_…`)은 JWT가 아니라서 함수가 호출자를 직접 확인한다. 오너가 아니면 DB 함수가 거부한다.
 - 별도 비밀값 설정은 필요 없다 (Supabase가 자동으로 넣어준다).
 
-## 6단계 — 메일 발송 설정 (강사 초대 전에 필수)
+## 6단계 (선택) — 메일 발송 설정
 
-Supabase 기본 메일 서버는 **조직 멤버에게만, 시간당 2통**까지만 보낸다 → 강사 초대가 실패한다.
-
-Authentication → **Emails** → **SMTP Settings** → Enable custom SMTP:
+지금은 메일을 쓰지 않는다 (직원 계정은 위의 "직원 추가"로 직접 만든다).
+메일이 필요한 곳은 **"비밀번호를 잊으셨나요?" 재설정 메일**뿐이다. Supabase 기본 메일은 조직 멤버에게만, 시간당 2통 보낸다.
+강사가 재설정 메일을 받게 하려면 Authentication → Emails → SMTP Settings에서 Gmail SMTP를 켠다:
 
 | 항목 | 값 |
 |---|---|
-| Sender email | `letspilatesla@gmail.com` |
-| Sender name | `Let's Pilates LA` |
-| Host | `smtp.gmail.com` |
-| Port | `465` |
-| Username | `letspilatesla@gmail.com` |
-| Password | Google **앱 비밀번호** (16자리) |
+| Sender email / Username | `letspilatesla@gmail.com` |
+| Host / Port | `smtp.gmail.com` / `465` |
+| Password | Google **앱 비밀번호** (2단계 인증 → 앱 비밀번호) |
 
-- 앱 비밀번호 만들기: Google 계정 → 보안 → **2단계 인증 켜기** → **앱 비밀번호** 생성.
-  일반 Gmail 비밀번호는 동작하지 않는다.
-- (선택) Emails → Templates → **Invite user** 제목을 `Let's Pilates LA 관리자 포털 초대`로 바꾸면 알아보기 쉽다.
+설정 전에는 강사가 비밀번호를 잊으면 Claude에게 요청 → 오너가 SQL로 새 비밀번호를 지정하는 방법을 안내받는다.
 
-## 7단계 — 동작 확인 (1단계 반영 후)
+## 7단계 — 동작 확인
 
-1. https://letspilatesla.com/staging/admin/ → 로그인 화면이 나온다.
-2. 오너 계정으로 로그인 → 대시보드에 "팀: 활성 2".
-3. **직원 → 강사 초대** → 본인의 다른 이메일로 테스트 → 메일의 링크 → 비밀번호 설정 → 강사 화면.
-4. 그 강사 계정으로 주소창에 `/staging/admin/staff/` 직접 입력 → 대시보드로 돌아간다 (정상: 오너 전용).
+1. https://letspilatesla.com/staging/admin/ → 오너 계정 로그인 → 대시보드.
+2. Supabase에서 테스트용 강사 계정 생성 → 포털 **Staff → 직원 추가**(역할: 강사).
+3. 다른 브라우저(또는 시크릿 창)에서 그 강사로 로그인 → 강사 화면 (직원 메뉴 없음).
+4. 강사 계정으로 주소창에 `/staging/admin/staff/` 직접 입력 → 대시보드로 돌아간다 (정상: 오너 전용).
 5. 오너로 그 강사를 **비활성화** → 강사 화면 새로고침 → "비활성 계정" (즉시 차단 확인).
 
 ## 8단계 (선택) — Claude가 직접 보안 테스트를 돌리게 하려면

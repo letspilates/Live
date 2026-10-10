@@ -1,12 +1,12 @@
-// Owner-only staff management: list, invite, cancel invite, deactivate,
-// reactivate, change role. Auth-admin actions go through the staff-admin
-// Edge Function; role changes call the owner-checked database function.
+// Owner-only staff management: list, add (link an account created in the
+// Supabase dashboard), deactivate, reactivate, change role. Blocking sign-in
+// goes through the staff-admin Edge Function; the rest are owner-checked
+// database functions.
 import { useEffect, useState, type FormEvent } from 'react';
 import { Ban, CircleCheck, Hourglass, UserPlus } from 'lucide-react';
 import { useStaff, type PricingTier, type Role, type StaffStatus } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
-import { adminUrl } from '../router';
 import { functionError, supabase } from '../supabase';
 import { Button, Card, Dialog, Initials, Notice, Skeleton, TextField, inputCls } from '../ui';
 
@@ -21,7 +21,7 @@ interface StaffRow {
   last_sign_in_at: string | null;
 }
 
-type Action = 'deactivate' | 'reactivate' | 'cancel' | 'makeOwner' | 'makeInstructor';
+type Action = 'deactivate' | 'reactivate' | 'makeOwner' | 'makeInstructor';
 type Message = { tone: 'success' | 'error' | 'info'; text: string };
 
 const ICON = { size: 16, strokeWidth: 1.75, 'aria-hidden': true } as const;
@@ -33,15 +33,13 @@ async function staffAdmin(body: Record<string, string>): Promise<{ error?: strin
   return { warning: data?.warning };
 }
 
-const inviteRedirect = () => window.location.origin + adminUrl('set-password');
-
 export default function StaffPage() {
   const { t, lang } = useT();
   const me = useStaff();
   const [rows, setRows] = useState<StaffRow[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [version, setVersion] = useState(0);
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [pending, setPending] = useState<{ action: Action; row: StaffRow } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
@@ -77,7 +75,6 @@ export default function StaffPage() {
       const done: Record<typeof action, TextKey> = {
         deactivate: 'deactivated',
         reactivate: 'reactivated',
-        cancel: 'inviteCancelled',
       };
       report(result, t(done[action], vars));
     }
@@ -86,38 +83,21 @@ export default function StaffPage() {
     reload();
   };
 
-  const resend = async (row: StaffRow) => {
-    setBusy(true);
-    const result = await staffAdmin({
-      action: 'invite',
-      email: row.email,
-      fullName: row.full_name,
-      pricingTier: row.pricing_tier ?? '',
-      redirectTo: inviteRedirect(),
-    });
-    setBusy(false);
-    report(result, t('inviteSent', { email: row.email }));
-    reload();
-  };
-
   const confirmText: Record<Action, TextKey> = {
     deactivate: 'confirmDeactivate',
     reactivate: 'confirmReactivate',
-    cancel: 'confirmCancelInvite',
     makeOwner: 'confirmMakeOwner',
     makeInstructor: 'confirmMakeInstructor',
   };
 
   const actionsFor = (row: StaffRow) => {
-    if (row.user_id === me.user_id) return null;
+    // Invited accounts only exist from the earlier email-invite flow.
+    if (row.user_id === me.user_id || row.status === 'INVITED') return null;
     const btn = (label: TextKey, onClick: () => void) => (
       <Button key={label} variant="secondary" className="min-h-9 px-3.5 text-[13px]" disabled={busy} onClick={onClick}>
         {t(label)}
       </Button>
     );
-    if (row.status === 'INVITED') {
-      return [btn('resendInvite', () => void resend(row)), btn('cancelInvite', () => setPending({ action: 'cancel', row }))];
-    }
     if (row.status === 'INACTIVE') return [btn('reactivate', () => setPending({ action: 'reactivate', row }))];
     return [
       row.role === 'OWNER'
@@ -133,9 +113,9 @@ export default function StaffPage() {
     <Layout
       title={t('navStaff')}
       actions={
-        <Button onClick={() => setInviteOpen(true)}>
+        <Button onClick={() => setAddOpen(true)}>
           <UserPlus size={18} strokeWidth={1.75} aria-hidden="true" />
-          {t('inviteInstructor')}
+          {t('addStaff')}
         </Button>
       }
     >
@@ -196,12 +176,12 @@ export default function StaffPage() {
         )}
       </div>
 
-      <InviteDialog
-        open={inviteOpen}
-        onClose={() => setInviteOpen(false)}
-        onSent={(email) => {
-          setInviteOpen(false);
-          setMessage({ tone: 'success', text: t('inviteSent', { email }) });
+      <AddStaffDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onAdded={(name) => {
+          setAddOpen(false);
+          setMessage({ tone: 'success', text: t('staffAdded', { name }) });
           reload();
         }}
       />
@@ -217,7 +197,7 @@ export default function StaffPage() {
                 {t('cancel')}
               </Button>
               <Button
-                variant={pending.action === 'deactivate' || pending.action === 'cancel' ? 'danger' : 'primary'}
+                variant={pending.action === 'deactivate' ? 'danger' : 'primary'}
                 disabled={busy}
                 onClick={() => void run()}
               >
@@ -246,18 +226,19 @@ function StatusBadge({ status }: { status: StaffStatus }) {
   );
 }
 
-function InviteDialog({
+function AddStaffDialog({
   open,
   onClose,
-  onSent,
+  onAdded,
 }: {
   open: boolean;
   onClose: () => void;
-  onSent: (email: string) => void;
+  onAdded: (name: string) => void;
 }) {
   const { t } = useT();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [role, setRole] = useState<Role>('INSTRUCTOR');
   const [tier, setTier] = useState('');
   const [errors, setErrors] = useState<{ name?: string; email?: string; form?: string }>({});
   const [busy, setBusy] = useState(false);
@@ -277,35 +258,30 @@ function InviteDialog({
     setErrors(next);
     if (next.name || next.email) return;
     setBusy(true);
-    const result = await staffAdmin({
-      action: 'invite',
-      email: email.trim(),
-      fullName: fullName.trim(),
-      pricingTier: tier,
-      redirectTo: inviteRedirect(),
+    const { error } = await supabase!.rpc('add_staff_account', {
+      p_email: email.trim(),
+      p_full_name: fullName.trim(),
+      p_role: role,
+      p_pricing_tier: tier || null,
     });
     setBusy(false);
-    if (result.error !== undefined) {
-      setErrors({ form: result.error || t('somethingWrong') });
+    if (error) {
+      const known: Record<string, TextKey> = { P0002: 'noSuchAccount', '23505': 'alreadyStaff' };
+      setErrors({ form: known[error.code] ? t(known[error.code]) : t('somethingWrong') });
       return;
     }
-    onSent(email.trim());
+    onAdded(fullName.trim());
     setFullName('');
     setEmail('');
+    setRole('INSTRUCTOR');
     setTier('');
   };
 
   return (
-    <Dialog open={open} onClose={close} title={t('inviteInstructor')}>
+    <Dialog open={open} onClose={close} title={t('addStaff')}>
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
+        <Notice tone="info">{t('addStaffNote')}</Notice>
         {errors.form && <Notice tone="error">{errors.form}</Notice>}
-        <TextField
-          label={t('fullName')}
-          autoComplete="off"
-          value={fullName}
-          error={errors.name}
-          onChange={(e) => setFullName(e.target.value)}
-        />
         <TextField
           label={t('email')}
           type="email"
@@ -315,23 +291,40 @@ function InviteDialog({
           error={errors.email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <div className="flex flex-col gap-2">
-          <label htmlFor="invite-tier" className="text-sm font-medium">
-            {t('tier')}
-          </label>
-          <select id="invite-tier" className={inputCls} value={tier} onChange={(e) => setTier(e.target.value)}>
-            <option value="">{t('tierNotSet')}</option>
-            <option value="CERTIFIED">{t('CERTIFIED')}</option>
-            <option value="MASTER">{t('MASTER')}</option>
-          </select>
+        <TextField
+          label={t('fullName')}
+          autoComplete="off"
+          value={fullName}
+          error={errors.name}
+          onChange={(e) => setFullName(e.target.value)}
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="add-role" className="text-sm font-medium">
+              {t('role')}
+            </label>
+            <select id="add-role" className={inputCls} value={role} onChange={(e) => setRole(e.target.value as Role)}>
+              <option value="INSTRUCTOR">{t('INSTRUCTOR')}</option>
+              <option value="OWNER">{t('OWNER')}</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="add-tier" className="text-sm font-medium">
+              {t('tier')}
+            </label>
+            <select id="add-tier" className={inputCls} value={tier} onChange={(e) => setTier(e.target.value)}>
+              <option value="">{t('tierNotSet')}</option>
+              <option value="CERTIFIED">{t('CERTIFIED')}</option>
+              <option value="MASTER">{t('MASTER')}</option>
+            </select>
+          </div>
         </div>
-        <p className="text-sm text-mute">{t('inviteNote')}</p>
         <div className="mt-2 flex justify-end gap-3">
           <Button variant="secondary" onClick={close}>
             {t('cancel')}
           </Button>
           <Button type="submit" disabled={busy}>
-            {busy ? t('sending') : t('sendInvite')}
+            {busy ? t('saving') : t('addStaff')}
           </Button>
         </div>
       </form>
