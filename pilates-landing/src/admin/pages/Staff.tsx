@@ -1,7 +1,7 @@
-// Owner-only staff management: list, add (link an account created in the
-// Supabase dashboard), deactivate, reactivate, change role. Blocking sign-in
-// goes through the staff-admin Edge Function; the rest are owner-checked
-// database functions.
+// Owner-only staff management: list, add (creates the login and the staff
+// profile in one step), deactivate, reactivate, change role. Actions that need
+// Supabase Auth admin rights go through the staff-admin Edge Function; role
+// changes are an owner-checked database function.
 import { useEffect, useState, type FormEvent } from 'react';
 import { Ban, CircleCheck, Hourglass, UserPlus } from 'lucide-react';
 import { useStaff, type PricingTier, type Role, type StaffStatus } from '../auth';
@@ -27,10 +27,15 @@ type Message = { tone: 'success' | 'error' | 'info'; text: string };
 const ICON = { size: 16, strokeWidth: 1.75, 'aria-hidden': true } as const;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-async function staffAdmin(body: Record<string, string>): Promise<{ error?: string; warning?: string }> {
+type AdminResult = { error?: string; code?: string; warning?: string; linkedExisting?: boolean };
+
+async function staffAdmin(body: Record<string, string>): Promise<AdminResult> {
   const { data, error } = await supabase!.functions.invoke('staff-admin', { body });
-  if (error) return { error: (await functionError(error)) ?? '' };
-  return { warning: data?.warning };
+  if (error) {
+    const detail = await functionError(error);
+    return { error: detail.error ?? '', code: detail.code };
+  }
+  return data ?? {};
 }
 
 export default function StaffPage() {
@@ -53,7 +58,7 @@ export default function StaffPage() {
 
   const reload = () => setVersion((v) => v + 1);
 
-  const report = (result: { error?: string; warning?: string }, success: string) => {
+  const report = (result: AdminResult, success: string) => {
     if (result.error !== undefined) setMessage({ tone: 'error', text: result.error || t('somethingWrong') });
     else if (result.warning) setMessage({ tone: 'info', text: result.warning });
     else setMessage({ tone: 'success', text: success });
@@ -179,9 +184,9 @@ export default function StaffPage() {
       <AddStaffDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onAdded={(name) => {
+        onAdded={(name, linkedExisting) => {
           setAddOpen(false);
-          setMessage({ tone: 'success', text: t('staffAdded', { name }) });
+          setMessage({ tone: 'success', text: t(linkedExisting ? 'staffLinked' : 'staffAdded', { name }) });
           reload();
         }}
       />
@@ -233,14 +238,15 @@ function AddStaffDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onAdded: (name: string) => void;
+  onAdded: (name: string, linkedExisting: boolean) => void;
 }) {
   const { t } = useT();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('INSTRUCTOR');
   const [tier, setTier] = useState('');
-  const [errors, setErrors] = useState<{ name?: string; email?: string; form?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string; form?: string }>({});
   const [busy, setBusy] = useState(false);
 
   const close = () => {
@@ -252,27 +258,30 @@ function AddStaffDialog({
     e.preventDefault();
     if (busy) return;
     const next = {
-      name: fullName.trim() ? undefined : t('enterName'),
       email: EMAIL_RE.test(email.trim()) ? undefined : t('enterEmail'),
+      name: fullName.trim() ? undefined : t('enterName'),
+      password: password.length >= 8 ? undefined : t('passwordTooShort'),
     };
     setErrors(next);
-    if (next.name || next.email) return;
+    if (next.name || next.email || next.password) return;
     setBusy(true);
-    const { error } = await supabase!.rpc('add_staff_account', {
-      p_email: email.trim(),
-      p_full_name: fullName.trim(),
-      p_role: role,
-      p_pricing_tier: tier || null,
+    const result = await staffAdmin({
+      action: 'create',
+      email: email.trim(),
+      fullName: fullName.trim(),
+      password,
+      role,
+      pricingTier: tier,
     });
     setBusy(false);
-    if (error) {
-      const known: Record<string, TextKey> = { P0002: 'noSuchAccount', '23505': 'alreadyStaff' };
-      setErrors({ form: known[error.code] ? t(known[error.code]) : t('somethingWrong') });
+    if (result.error !== undefined) {
+      setErrors({ form: result.code === '23505' ? t('alreadyStaff') : result.error || t('somethingWrong') });
       return;
     }
-    onAdded(fullName.trim());
+    onAdded(fullName.trim(), Boolean(result.linkedExisting));
     setFullName('');
     setEmail('');
+    setPassword('');
     setRole('INSTRUCTOR');
     setTier('');
   };
@@ -298,7 +307,18 @@ function AddStaffDialog({
           error={errors.name}
           onChange={(e) => setFullName(e.target.value)}
         />
-        <div className="grid gap-4 sm:grid-cols-2">
+        <TextField
+          label={t('firstPassword')}
+          type="text"
+          autoComplete="new-password"
+          autoCapitalize="off"
+          spellCheck={false}
+          hint={t('firstPasswordHint')}
+          value={password}
+          error={errors.password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-2">
             <label htmlFor="add-role" className="text-sm font-medium">
               {t('role')}

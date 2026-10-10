@@ -793,8 +793,8 @@ audit_logs (
 | **XSS 방어** (토큰이 localStorage에 있으므로) | `dangerouslySetInnerHTML` 금지, 관리자 HTML에 `<meta http-equiv="Content-Security-Policy">`로 스크립트·연결 출처 제한(Supabase 도메인만) |
 | **오너 계정 잠김 대비** | 비밀번호 분실 → 재설정 메일. 메일 접근까지 잃으면 Supabase 대시보드(사장님 Supabase 계정)에서 복구. 오너 2명 운영 권장 |
 
-> **결정 (2026-10-10):** 메일 초대는 쓰지 않는다. 오너가 Supabase 대시보드에서 계정(이메일·비밀번호, Auto Confirm)을 만들고,
-> 포털 **Staff → 직원 추가**(`add_staff_account`, 오너 전용)로 역할을 준다. SMTP는 비밀번호 재설정 메일이 필요할 때만 선택 설정.
+> **결정 (2026-10-10):** 메일 초대는 쓰지 않는다. 오너가 포털 **Staff → 직원 추가**에서 이메일·이름·처음 비밀번호·역할을 넣으면
+> `staff-admin`(action=create)이 로그인 계정을 만들고 `add_staff_account`(오너 전용)로 프로필을 붙인다 (한 번에, 실패 시 계정 정리). SMTP는 비밀번호 재설정 메일이 필요할 때만 선택 설정.
 > 신규 가입 끄기도 당장은 보류 (프로필 없는 가입자는 데이터 접근 불가). 실제 운영 전 끈다.
 
 ---

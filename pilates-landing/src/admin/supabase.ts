@@ -29,16 +29,15 @@ export const supabase: SupabaseClient | null =
     ? createClient(project.url, project.publishableKey)
     : null;
 
-/** Reads the message an Edge Function returned with a non-2xx status. */
-export async function functionError(error: unknown): Promise<string | null> {
+/** Reads { error, code } that an Edge Function returned with a non-2xx status. */
+export async function functionError(error: unknown): Promise<{ error?: string; code?: string }> {
   const context = (error as { context?: Response } | null)?.context;
   if (context && typeof context.json === 'function') {
     try {
-      const body = await context.json();
-      if (typeof body?.error === 'string') return body.error;
+      return await context.json();
     } catch {
       /* not JSON */
     }
   }
-  return null;
+  return {};
 }

@@ -165,7 +165,7 @@ export function Dialog({
       ref={ref}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
-      className="w-[min(calc(100%-2rem),28rem)] rounded-[20px] bg-paper p-0 text-ink shadow-[0_24px_60px_rgba(28,26,22,0.18)] backdrop:bg-ink/30"
+      className="max-h-[calc(100dvh-2rem)] w-[min(calc(100%-2rem),28rem)] overflow-y-auto rounded-[20px] bg-paper p-0 text-ink shadow-[0_24px_60px_rgba(28,26,22,0.18)] backdrop:bg-ink/30"
     >
       <div className="p-6">
         <h2 className="mb-4 font-display text-lg font-semibold">{title}</h2>
