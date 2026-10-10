@@ -79,6 +79,23 @@ const MEMBERS = [
 ];
 let duplicateOnce = false;
 
+// Expenses (this month at the studio)
+const MONTH = `${LA_TODAY.slice(0, 8)}01`;
+const CATEGORIES = [['RENT', 'Studio Rent'], ['INSTRUCTOR_PAY', 'Instructor Compensation'], ['UTILITIES', 'Utilities'], ['SOFTWARE', 'Software Subscriptions'], ['OTHER', 'Other Expenses']]
+  .map(([code, name_en]) => ({ code, name_en, name_ko: name_en }));
+const exp = (e) => ({ vendor: '', due_date: null, payment_status: 'UNPAID', paid_on: null, payment_method: null, status: 'ACTIVE', void_reason: '',
+  recurring_rule_id: null, is_estimate: false, payee_staff_id: null, notes: '', period_month: MONTH, ...e });
+const EXPENSES = [
+  exp({ id: 'e-rent', category: 'RENT', description: 'Monthly studio rent', amount_cents: 300000, expense_date: MONTH, recurring_rule_id: 'r-rent' }),
+  exp({ id: 'e-app', category: 'SOFTWARE', description: 'Mindbody subscription', vendor: 'Mindbody', amount_cents: 27900, expense_date: MONTH,
+    payment_status: 'PAID', paid_on: MONTH, payment_method: 'CARD' }),
+  exp({ id: 'e-elec', category: 'UTILITIES', description: 'Electricity', amount_cents: 18000, expense_date: `${MONTH.slice(0, 8)}09`, is_estimate: true }),
+  exp({ id: 'e-void', category: 'OTHER', description: 'Typo entry', amount_cents: 5000, expense_date: `${MONTH.slice(0, 8)}05`, status: 'VOID', void_reason: 'Entered twice' }),
+];
+const RULES = [{ id: 'r-rent', category: 'RENT', description: 'Monthly studio rent', vendor: 'Landlord', amount_cents: 300000, due_day: 1,
+  start_month: MONTH, end_month: null, is_estimate: false, payee_staff_id: null, active: true }];
+const writes = []; // [table, method, body, url]
+
 /** A page signed in as `who` (or signed out when null) at the given width. */
 async function open(who, width, path = '') {
   const context = await browser.newContext({ viewport: { width, height: width < 768 ? 852 : 900 } });
@@ -161,6 +178,20 @@ async function open(who, width, path = '') {
       return r.fulfill({ json: pay({ id: 'p-new', amount_cents: body.p_amount_cents, method: body.p_method, payer_name: body.p_payer_name ?? 'Mina Cho', recorded_by: staff.user_id, recorded_by_name: staff.full_name, collected_by: body.p_collected_by, collected_by_name: Object.values(PEOPLE).find((x) => x.user_id === body.p_collected_by)?.full_name ?? 'Ben Yoo', recorded_at: new Date().toISOString() }) });
     });
   }
+  await context.route(`${SUPABASE}/rest/v1/expense_categories?**`, (r) => r.fulfill({ json: CATEGORIES }));
+  await context.route(`${SUPABASE}/rest/v1/staff_profiles?**`, (r) => r.fulfill({ json: Object.values(PEOPLE) }));
+  await context.route(`${SUPABASE}/rest/v1/rpc/generate_recurring_expenses`, (r) => r.fulfill({ json: 1 }));
+  for (const [table, rows] of [['expenses', EXPENSES], ['recurring_expense_rules', RULES]]) {
+    await context.route(`${SUPABASE}/rest/v1/${table}**`, (r) => {
+      const req = r.request();
+      if (req.method() !== 'GET') {
+        writes.push([table, req.method(), req.postDataJSON(), decodeURIComponent(req.url())]);
+        return r.fulfill({ status: 201, body: '' });
+      }
+      const month = new URL(req.url()).searchParams.get('period_month');
+      return r.fulfill({ json: month ? rows.filter((x) => `eq.${x.period_month}` === month) : rows });
+    });
+  }
   // Staging no longer uses the Google Sheet at all.
   await context.route('https://script.google.com/**', (r) => {
     browserCalledSheet = true;
@@ -196,7 +227,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Enrollments' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Daily Income,Members,Enrollments,Staff', `${device}: owner menu`);
+    check((await navLabels(page)).join() === 'Dashboard,Daily Income,Members,Expenses,Enrollments,Staff', `${device}: owner menu`);
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
     } else {
@@ -269,7 +300,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
   }
-  for (const path of ['enrollments/', 'staff/', 'members/']) {
+  for (const path of ['enrollments/', 'staff/', 'members/', 'expenses/']) {
     const { page, context } = await open(who, 1280, path);
     await page.waitForURL(/\/admin\/$/);
     check(!(await page.getByRole('tab').count()), `${who}: /${path} redirects to dashboard`);
@@ -587,9 +618,131 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     check(scRow?.p_source === 'SCHEDULISTA' && scRow.p_rows[0].visits === '44' && scRow.p_rows[0].last_visit === '2026-09-18 18:30:00'
       && scRow.p_rows[0].services.join() === 'Private with Sunnie' && scRow.p_rows[0].notes === 'Knee', 'import: Schedulista fields, "All" dropped');
     await file.setInputFiles({ name: 'other.csv', mimeType: 'text/csv', buffer: Buffer.from('a,b\n1,2\n') });
+    await page.getByText('not a Mindbody or Schedulista client export').waitFor({ timeout: 3000 }).catch(() => {});
     check(await page.getByText('not a Mindbody or Schedulista client export').isVisible(), 'import: other files refused');
   }
   check(errors.length === 0, `${device} members: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 12. Expenses (owner): month list, totals, add / mark paid / void, CSV, recurring rules
+for (const [device, width] of Object.entries(WIDTHS)) {
+  writes.length = 0;
+  const { page, context, errors } = await open('OWNER', width, 'expenses/');
+  await page.getByText('Monthly studio rent').waitFor();
+  const main = page.locator('main');
+  check((await page.locator('h1').innerText()) === 'Expenses', `${device} expenses: title`);
+  check(await page.getByText('Recurring expenses added: 1.').isVisible(), `${device} expenses: recurring expenses created on open`);
+  const totals = await main.locator('dl').innerText();
+  check(totals.includes('$3,459.00') && totals.includes('$279.00') && totals.includes('Unpaid (2)') && totals.includes('$3,180.00'),
+    `${device} expenses: totals leave the void out`);
+  check(await main.getByText('Estimate', { exact: true }).isVisible(), `${device} expenses: estimate tag`);
+  check(await main.locator('li', { hasText: 'Monthly studio rent' }).getByTitle('From a recurring expense').isVisible(), `${device} expenses: recurring mark`);
+  check(await main.locator('li', { hasText: 'Typo entry' }).getByText('Void').isVisible(), `${device} expenses: void row labelled`);
+  check(await noOverflow(page), `${device} expenses: no sideways scroll`);
+  await shot(page, `${device}-expenses`);
+  await page.getByLabel('Status').selectOption('UNPAID');
+  check(!(await main.getByText('Mindbody subscription').count()) && await main.getByText('Electricity').isVisible(), `${device} expenses: unpaid filter`);
+  await page.getByLabel('Status').selectOption('');
+
+  if (device === 'desktop') {
+    await main.locator('li', { hasText: 'Monthly studio rent' }).getByRole('button', { name: 'Mark paid' }).click();
+    let dialog = page.locator('dialog[open]');
+    check(await dialog.getByRole('radio', { name: 'Paid', exact: true }).getAttribute('aria-checked') === 'true', 'mark paid: Paid preselected');
+    await dialog.getByRole('button', { name: 'Save expense' }).click();
+    check(await dialog.getByText('Choose how it was paid.').isVisible(), 'mark paid: asks how it was paid');
+    await dialog.getByLabel('Paid with').selectOption('BANK');
+    await dialog.getByRole('button', { name: 'Save expense' }).click();
+    await page.getByText('Expense saved.').waitFor();
+    const paid = writes.find(([t, m]) => t === 'expenses' && m === 'PATCH');
+    check(paid?.[3].includes('id=eq.e-rent') && paid[2].payment_status === 'PAID' && paid[2].paid_on === LA_TODAY && paid[2].payment_method === 'BANK'
+      && paid[2].amount_cents === 300000, 'mark paid: saved as paid today by bank transfer');
+
+    writes.length = 0;
+    await page.getByRole('button', { name: 'Add expense' }).click();
+    dialog = page.locator('dialog[open]');
+    await dialog.getByLabel('Category').selectOption('INSTRUCTOR_PAY');
+    await dialog.getByLabel('Description').fill('Ana, September');
+    await dialog.getByLabel('Amount ($)').fill('1,300');
+    await dialog.getByLabel('Paid to (staff)').selectOption('u-ins');
+    await shot(page, 'desktop-add-expense');
+    await dialog.getByRole('button', { name: 'Save expense' }).click();
+    await page.getByText('Expense saved.').waitFor();
+    const added = writes.find(([t, m]) => t === 'expenses' && m === 'POST')?.[2];
+    check(added?.amount_cents === 130000 && added.payee_staff_id === 'u-ins' && added.payment_status === 'UNPAID' && added.expense_date === LA_TODAY,
+      'add expense: instructor pay linked to the staff member');
+
+    writes.length = 0;
+    await main.getByRole('button', { name: /Electricity/ }).click();
+    dialog = page.locator('dialog[open]');
+    await dialog.getByRole('button', { name: 'Void expense' }).click();
+    await dialog.getByLabel('Reason').fill('Paid by the landlord');
+    await dialog.getByRole('button', { name: 'Void expense' }).click();
+    await page.getByText('Expense voided.').waitFor();
+    const voided = writes.find(([t]) => t === 'expenses')?.[2];
+    check(voided?.status === 'VOID' && voided.void_reason === 'Paid by the landlord', 'void: status and reason saved');
+
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export CSV' }).click()]);
+    const csv = (await import('node:fs')).readFileSync(await download.path(), 'utf8');
+    check(download.suggestedFilename() === `expenses-${MONTH.slice(0, 7)}.csv` && csv.includes('Date,Category,Description') && csv.includes('Monthly studio rent')
+      && csv.includes('3000'), 'export: CSV of the month');
+
+    await page.getByRole('button', { name: 'Next month' }).click();
+    await page.getByText(/^No expenses in .* yet\.$/).waitFor();
+    check(true, 'next month: empty month message');
+  }
+
+  if (device === 'phone') {
+    writes.length = 0;
+    await page.getByRole('button', { name: 'Add expense' }).click();
+    const dialog = page.locator('dialog[open]');
+    await dialog.getByLabel('Category').selectOption('OTHER');
+    await dialog.getByLabel('Description').fill('Spring credit');
+    await dialog.getByLabel('Amount ($)').fill('-50');
+    await dialog.getByRole('button', { name: 'Save expense' }).click();
+    check(await dialog.getByText('Add a note saying what the credit is for.').isVisible(), 'credit: needs a note');
+    check(!(await dialog.getByLabel('Paid to (staff)').count()), 'add expense: staff field only for instructor pay');
+    await dialog.getByLabel('Note').fill('Refund for a broken spring');
+    await shot(page, 'phone-add-expense');
+    await dialog.getByRole('button', { name: 'Save expense' }).click();
+    await page.getByText('Expense saved.').waitFor();
+    check(writes.find(([t, m]) => t === 'expenses' && m === 'POST')?.[2].amount_cents === -5000, 'credit: saved as -$50.00');
+
+    writes.length = 0;
+    await page.getByRole('tab', { name: 'Recurring' }).click();
+    await page.getByRole('button', { name: 'Add recurring expense' }).click();
+    const rule = page.locator('dialog[open]');
+    await rule.getByLabel('Category').selectOption('UTILITIES');
+    await rule.getByLabel('Description').fill('Water');
+    await rule.getByLabel('Amount ($)').fill('60');
+    await rule.getByLabel('Due day').fill('31');
+    await shot(page, 'phone-add-rule');
+    await rule.getByRole('button', { name: 'Save' }).click();
+    await page.getByText('Recurring expense saved.').waitFor();
+    const r = writes.find(([t, m]) => t === 'recurring_expense_rules' && m === 'POST')?.[2];
+    check(r?.amount_cents === 6000 && r.due_day === 31 && r.start_month === MONTH && r.end_month === null, 'rule: added from this month, day 31');
+  }
+
+  if (device === 'tablet') {
+    writes.length = 0;
+    await page.getByRole('tab', { name: 'Recurring' }).click();
+    await page.getByText('$3,000.00 / mo').waitFor();
+    check(await noOverflow(page), 'tablet recurring: no sideways scroll');
+    await shot(page, 'tablet-recurring');
+    await main.getByRole('button', { name: /Monthly studio rent/ }).click();
+    const rule = page.locator('dialog[open]');
+    check(!(await rule.getByText('Also change this month').count()), 'rule: no apply-now box before the amount changes');
+    await rule.getByLabel('Amount ($)').fill('3,200');
+    await rule.getByText('Also change this month’s unpaid expense').click();
+    await rule.getByRole('button', { name: 'Save' }).click();
+    await page.getByText('Recurring expense saved.').waitFor();
+    const ruleWrite = writes.find(([t, m]) => t === 'recurring_expense_rules' && m === 'PATCH');
+    const thisMonth = writes.find(([t, m]) => t === 'expenses' && m === 'PATCH');
+    check(ruleWrite?.[2].amount_cents === 320000 && ruleWrite[3].includes('id=eq.r-rent'), 'rule: new amount saved');
+    check(thisMonth?.[2].amount_cents === 320000 && thisMonth[3].includes('recurring_rule_id=eq.r-rent') && thisMonth[3].includes(`period_month=eq.${MONTH}`)
+      && thisMonth[3].includes('payment_status=eq.UNPAID'), 'rule: this month\'s unpaid expense follows, past months untouched');
+  }
+  check(errors.length === 0, `${device} expenses: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 

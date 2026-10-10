@@ -10,6 +10,7 @@ import Account from './pages/Account';
 import DailyIncome from './pages/DailyIncome';
 import Dashboard from './pages/Dashboard';
 import Enrollments from './pages/Enrollments';
+import Expenses from './pages/Expenses';
 import Login from './pages/Login';
 import Members from './pages/Members';
 import SetPassword from './pages/SetPassword';
@@ -19,6 +20,7 @@ const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType>
   '': Dashboard,
   'daily-income': DailyIncome,
   members: Members,
+  expenses: Expenses,
   enrollments: Enrollments,
   staff: StaffPage,
   account: Account,
