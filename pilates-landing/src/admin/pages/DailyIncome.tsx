@@ -13,12 +13,14 @@ import {
   formatDay,
   formatTime,
   laToday,
+  loadCollectors,
   loadMethods,
   loadPayments,
   methodLabel,
   parseCents,
   rangeDates,
   totals,
+  type Collector,
   type Method,
   type Payment,
   type Range,
@@ -52,12 +54,12 @@ export default function DailyIncome() {
   const [tab, setTab] = useState<'record' | 'history'>(() =>
     new URLSearchParams(window.location.search).get('tab') === 'history' ? 'history' : 'record',
   );
-  const [methods, setMethods] = useState<Method[] | null>(null);
+  const [data, setData] = useState<{ methods: Method[]; collectors: Collector[] } | null>(null);
   const [failed, setFailed] = useState(false);
 
   const load = () =>
-    loadMethods()
-      .then(setMethods)
+    Promise.all([loadMethods(), loadCollectors()])
+      .then(([methods, collectors]) => setData({ methods, collectors }))
       .catch(() => setFailed(true));
   useEffect(() => {
     load();
@@ -101,15 +103,15 @@ export default function DailyIncome() {
             {t('tryAgain')}
           </Button>
         </div>
-      ) : !methods ? (
+      ) : !data ? (
         <div className="grid max-w-xl gap-4" aria-busy="true">
           <Skeleton className="h-48 w-full rounded-2xl" />
           <Skeleton className="h-32 w-full rounded-2xl" />
         </div>
       ) : tab === 'record' ? (
-        <RecordPayment methods={methods} onShowHistory={() => show('history')} />
+        <RecordPayment {...data} onShowHistory={() => show('history')} />
       ) : (
-        <History methods={methods} />
+        <History {...data} />
       )}
     </Layout>
   );
@@ -128,8 +130,19 @@ function readLastMethod(methods: Method[]): string {
   }
 }
 
-function RecordPayment({ methods, onShowHistory }: { methods: Method[]; onShowHistory: () => void }) {
+function RecordPayment({
+  methods,
+  collectors,
+  onShowHistory,
+}: {
+  methods: Method[];
+  collectors: Collector[];
+  onShowHistory: () => void;
+}) {
   const { t, lang } = useT();
+  const me = useStaff();
+  // Who was handed the money: the person typing, unless they pick someone else.
+  const [collector, setCollector] = useState(me.user_id);
   const [payer, setPayer] = useState<Payer | null>(null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState(() => readLastMethod(methods));
@@ -168,6 +181,7 @@ function RecordPayment({ methods, onShowHistory }: { methods: Method[]; onShowHi
       p_payer_name: payer.kind === 'walkin' ? payer.name.trim() || null : null,
       p_notes: notes.trim(),
       p_confirm_duplicate: confirmDuplicate,
+      p_collected_by: collector,
     });
     setBusy(false);
     if (dbError) {
@@ -192,6 +206,7 @@ function RecordPayment({ methods, onShowHistory }: { methods: Method[]; onShowHi
     setTried(false);
     setError('');
     setSaved(null);
+    setCollector(me.user_id);
     setRequestId(crypto.randomUUID());
   };
 
@@ -206,6 +221,7 @@ function RecordPayment({ methods, onShowHistory }: { methods: Method[]; onShowHi
             <p className="mt-1 text-sm text-mute">
               {methodLabel(methods, saved.method, lang)} · {saved.payer_name} · {formatTime(saved.recorded_at)}
             </p>
+            <p className="mt-1 text-sm text-mute">{t('receivedByName', { name: saved.collected_by_name })}</p>
           </div>
         </div>
         <div className="mt-6 flex flex-wrap gap-3">
@@ -294,6 +310,7 @@ function RecordPayment({ methods, onShowHistory }: { methods: Method[]; onShowHi
             </div>
             {tried && !method && <p className="mt-2 text-sm text-red-700">{t('chooseMethod')}</p>}
           </fieldset>
+          <CollectorSelect collectors={collectors} value={collector} onChange={setCollector} />
           {noteOpen ? (
             <TextField
               label={t('note')}
@@ -345,6 +362,33 @@ function RecordPayment({ methods, onShowHistory }: { methods: Method[]; onShowHi
         </div>
       </Dialog>
     </form>
+  );
+}
+
+function CollectorSelect({
+  collectors,
+  value,
+  onChange,
+}: {
+  collectors: Collector[];
+  value: string;
+  onChange: (userId: string) => void;
+}) {
+  const { t } = useT();
+  const me = useStaff();
+  // The picker always offers the current choice, even if that person was deactivated since.
+  const options = collectors.some((c) => c.user_id === value) ? collectors : [...collectors, { user_id: value, full_name: '—' }];
+  return (
+    <label className="flex flex-col gap-2">
+      <span className="text-sm font-medium text-ink">{t('receivedBy')}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
+        {options.map((c) => (
+          <option key={c.user_id} value={c.user_id}>
+            {c.user_id === me.user_id ? t('meName', { name: c.full_name }) : c.full_name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -533,7 +577,7 @@ const RANGES: { id: Range; label: TextKey }[] = [
   { id: 'custom', label: 'rangeCustom' },
 ];
 
-function History({ methods }: { methods: Method[] }) {
+function History({ methods, collectors }: { methods: Method[]; collectors: Collector[] }) {
   const { t, lang } = useT();
   const me = useStaff();
   const owner = me.role === 'OWNER';
@@ -563,10 +607,10 @@ function History({ methods }: { methods: Method[] }) {
     };
   }, [from, to, version]);
 
-  const recorders = [...new Map((rows ?? []).map((r) => [r.recorded_by, r.recorded_by_name])).entries()];
+  const receivers = [...new Map((rows ?? []).map((r) => [r.collected_by, r.collected_by_name])).entries()];
   const shown = (rows ?? []).filter(
     (r) =>
-      (!who || r.recorded_by === who) &&
+      (!who || r.collected_by === who) &&
       (!methodFilter || r.method === methodFilter) &&
       (!statusFilter || r.status === statusFilter),
   );
@@ -592,9 +636,9 @@ function History({ methods }: { methods: Method[] }) {
         )}
         {owner && (
           <>
-            <Select label={t('recordedBy')} value={who} onChange={setWho} className={selectCls}>
+            <Select label={t('receivedBy')} value={who} onChange={setWho} className={selectCls}>
               <option value="">{t('everyone')}</option>
-              {recorders.map(([id, name]) => (
+              {receivers.map(([id, name]) => (
                 <option key={id} value={id}>
                   {name}
                 </option>
@@ -670,7 +714,7 @@ function History({ methods }: { methods: Method[] }) {
                       {[
                         oneDay ? formatTime(r.recorded_at) : `${formatDay(r.business_date, lang)}, ${formatTime(r.recorded_at)}`,
                         methodLabel(methods, r.method, lang),
-                        owner ? r.recorded_by_name : '',
+                        owner || r.collected_by !== me.user_id ? t('receivedByName', { name: r.collected_by_name }) : '',
                       ]
                         .filter(Boolean)
                         .join(' · ')}
@@ -693,6 +737,7 @@ function History({ methods }: { methods: Method[] }) {
         <PaymentDialog
           payment={open}
           methods={methods}
+          collectors={collectors}
           onClose={() => setOpen(null)}
           onDone={(text) => {
             setOpen(null);
@@ -777,11 +822,13 @@ function DateInput({
 function PaymentDialog({
   payment: p,
   methods,
+  collectors,
   onClose,
   onDone,
 }: {
   payment: Payment;
   methods: Method[];
+  collectors: Collector[];
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
@@ -791,6 +838,7 @@ function PaymentDialog({
   const [mode, setMode] = useState<'view' | 'correct' | 'void' | 'refund'>('view');
   const [amount, setAmount] = useState(centsInput(p.amount_cents));
   const [method, setMethod] = useState(p.method);
+  const [collector, setCollector] = useState(p.collected_by);
   const [notes, setNotes] = useState(p.notes);
   const [reason, setReason] = useState('');
   const [refunded, setRefunded] = useState<number | null>(null);
@@ -836,6 +884,7 @@ function PaymentDialog({
             p_method: method,
             p_notes: notes.trim(),
             p_reason: reason.trim(),
+            p_collected_by: collector,
           })
         : mode === 'void'
           ? supabase!.rpc('void_payment', { p_id: p.id, p_reason: reason.trim() })
@@ -862,6 +911,7 @@ function PaymentDialog({
     ['amount', `${p.kind === 'REFUND' ? '−' : ''}${formatCents(p.amount_cents)}`],
     ['method', methodLabel(methods, p.method, lang)],
     ['when', `${formatDay(p.business_date, lang)}, ${formatTime(p.recorded_at)}`],
+    ['receivedBy', p.collected_by_name],
     ['recordedBy', p.recorded_by_name],
     ['status', `${p.kind === 'REFUND' ? `${t('refund')} · ` : ''}${t(valid ? 'statusValid' : 'statusVoid')}`],
   ];
@@ -951,6 +1001,7 @@ function PaymentDialog({
               </label>
             </>
           )}
+          {mode === 'correct' && <CollectorSelect collectors={collectors} value={collector} onChange={setCollector} />}
           {mode === 'correct' && (
             <TextField label={t('note')} maxLength={500} value={notes} onChange={(e) => setNotes(e.target.value)} />
           )}

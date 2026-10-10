@@ -54,7 +54,7 @@ const HITS = [
   { id: 's-mina', full_name: 'Mina Cho', phone_last4: '0142', last_paid_on: LA_YESTERDAY, last_amount_cents: 10000, last_method: 'ZELLE' },
   { id: 's-leo', full_name: 'Leo Park', phone_last4: '', last_paid_on: null, last_amount_cents: null, last_method: null },
 ];
-const pay = (r) => ({ kind: 'PAYMENT', status: 'VALID', student_id: null, related_transaction_id: null, notes: '', reason: '', business_date: LA_TODAY, ...r });
+const pay = (r) => ({ collected_by: r.recorded_by, collected_by_name: r.recorded_by_name, kind: 'PAYMENT', status: 'VALID', student_id: null, related_transaction_id: null, notes: '', reason: '', business_date: LA_TODAY, ...r });
 const PAYMENTS = [
   pay({ id: 'p-1', amount_cents: 10000, method: 'CASH', payer_name: 'Mina Cho', recorded_by: 'u-ins', recorded_by_name: 'Ana Park', recorded_at: new Date().toISOString() }),
   pay({ id: 'p-2', amount_cents: 15000, method: 'ZELLE', payer_name: 'Leo Park', recorded_by: 'u-ben', recorded_by_name: 'Ben Yoo', recorded_at: new Date().toISOString() }),
@@ -120,6 +120,9 @@ async function open(who, width, path = '') {
       && (!from || p.business_date >= from) && (!to || p.business_date <= to));
     return r.fulfill({ json: rows });
   });
+  await context.route(`${SUPABASE}/rest/v1/rpc/list_collectors`, (r) =>
+    r.fulfill({ json: [...Object.values(PEOPLE), { user_id: 'u-ben', full_name: 'Ben Yoo' }].map(({ user_id, full_name }) => ({ user_id, full_name })) }),
+  );
   await context.route(`${SUPABASE}/rest/v1/rpc/search_students`, (r) => {
     const q = (r.request().postDataJSON().p_query ?? '').toLowerCase();
     return r.fulfill({ json: q.length < 2 ? HITS.filter((h) => h.last_paid_on) : HITS.filter((h) => h.full_name.toLowerCase().includes(q)) });
@@ -133,7 +136,7 @@ async function open(who, width, path = '') {
         duplicateOnce = false;
         return r.fulfill({ status: 400, json: { code: 'LPDUP', message: 'A payment like this was saved in the last 10 minutes.' } });
       }
-      return r.fulfill({ json: pay({ id: 'p-new', amount_cents: body.p_amount_cents, method: body.p_method, payer_name: body.p_payer_name ?? 'Mina Cho', recorded_by: staff.user_id, recorded_by_name: staff.full_name, recorded_at: new Date().toISOString() }) });
+      return r.fulfill({ json: pay({ id: 'p-new', amount_cents: body.p_amount_cents, method: body.p_method, payer_name: body.p_payer_name ?? 'Mina Cho', recorded_by: staff.user_id, recorded_by_name: staff.full_name, collected_by: body.p_collected_by, collected_by_name: Object.values(PEOPLE).find((x) => x.user_id === body.p_collected_by)?.full_name ?? 'Ben Yoo', recorded_at: new Date().toISOString() }) });
     });
   }
   // Staging no longer uses the Google Sheet at all.
@@ -380,7 +383,8 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   const first = calls.find(([n]) => n === 'record_payment')?.[1];
   check(first?.p_amount_cents === 10000 && first.p_method === 'ZELLE' && first.p_student_id === 's-mina' && /^[0-9a-f-]{36}$/.test(first.p_client_request_id),
     'daily income: sends cents, method, student and a request id');
-  check(!('p_recorded_by' in first) && !('p_business_date' in first), 'daily income: browser never sends who or which day');
+  check(!('p_recorded_by' in first) && !('p_business_date' in first), 'daily income: browser never sends who recorded or which day');
+  check(first.p_collected_by === 'u-ins' && await page.getByText('Received by Ana Park').isVisible(), 'daily income: received by me by default');
   await page.getByRole('button', { name: 'Record another' }).click();
 
   // Duplicate warning: same request id is resent with the confirmation
@@ -411,10 +415,12 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   await page.getByRole('button', { name: 'Save payment' }).click();
   check(await page.getByText('Enter an amount').isVisible() && !calls.length, 'daily income: bad amount is caught on the screen');
   await page.getByLabel('Amount ($)').fill('25');
+  await page.getByLabel('Received by').selectOption({ label: 'Ben Yoo' });
   await page.getByRole('button', { name: 'Received $25.00 · Cash · Save' }).click();
   await page.getByText('Payment saved').waitFor();
   const walk = calls.find(([n]) => n === 'record_payment')?.[1];
   check(walk?.p_student_id === null && walk.p_payer_name === 'Drop-in Jo' && walk.p_amount_cents === 2500, 'daily income: walk-in with a name');
+  check(walk?.p_collected_by === 'u-ben', 'daily income: another staff member as the receiver');
   await page.getByRole('button', { name: 'Record another' }).click();
 
   // New student from the search box
@@ -472,9 +478,9 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   check(stats.join('|') === '$230.00|$250.00|−$20.00|2', `${device} owner: totals ${stats.join('|')}`);
   await shot(page, `${device}-owner-history`);
   check(await page.locator('main li').getByText(/Ben Yoo/).first().isVisible(), `${device} owner: sees who recorded`);
-  await page.getByLabel('Recorded by').selectOption({ label: 'Ben Yoo' });
+  await page.getByLabel('Received by').selectOption({ label: 'Ben Yoo' });
   check(!(await page.getByText('Mina Cho').count()) && (await page.locator('dl dd').first().innerText()) === '$150.00', `${device} owner: filter by recorder`);
-  await page.getByLabel('Recorded by').selectOption({ label: 'Everyone' });
+  await page.getByLabel('Received by').selectOption({ label: 'Everyone' });
   check(await noOverflow(page), `${device} owner: no sideways scroll on transactions`);
   if (device === 'desktop') {
     await page.getByRole('button', { name: /Mina Cho.*\$100\.00/ }).click();
@@ -490,6 +496,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await page.getByText('Refund saved.').waitFor();
     const refund = calls.find(([n]) => n === 'record_refund')?.[1];
     check(refund?.p_original_id === 'p-1' && refund.p_amount_cents === 4000 && refund.p_reason === 'class cancelled' && refund.p_method === 'CASH', 'owner: refund sent');
+
     await page.goto(ROOT);
     await page.getByText('$230.00').waitFor({ timeout: 5000 }).catch(() => {});
     await shot(page, 'desktop-owner-dashboard');

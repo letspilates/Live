@@ -15,6 +15,8 @@ export interface Payment {
   related_transaction_id: string | null;
   recorded_by: string;
   recorded_by_name: string;
+  collected_by: string;
+  collected_by_name: string;
   recorded_at: string;
   business_date: string;
   notes: string;
@@ -25,6 +27,11 @@ export interface Method {
   code: string;
   label_en: string;
   label_ko: string;
+}
+
+export interface Collector {
+  user_id: string;
+  full_name: string;
 }
 
 export interface StudentHit {
@@ -145,3 +152,10 @@ export const methodLabel = (methods: Method[], code: string, lang: 'en' | 'ko') 
   const m = methods.find((x) => x.code === code);
   return m ? (lang === 'ko' ? m.label_ko : m.label_en) : code;
 };
+
+/** Active staff who can be named as having received a payment. */
+export async function loadCollectors(): Promise<Collector[]> {
+  const { data, error } = await supabase!.rpc('list_collectors');
+  if (error) throw error;
+  return data as Collector[];
+}

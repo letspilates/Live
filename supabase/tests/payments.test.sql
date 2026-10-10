@@ -235,6 +235,31 @@ select t.expect_error('S11 inactive: cannot record', '42501',
 select t.expect_error('S11 inactive: cannot search', '42501', $$select * from public.search_students('mi')$$);
 reset role;
 
+-- Received by: A types in a payment Ben was handed ------------------------------------------
+select t.login('00000000-0000-0000-0000-0000000000b1');
+select t.check('collectors: active staff names', (select count(*) = 4 and bool_and(full_name <> 'Gone') from public.list_collectors()));
+select t.check('A: records for Ben', (select recorded_by = '00000000-0000-0000-0000-0000000000b1'
+  and collected_by = '00000000-0000-0000-0000-0000000000b2' and collected_by_name = 'Ben'
+  from public.record_payment('77777777-0000-0000-0000-000000000001', 3300, 'CASH', p_payer_name => 'Handed to Ben',
+                             p_collected_by => '00000000-0000-0000-0000-0000000000b2')));
+select t.check('A: own payments default to A as receiver', (select bool_and(collected_by = recorded_by)
+  from public.payment_transactions where client_request_id::text like '11111111%'));
+select t.expect_error('A: inactive staff cannot be the receiver', '22023',
+  $$select public.record_payment(gen_random_uuid(), 100, 'CASH', p_payer_name => 'X',
+                                 p_collected_by => '00000000-0000-0000-0000-0000000000d1')$$);
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b2');
+select t.check('Ben: sees the payment he received', (select count(*) = 1 from public.payment_transactions
+  where client_request_id = '77777777-0000-0000-0000-000000000001'));
+select t.expect_error('Ben: cannot change what A recorded', 'P0002', format($$select public.void_payment('%s', 'x')$$,
+  (select id from public.payment_transactions where client_request_id = '77777777-0000-0000-0000-000000000001')));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.check('owner: changes the receiver', (select collected_by = '00000000-0000-0000-0000-0000000000c1' and collected_by_name = 'Sam'
+  from public.correct_payment((select id from public.payment_transactions where client_request_id = '77777777-0000-0000-0000-000000000001'),
+                              3300, 'CASH', p_collected_by => '00000000-0000-0000-0000-0000000000c1')));
+reset role;
+
 -- S10: anon gets nothing ---------------------------------------------------------------------
 select t.as_anon();
 select t.expect_error('S10 anon: payments', '42501', $$select * from public.payment_transactions$$);
@@ -243,6 +268,7 @@ select t.expect_error('S10 anon: methods', '42501', $$select * from public.payme
 select t.expect_error('S10 anon: record', '42501',
   $$select public.record_payment(gen_random_uuid(), 100, 'CASH', p_payer_name => 'X')$$);
 select t.expect_error('S10 anon: search', '42501', $$select * from public.search_students('mi')$$);
+select t.expect_error('S10 anon: collectors', '42501', $$select * from public.list_collectors()$$);
 reset role;
 
 select app.check_api_exposure();
