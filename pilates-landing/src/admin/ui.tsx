@@ -286,3 +286,27 @@ export function Chip({ tone = 'neutral', children }: { tone?: keyof typeof CHIP;
     </span>
   );
 }
+
+/** On/off switch: a real checkbox (keyboard, screen readers) drawn as a pill. */
+export function Switch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <label className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer">
+      <input
+        type="checkbox"
+        role="switch"
+        aria-label={label}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 rounded-full bg-ink/[0.12] transition-colors duration-200 peer-checked:bg-sage peer-focus-visible:ring-2 peer-focus-visible:ring-sage/40 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-paper"
+      />
+      <span
+        aria-hidden="true"
+        className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgb(var(--c-shadow)/0.25)] transition-transform duration-200 ease-smooth peer-checked:translate-x-5"
+      />
+    </label>
+  );
+}

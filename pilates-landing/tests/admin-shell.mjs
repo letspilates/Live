@@ -1042,6 +1042,22 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   await cl.context.close();
 }
 
+// 20. Notifications settings (preview): grouped events, one switch per channel
+for (const [device, width] of Object.entries(WIDTHS)) {
+  const { page, context, errors } = await open('OWNER', width, 'notifications/');
+  const sw = page.getByRole('switch', { name: 'New payment: Email' });
+  await sw.waitFor();
+  check((await page.getByRole('switch').count()) === 16, `${device} notifications: 8 events × email/text`);
+  check(!(await sw.isChecked()), `${device} notifications: new payment email off by default`);
+  await sw.click({ force: true });
+  check(await sw.isChecked(), `${device} notifications: switch turns on`);
+  check(await page.getByText(/Preview: the portal does not send notifications yet/).isVisible(), `${device} notifications: says nothing is sent or saved`);
+  check(await noOverflow(page), `${device} notifications: no sideways scroll`);
+  await shot(page, `${device}-notifications`);
+  check(errors.length === 0, `${device} notifications: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
 // 19. Dark mode: toggle in the top bar, remembered
 {
   const { page, context, errors } = await open('OWNER', 393);
