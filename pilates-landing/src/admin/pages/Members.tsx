@@ -27,6 +27,7 @@ async function loadMembers(): Promise<Member[]> {
       .from('students')
       .select('*')
       .order('full_name')
+      .order('id') // unique tiebreak: pages must not skip or repeat clients with the same name
       .range(from, from + 999);
     if (error) throw error;
     all.push(...(data as Member[]));

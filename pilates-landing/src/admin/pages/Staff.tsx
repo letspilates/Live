@@ -5,7 +5,7 @@
 // people with records are deactivated instead of deleted).
 import { useEffect, useState, type FormEvent } from 'react';
 import { Ban, CircleCheck, Hourglass, Pencil, UserPlus } from 'lucide-react';
-import { ROLES, useStaff, type PricingTier, type Role, type StaffStatus } from '../auth';
+import { ROLES, useAuth, useStaff, type PricingTier, type Role, type StaffStatus } from '../auth';
 import { useT } from '../i18n';
 import Layout from '../Layout';
 import { functionError, supabase } from '../supabase';
@@ -48,6 +48,7 @@ async function staffAdmin(body: Record<string, unknown>): Promise<AdminResult> {
 export default function StaffPage() {
   const { t, lang } = useT();
   const me = useStaff();
+  const { refresh } = useAuth();
   const iAmOwner = me.roles.includes('OWNER');
   const [rows, setRows] = useState<UserRow[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -66,6 +67,8 @@ export default function StaffPage() {
   }, [version]);
 
   const reload = () => setVersion((v) => v + 1);
+  // My own name, roles or status changed: reload my profile so menus and access follow.
+  const reloadMe = (userId: string) => userId === me.user_id && refresh();
 
   const errorText = (r: AdminResult, name: string) =>
     r.code === 'LPREF'
@@ -93,6 +96,7 @@ export default function StaffPage() {
     setPending(null);
     setEditing(null);
     reload();
+    reloadMe(row.user_id);
   };
 
   const resend = async (row: UserRow) => {
@@ -212,6 +216,7 @@ export default function StaffPage() {
         busy={busy}
         onClose={() => setEditing(null)}
         onSaved={(text) => {
+          if (editing && editing !== 'new') reloadMe(editing.user_id);
           setEditing(null);
           setMessage({ tone: 'success', text });
           reload();

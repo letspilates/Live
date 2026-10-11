@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLang } from '../i18n/LanguageContext';
-import { HAS_SUPABASE, publicRpc } from '../supabaseProject';
+import { HAS_SUPABASE, IS_STAGING, publicRpc } from '../supabaseProject';
 
 const SHEETS_URL =
   'https://script.google.com/macros/s/AKfycbxGzSZjRnZybJX-kqwsiPAp9UTOLmc4fxx2JKUxIWZgXnJ96c_YRYdMN3M2dgKxWUM4zQ/exec';
@@ -38,7 +38,8 @@ interface RemoteCourse {
 }
 
 // Staging and production share one origin (and so localStorage): separate keys.
-const COURSES_CACHE_KEY = HAS_SUPABASE ? 'lp-courses-sb1' : 'lp-courses-v1';
+// Staging and production share one origin (and localStorage), so each project gets its own cache.
+const COURSES_CACHE_KEY = HAS_SUPABASE ? (IS_STAGING ? 'lp-courses-sb1' : 'lp-courses-prod1') : 'lp-courses-v1';
 
 // "1225" / "$1,050" / "1050.5" 등 어떤 형태로 입력돼도 "$1,225" 형식으로 표시.
 // 숫자로 해석 안 되는 값(예: "TBD")은 입력 그대로 보여준다.

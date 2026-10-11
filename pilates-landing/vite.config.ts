@@ -10,7 +10,10 @@ const ADMIN_CSP = [
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
   "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
-  "img-src 'self' data:",
+  // Knowledge library: YouTube thumbnails, embedded players, uploaded videos (Storage signed URLs).
+  "img-src 'self' data: https://i.ytimg.com",
+  "media-src 'self' https://*.supabase.co",
+  "frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://drive.google.com",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
   "object-src 'none'",
   "base-uri 'self'",

@@ -107,8 +107,8 @@ export async function loadRules(): Promise<Rule[]> {
 export function toCsv(rows: (string | number)[][]): string {
   const cell = (v: string | number) => {
     let s = String(v);
-    if (typeof v === 'string' && /^[=+\-@]/.test(s)) s = `'${s}`;
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return rows.map((r) => r.map(cell).join(',')).join('\n');
 }
