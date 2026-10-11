@@ -4,7 +4,7 @@
 // Uploaded files sit in a private bucket and open through signed URLs.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ExternalLink, FileText, Pencil, Play, Plus, RefreshCw, Search, X } from 'lucide-react';
-import { isAdmin, useStaff } from '../auth';
+import { isAdmin, useStaff, type Role } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import {
   BUCKET,
@@ -12,6 +12,7 @@ import {
   embedFor,
   formatBytes,
   uploadPath,
+  type KnowledgeAudience,
   type KnowledgeCategory,
   type KnowledgeItem,
   type KnowledgeKind,
@@ -43,12 +44,24 @@ const SOURCE_LABEL: Record<Source, TextKey> = {
 const catLabel = (c: KnowledgeCategory) => CATEGORIES.find((x) => x.id === c)!.label;
 
 /** An item with what it needs to open: an embeddable player and/or a URL. */
-type Entry = KnowledgeItem & { source: Source; url: string | null; player?: string; thumbnail?: string; video: boolean };
+type Entry = KnowledgeItem & {
+  source: Source;
+  url: string | null;
+  player?: string;
+  thumbnail?: string;
+  video: boolean;
+  /** Who was chosen (owners and admins see the full list; others only themselves). */
+  viewer_ids: string[];
+};
 
 async function loadLibrary(): Promise<Entry[]> {
   const { data, error } = await supabase!.from('knowledge_items').select('*').order('created_at', { ascending: false });
   if (error) throw error;
   const items = data as KnowledgeItem[];
+  const { data: viewerRows, error: viewerError } = await supabase!.from('knowledge_item_viewers').select('item_id, user_id');
+  if (viewerError) throw viewerError;
+  const viewers = (id: string) =>
+    (viewerRows as { item_id: string; user_id: string }[]).filter((v) => v.item_id === id).map((v) => v.user_id);
   const paths = items.flatMap((i) => (i.file_path ? [i.file_path] : []));
   const signed = new Map<string, string>();
   if (paths.length) {
@@ -60,10 +73,10 @@ async function loadLibrary(): Promise<Entry[]> {
     if (i.file_path) {
       const url = signed.get(i.file_path) ?? null;
       // Uploaded videos play in a <video> element.
-      return { ...i, source: 'file', url, video: i.kind === 'VIDEO' && Boolean(url) };
+      return { ...i, source: 'file', url, video: i.kind === 'VIDEO' && Boolean(url), viewer_ids: viewers(i.id) };
     }
     const embed = embedFor(i.link_url!);
-    return { ...i, ...embed, url: i.link_url, video: Boolean(embed.player) };
+    return { ...i, ...embed, url: i.link_url, video: Boolean(embed.player), viewer_ids: viewers(i.id) };
   });
 }
 
@@ -266,6 +279,7 @@ function ItemCard({ item, admin, onWatch, onEdit }: { item: Entry; admin: boolea
         <div className="flex flex-wrap items-center gap-1.5">
           <Chip tone="good">{t(catLabel(item.category))}</Chip>
           <Chip>{t(item.kind === 'VIDEO' ? 'kindVideo' : 'kindDocument')}</Chip>
+          {admin && item.audience === 'SELECTED' && <Chip tone="warn">{t('onlyPeople', { n: String(item.viewer_ids.length) })}</Chip>}
         </div>
         <h2 className="font-display text-base font-semibold text-ink">{item.title}</h2>
         {item.description && <p className="line-clamp-3 whitespace-pre-line text-sm text-mute">{item.description}</p>}
@@ -366,9 +380,22 @@ function ItemDialog({ item, onClose, onDone }: { item: Entry | null; onClose: ()
     description: item?.description ?? '',
     source: 'link' as 'link' | 'file',
     link: '',
+    audience: item?.audience ?? ('ALL' as KnowledgeAudience),
+    viewer_ids: item?.viewer_ids ?? ([] as string[]),
   });
+  // People who can be chosen: everyone active or invited except owners/admins (they see everything anyway).
+  const [people, setPeople] = useState<{ user_id: string; full_name: string; roles: Role[] }[] | null>(null);
+  useEffect(() => {
+    supabase!.rpc('list_staff').then(({ data }) =>
+      setPeople(
+        ((data ?? []) as { user_id: string; full_name: string; roles: Role[]; status: string }[]).filter(
+          (p) => p.status !== 'INACTIVE' && !isAdmin(p),
+        ),
+      ),
+    );
+  }, []);
   const [file, setFile] = useState<File | null>(null);
-  const [errors, setErrors] = useState<Partial<Record<'title' | 'link' | 'file' | 'form', string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<'title' | 'link' | 'file' | 'people' | 'form', string>>>({});
   const [busy, setBusy] = useState<'' | 'saving' | 'uploading'>('');
   const [confirming, setConfirming] = useState(false);
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -383,6 +410,7 @@ function ItemDialog({ item, onClose, onDone }: { item: Entry | null; onClose: ()
       if (!file) next.file = t('chooseFile');
       else if (file.size > MAX_FILE_BYTES) next.file = t('fileTooBig');
     }
+    if (form.audience === 'SELECTED' && !form.viewer_ids.length) next.people = t('choosePeople');
     setErrors(next);
     if (Object.keys(next).length || busy) return;
 
@@ -392,6 +420,8 @@ function ItemDialog({ item, onClose, onDone }: { item: Entry | null; onClose: ()
       kind: form.kind,
       title: form.title.trim(),
       description: form.description.trim(),
+      audience: form.audience,
+      viewer_ids: form.audience === 'SELECTED' ? form.viewer_ids : [],
     };
     let uploaded: string | null = null;
     if (!item && form.source === 'link') row.link_url = form.link.trim();
@@ -513,6 +543,41 @@ function ItemDialog({ item, onClose, onDone }: { item: Entry | null; onClose: ()
             )}
           </>
         )}
+
+        <fieldset className="grid gap-2">
+          <legend className="mb-2 text-sm font-medium text-ink">{t('audienceLabel')}</legend>
+          <div className="flex gap-1 rounded-full bg-ink/[0.06] p-1">
+            {(['ALL', 'SELECTED'] as const).map((a) => (
+              <button key={a} type="button" aria-pressed={form.audience === a} onClick={() => set('audience', a)} className={segment(form.audience === a)}>
+                {t(a === 'ALL' ? 'audienceAll' : 'audienceSelected')}
+              </button>
+            ))}
+          </div>
+          {form.audience === 'SELECTED' && (
+            <div className="grid max-h-56 gap-1 overflow-y-auto rounded-xl p-1 ring-1 ring-ink/[0.12]">
+              {!people ? (
+                <Skeleton className="h-10 w-full" />
+              ) : (
+                people.map((p) => (
+                  <label key={p.user_id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 text-sm hover:bg-ink/[0.03]">
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 accent-sage"
+                      checked={form.viewer_ids.includes(p.user_id)}
+                      onChange={(e) =>
+                        set('viewer_ids', e.target.checked ? [...form.viewer_ids, p.user_id] : form.viewer_ids.filter((id) => id !== p.user_id))
+                      }
+                    />
+                    <span className="min-w-0 flex-1 truncate">{p.full_name}</span>
+                    <span className="shrink-0 text-xs text-mute">{p.roles.map((r) => t(r)).join(' · ')}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          )}
+          {errors.people && <p className="text-sm text-red-700">{errors.people}</p>}
+          <p className="text-xs text-mute">{t('audienceHint')}</p>
+        </fieldset>
 
         <TextArea label={t('description')} maxLength={4000} value={form.description} onChange={(e) => set('description', e.target.value)} />
 

@@ -4,6 +4,8 @@
 
 export type KnowledgeCategory = 'PILATES' | 'GYROTONIC';
 export type KnowledgeKind = 'VIDEO' | 'DOCUMENT';
+/** ALL = every portal user; SELECTED = only viewer_ids (owners and admins always see all). */
+export type KnowledgeAudience = 'ALL' | 'SELECTED';
 
 export interface KnowledgeItem {
   id: string;
@@ -15,6 +17,7 @@ export interface KnowledgeItem {
   file_path: string | null;
   file_name: string | null;
   file_size: number | null;
+  audience: KnowledgeAudience;
   created_at: string;
 }
 

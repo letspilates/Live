@@ -33,11 +33,13 @@ grant execute on all functions in schema t to anon, authenticated;
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000a1', 'owner@test.local'),
   ('00000000-0000-0000-0000-0000000000b2', 'inst@test.local'),
-  ('00000000-0000-0000-0000-0000000000b3', 'gone@test.local');
+  ('00000000-0000-0000-0000-0000000000b3', 'gone@test.local'),
+  ('00000000-0000-0000-0000-0000000000b4', 'other@test.local');
 select app.grant_owner('owner@test.local', 'Owner');
 insert into public.staff_profiles (user_id, full_name, email, role, roles, status) values
   ('00000000-0000-0000-0000-0000000000b2', 'Ian Inst', 'inst@test.local', 'INSTRUCTOR', '{INSTRUCTOR}', 'ACTIVE'),
-  ('00000000-0000-0000-0000-0000000000b3', 'Gus Gone', 'gone@test.local', 'INSTRUCTOR', '{INSTRUCTOR}', 'INACTIVE');
+  ('00000000-0000-0000-0000-0000000000b3', 'Gus Gone', 'gone@test.local', 'INSTRUCTOR', '{INSTRUCTOR}', 'INACTIVE'),
+  ('00000000-0000-0000-0000-0000000000b4', 'Olu Other', 'other@test.local', 'STAFF', '{STAFF}', 'ACTIVE');
 
 select t.check('bucket is private with a 50 MB limit',
   (select not public and file_size_limit = 52428800 from storage.buckets where id = 'knowledge'));
@@ -85,6 +87,39 @@ select t.check('inactive user sees nothing', (select count(*) = 0 from public.kn
 reset role;
 set local role anon;
 select t.expect_error('anon cannot read', '42501', $$select * from public.knowledge_items$$);
+reset role;
+
+-- Items for selected people only ---------------------------------------------------------------
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.expect_error('selected needs someone', '22023',
+  $$select public.save_knowledge_item('{"category":"PILATES","kind":"VIDEO","title":"Private","link_url":"https://x.y","audience":"SELECTED","viewer_ids":[]}')$$);
+select public.save_knowledge_item('{"category":"PILATES","kind":"VIDEO","title":"For Ian","link_url":"https://x.y/ian",
+  "audience":"SELECTED","viewer_ids":["00000000-0000-0000-0000-0000000000b2"]}');
+insert into storage.objects (bucket_id, name) values ('knowledge', 'z/ian.pdf');
+select public.save_knowledge_item('{"category":"PILATES","kind":"DOCUMENT","title":"Ian file","file_path":"z/ian.pdf",
+  "audience":"SELECTED","viewer_ids":["00000000-0000-0000-0000-0000000000b2"]}');
+select t.check('owner sees private items and viewer list', (select count(*) = 4 from public.knowledge_items)
+  and (select count(*) = 2 from public.knowledge_item_viewers));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b2');
+select t.check('chosen person sees them', (select count(*) = 4 from public.knowledge_items)
+  and (select count(*) = 2 from storage.objects));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b4');
+select t.check('others do not', (select count(*) = 2 from public.knowledge_items)
+  and (select count(*) = 1 from storage.objects) and (select count(*) = 0 from public.knowledge_item_viewers));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select public.save_knowledge_item(jsonb_build_object('id', (select id from public.knowledge_items where title = 'For Ian'),
+  'category', 'PILATES', 'kind', 'VIDEO', 'title', 'For Ian', 'audience', 'ALL'));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b4');
+select t.check('switching to everyone shows it', (select count(*) = 3 from public.knowledge_items));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select public.delete_knowledge_item(id) from public.knowledge_items where title in ('For Ian', 'Ian file');
+delete from storage.objects where name = 'z/ian.pdf';
+select t.check('viewer rows go with the item', (select count(*) = 0 from public.knowledge_item_viewers));
 reset role;
 
 -- Owner removes ------------------------------------------------------------------------------

@@ -129,11 +129,11 @@ function report(from, to) {
 // Knowledge library: a YouTube link, an uploaded PDF, a Vimeo video.
 const KNOWLEDGE = [
   { id: 'k-1', category: 'PILATES', kind: 'VIDEO', title: 'Reformer footwork', description: 'Week 1 basics', link_url: 'https://www.youtube.com/watch?v=abcDEF12345',
-    file_path: null, file_name: null, file_size: null, created_at: '2026-10-10T20:00:00Z' },
+    file_path: null, file_name: null, file_size: null, audience: 'ALL', created_at: '2026-10-10T20:00:00Z' },
   { id: 'k-2', category: 'GYROTONIC', kind: 'DOCUMENT', title: 'Gyrotonic Level 1 manual', description: '', link_url: null,
-    file_path: 'f1/manual.pdf', file_name: 'manual.pdf', file_size: 2400000, created_at: '2026-10-09T20:00:00Z' },
+    file_path: 'f1/manual.pdf', file_name: 'manual.pdf', file_size: 2400000, audience: 'SELECTED', created_at: '2026-10-09T20:00:00Z' },
   { id: 'k-3', category: 'GYROTONIC', kind: 'VIDEO', title: 'Arch and curl', description: '', link_url: 'https://vimeo.com/123456789/abcdef1234',
-    file_path: null, file_name: null, file_size: null, created_at: '2026-10-08T20:00:00Z' },
+    file_path: null, file_name: null, file_size: null, audience: 'ALL', created_at: '2026-10-08T20:00:00Z' },
 ];
 const knowledgeCalls = [];
 
@@ -276,6 +276,10 @@ async function open(who, width, path = '') {
     return r.fulfill({ json: month === `eq.${LAST_MONTH}` && finance.some(([f]) => f !== 'finance_report') ? [row] : [] });
   });
   await context.route(`${SUPABASE}/rest/v1/knowledge_items?**`, (r) => r.fulfill({ json: KNOWLEDGE }));
+  // RLS stand-in: owners/admins see every viewer row, others only their own.
+  await context.route(`${SUPABASE}/rest/v1/knowledge_item_viewers?**`, (r) =>
+    r.fulfill({ json: [{ item_id: 'k-2', user_id: 'u-ins' }, { item_id: 'k-2', user_id: 'u-staff' }].filter((v) => ['OWNER', 'ADMIN'].includes(who) || v.user_id === staff?.user_id) }),
+  );
   await context.route(`${SUPABASE}/storage/v1/object/sign/knowledge`, (r) =>
     r.fulfill({ json: r.request().postDataJSON().paths.map((path) => ({ path, signedURL: `/object/sign/knowledge/${path}?token=t`, error: null })) }),
   );
@@ -1148,7 +1152,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await dlg.getByRole('button', { name: 'Save' }).click();
   await page.getByText('Saved to the library.').waitFor();
   const add = knowledgeCalls.find(([n]) => n === 'save_knowledge_item')?.[1].p;
-  check(add?.title === 'Spine stretch' && add.link_url === 'https://youtu.be/xyz987654' && add.category === 'PILATES' && add.kind === 'VIDEO' && add.id === null, 'knowledge: link saved');
+  check(add?.audience === 'ALL' && add.title === 'Spine stretch' && add.link_url === 'https://youtu.be/xyz987654' && add.category === 'PILATES' && add.kind === 'VIDEO' && add.id === null, 'knowledge: link saved');
   // Upload a file
   knowledgeCalls.length = 0;
   await page.getByRole('button', { name: 'Add item' }).click();
@@ -1171,10 +1175,25 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await dlg.getByRole('button', { name: 'Save' }).click();
   check(await dlg.getByText(/over 50 MB/).isVisible(), 'knowledge: over 50 MB asks for a link');
   await dlg.getByRole('button', { name: 'Cancel' }).click();
+  // Only for chosen people
+  check(await page.getByText('Selected · 2').isVisible(), 'knowledge: card shows it is for selected people');
+  knowledgeCalls.length = 0;
+  await page.getByRole('button', { name: 'Edit item: Reformer footwork' }).click();
+  await dlg.getByRole('button', { name: 'Selected people' }).click();
+  await dlg.getByRole('button', { name: 'Save' }).click();
+  check(await dlg.getByText('Choose at least one person.').isVisible(), 'knowledge: selected needs someone');
+  await dlg.getByLabel('Ana Park').check();
+  await dlg.getByRole('button', { name: 'Save' }).click();
+  await page.getByText('Saved to the library.').waitFor();
+  const priv = knowledgeCalls.find(([n]) => n === 'save_knowledge_item')?.[1].p;
+  check(priv?.id === 'k-1' && priv.audience === 'SELECTED' && priv.viewer_ids.join() === 'u-ins', 'knowledge: saved for Ana only');
   // Edit and remove
   knowledgeCalls.length = 0;
   await page.getByRole('button', { name: 'Edit item: Gyrotonic Level 1 manual' }).click();
   check(await dlg.getByText(/stays the same/).isVisible(), 'knowledge: edit says the source stays');
+  check(await dlg.getByRole('button', { name: 'Selected people' }).getAttribute('aria-pressed') === 'true'
+    && await dlg.getByLabel('Ana Park').isChecked() && await dlg.getByLabel('Sam Lee').isChecked()
+    && !(await dlg.getByLabel('Ada Admin').count()), 'knowledge: edit shows the chosen people (no owners/admins to pick)');
   await dlg.getByRole('button', { name: 'Remove', exact: true }).click();
   await dlg.getByRole('button', { name: 'Remove for good' }).click();
   await page.getByText('"Gyrotonic Level 1 manual" removed.').waitFor();

@@ -3,6 +3,8 @@
 
 \set ON_ERROR_STOP 1
 begin;
+-- current_date below means the studio's day (the functions use app.la_today()).
+set local timezone to 'America/Los_Angeles';
 
 create schema t;
 grant usage on schema t to anon, authenticated;

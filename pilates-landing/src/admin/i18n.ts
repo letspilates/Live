@@ -562,6 +562,12 @@ const en = {
   sourceDrive: 'Google Drive',
   sourceWeb: 'Web link',
   sourceUpload: 'File',
+  audienceLabel: 'Who can see it',
+  audienceAll: 'Everyone',
+  audienceSelected: 'Selected people',
+  audienceHint: 'Owners and admins always see every item.',
+  choosePeople: 'Choose at least one person.',
+  onlyPeople: 'Selected · {n}',
 };
 
 type Dict = typeof en;
@@ -1111,6 +1117,12 @@ const ko: Dict = {
   sourceDrive: 'Google Drive',
   sourceWeb: '웹 링크',
   sourceUpload: '파일',
+  audienceLabel: '볼 수 있는 사람',
+  audienceAll: '모두',
+  audienceSelected: '지정한 사람만',
+  audienceHint: 'Owner와 Admin은 항상 모든 자료를 봅니다.',
+  choosePeople: '한 명 이상 고르세요.',
+  onlyPeople: '{n}명만',
 };
 
 export type TextKey = keyof Dict;
