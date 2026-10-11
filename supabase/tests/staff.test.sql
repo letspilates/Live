@@ -122,7 +122,7 @@ reset role;
 -- Deactivation cuts access immediately ------------------------------------------
 select t.login('00000000-0000-0000-0000-0000000000a1');
 select t.check('owner: deactivate B', public.set_staff_status('00000000-0000-0000-0000-0000000000b2', 'INACTIVE'));
-select t.check('owner: deactivate again is a no-op', not public.set_staff_status('00000000-0000-0000-0000-0000000000b2', 'INACTIVE'));
+select t.check('owner: deactivate again still reports the user (retry-safe)', public.set_staff_status('00000000-0000-0000-0000-0000000000b2', 'INACTIVE'));
 reset role;
 select t.login('00000000-0000-0000-0000-0000000000b2');
 select t.check('S11: inactive is not active staff', not app.is_active_staff());

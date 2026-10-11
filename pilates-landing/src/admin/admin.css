@@ -37,6 +37,11 @@ html.dark .bg-red-50 {
 html.dark dialog::backdrop {
   background-color: rgb(0 0 0 / 0.55);
 }
+/* Keyboard focus ring: the 40% sage ring is faint on the dark canvas. */
+html.dark .focus-visible\:ring-sage\/40:focus-visible,
+html.dark .peer:focus-visible ~ .peer-focus-visible\:ring-sage\/40 {
+  --tw-ring-color: rgb(var(--c-sage) / 0.85);
+}
 
 /* iPhone Safari draws date/month inputs with a fixed native width and centered,
    taller text, so they spill out of narrow grid cells. Make them size like the

@@ -46,6 +46,7 @@ const REGS = [
 ];
 let saved = null;
 let imported = null;
+let deletedReg = null;
 let submitted = null;
 let browserCalledSheet = false;
 let loadMode = 'ok'; // 'ok' | 'fail'
@@ -194,6 +195,10 @@ async function open(who, width, path = '') {
   await context.route(`${SUPABASE}/rest/v1/rpc/import_training_registrations`, (r) => {
     imported = r.request().postDataJSON().p_rows;
     return r.fulfill({ json: imported.length });
+  });
+  await context.route(`${SUPABASE}/rest/v1/rpc/delete_training_registration`, (r) => {
+    deletedReg = r.request().postDataJSON().p_id;
+    return r.fulfill({ status: 204, body: '' });
   });
   await context.route(`${SUPABASE}/rest/v1/rpc/public_training_courses`, (r) =>
     r.fulfill({ json: [{ uid: 'c-b', id: 'B', name_en: 'Jumping Stretching Board', name_kr: '점핑 보드', dates: '10/24 - 10/25', tag_en: '2 days', tag_kr: '2일', capacity: null, taken: 1, time: '', price: '', fee: '$200', fee_early: '', early_until: '', conducted_by: '' }] }),
@@ -355,6 +360,11 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   check(await page.getByText(/Not matched to a current course.*Z - Retired course/).isVisible(), `${device}: unmatched course warning`);
   await page.getByLabel('All courses').selectOption({ label: 'B · Jumping Stretching Board (1)' });
   check((await page.getByText('Leo Park').isVisible()) && !(await page.getByText('Mina Cho').isVisible()), `${device}: course filter`);
+  await page.getByRole('button', { name: 'Delete applicant' }).first().click();
+  check(await page.getByText('Delete the sign-up from Leo Park?').isVisible(), `${device}: delete applicant asks first`);
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await page.getByText('Applicant deleted.').waitFor();
+  check(deletedReg === 'r-2', `${device}: delete applicant calls the database function`);
   await page.getByRole('tab', { name: 'Courses' }).click();
   const active = page.locator('aside a[aria-current="page"]');
   if (device !== 'phone') check((await active.getAttribute('title')) === 'Trainings', `${device}: active menu item`);

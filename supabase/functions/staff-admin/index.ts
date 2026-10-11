@@ -118,11 +118,13 @@ Deno.serve(async (req) => {
   if (action === 'deactivate' || action === 'reactivate') {
     const active = action === 'reactivate';
     // Database first: data access stops here even if the Auth call below fails.
-    const { error } = await asCaller.rpc('set_staff_status', {
+    const { data: changed, error } = await asCaller.rpc('set_staff_status', {
       p_user_id: userId,
       p_status: active ? 'ACTIVE' : 'INACTIVE',
     });
     if (error) return reply(400, { error: error.message });
+    // false = no such portal user (or still invited): never ban or unban a login the DB does not know.
+    if (changed === false) return reply(400, { error: 'No active or deactivated user with that ID.' });
     const { error: banError } = await admin.auth.admin.updateUserById(userId, {
       ban_duration: active ? 'none' : '876000h',
     });

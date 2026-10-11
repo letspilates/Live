@@ -595,6 +595,8 @@ function Registrants({
   const { t } = useT();
   const [filter, setFilter] = useState('');
   const [status, setStatus] = useState<Status>(null);
+  const [deleting, setDeleting] = useState<Registration | null>(null);
+  const [busy, setBusy] = useState(false);
   const byUid = new Map(courses.map((c) => [c.uid, c]));
   const countOf = (uid: string) => regs.filter((r) => r.course_ids.includes(uid)).length;
   const used = [...courses]
@@ -624,6 +626,21 @@ function Registrants({
     if (skipped) parts.push(t('rowsSkipped', { n: String(skipped) }));
     setStatus({ tone: added ? 'ok' : 'error', text: parts.join(' ') });
     if (added) await reload();
+  };
+
+  // Owner/Admin only (the database refuses everyone else). Personal-data requests.
+  const deleteApplicant = async () => {
+    if (!deleting) return;
+    setBusy(true);
+    const { error } = await supabase!.rpc('delete_training_registration', { p_id: deleting.id });
+    setBusy(false);
+    setDeleting(null);
+    if (error) {
+      setStatus({ tone: 'error', text: t('deleteFailed', { reason: error.message }) });
+      return;
+    }
+    setStatus({ tone: 'ok', text: t('applicantDeleted') });
+    await reload();
   };
 
   return (
@@ -673,7 +690,18 @@ function Registrants({
                 <Card className="!p-4 sm:!p-5">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="min-w-0 truncate font-medium">{r.full_name || t('noName')}</p>
-                    <p className="shrink-0 text-xs tabular-nums text-mute">{studioDateTime(r.submitted_at)}</p>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <p className="text-xs tabular-nums text-mute">{studioDateTime(r.submitted_at)}</p>
+                      <button
+                        type="button"
+                        onClick={() => setDeleting(r)}
+                        aria-label={t('deleteApplicant')}
+                        title={t('deleteApplicant')}
+                        className="-mr-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-mute hover:bg-ink/[0.05] hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
+                      >
+                        <Trash2 {...ICON} size={16} />
+                      </button>
+                    </span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {matched.map((c) => (
@@ -717,6 +745,18 @@ function Registrants({
           })}
         </ul>
       )}
+
+      <Dialog open={deleting !== null} onClose={() => setDeleting(null)} title={t('deleteApplicant')}>
+        <p className="text-sm text-mute">{t('confirmDeleteApplicant', { name: deleting?.full_name || t('noName') })}</p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="secondary" onClick={() => setDeleting(null)}>
+            {t('cancel')}
+          </Button>
+          <Button variant="danger" onClick={deleteApplicant} disabled={busy}>
+            {busy ? t('saving') : t('delete')}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

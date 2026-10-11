@@ -108,7 +108,7 @@ function readCachedCourses(): RemoteCourse[] | null {
   }
 }
 const STAGE_VALUES = [
-  'New Student',
+  'New Client',
   'Level 1 Trainee',
   'Apprentice',
   'Certified Trainer',

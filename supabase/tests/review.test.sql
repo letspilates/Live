@@ -129,6 +129,40 @@ select t.check('no-limit course still open', public.submit_training_registration
   'course_ids', jsonb_build_array(current_setting('t.c')), 'full_name', 'X', 'email', 'x@y.z', 'phone', '1', 'certification', 'c')) is not null);
 reset role;
 
+-- 7. Follow-ups (20261011110000_review_followups.sql) --------------------------------
+-- Spam limits: a 4th sign-up from one email within a day is refused.
+-- (one sign-up from x@y.z exists from test 6; now() is fixed inside a transaction, so backdate the others)
+insert into public.training_registrations (course_ids, full_name, email, phone, submitted_at)
+values (array[current_setting('t.c')::uuid], 'X', 'x@y.z', '1', now() - interval '2 hours'),
+       (array[current_setting('t.c')::uuid], 'X', 'x@y.z', '1', now() - interval '20 hours');
+select t.anon();
+select t.expect_error('spam: 4th sign-up from one email today refused', '22023', format(
+  $$select public.submit_training_registration('{"course_ids":["%s"],"full_name":"X","email":"x@y.z","phone":"1","certification":"c"}')$$,
+  current_setting('t.c')));
+select t.check('spam: another email still fine', public.submit_training_registration(jsonb_build_object(
+  'course_ids', jsonb_build_array(current_setting('t.c')), 'full_name', 'Y', 'email', 'other@y.z', 'phone', '1', 'certification', 'c')) is not null);
+reset role;
+select set_config('t.reg', (select id::text from public.training_registrations where email = 'other@y.z'), true);
+-- Delete an applicant: staff refused, owner ok, audit row kept, anon refused.
+select t.login('00000000-0000-0000-0000-0000000000b1');
+select t.expect_error('staff: cannot delete applicant', '42501', format($$select public.delete_training_registration('%s')$$, current_setting('t.reg')));
+reset role;
+select t.anon();
+select t.expect_error('anon: cannot delete applicant', '42501', format($$select public.delete_training_registration('%s')$$, current_setting('t.reg')));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000a2');
+select public.delete_training_registration(current_setting('t.reg')::uuid);
+select t.expect_error('admin: deleting twice reports not found', 'P0002', format($$select public.delete_training_registration('%s')$$, current_setting('t.reg')));
+reset role;
+select t.check('applicant gone', not exists (select 1 from public.training_registrations where email = 'other@y.z'));
+select t.check('applicant delete audited', exists (select 1 from public.audit_logs
+  where entity_type = 'training_registrations' and action = 'delete' and entity_id = current_setting('t.reg')));
+-- set_staff_status: unknown user false, repeat true.
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.check('status: unknown user is false', not public.set_staff_status('00000000-0000-0000-0000-0000000000ff', 'INACTIVE'));
+select t.check('status: already inactive is still true', public.set_staff_status('00000000-0000-0000-0000-0000000000b2', 'INACTIVE'));
+reset role;
+
 select app.check_api_exposure();
 
 rollback;
