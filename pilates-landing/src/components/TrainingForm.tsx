@@ -171,7 +171,8 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
           );
     load
       .then((list) => {
-        if (Array.isArray(list) && list.length > 0) {
+        // Supabase (portal) is the source of truth: an empty list means no open courses.
+        if (Array.isArray(list) && (HAS_SUPABASE || list.length > 0)) {
           setRemoteCourses(list);
           try {
             window.localStorage.setItem(COURSES_CACHE_KEY, JSON.stringify(list));
@@ -210,7 +211,9 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
           conductedBy: c.conducted_by || '',
         };
       })
-    : f.courses.map((c) => ({
+    : HAS_SUPABASE
+      ? [] // never show the old bundled (Sheets-era) list on portal builds
+      : f.courses.map((c) => ({
         id: c.id,
         name: c.name,
         meta: f.courseMeta,
@@ -462,6 +465,7 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                   </h4>
                   <p className="mt-1.5 text-sm text-mute">{f.s1Subtitle}</p>
                   <div className="mt-6 flex flex-col gap-3">
+                    {displayCourses.length === 0 && <p className="text-sm text-mute">{f.noCourses}</p>}
                     {displayCourses.map((c) => {
                       const selected = courses.includes(c.id);
                       return (
