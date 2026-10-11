@@ -1032,6 +1032,10 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   await page.locator('dialog[open]').last().getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByText(/has records in the studio books/).waitFor();
   check(true, 'delete: user with records is told to deactivate instead');
+  await page.getByRole('button', { name: 'Delete user: Ana Park' }).click();
+  check(await page.locator('dialog[open]').last().getByRole('button', { name: 'Delete', exact: true }).isVisible(), 'delete button on the user row asks first');
+  await page.locator('dialog[open]').last().getByRole('button', { name: 'Cancel' }).click();
+  check(!(await page.getByRole('button', { name: 'Delete user: Calvin Kim' }).count()), 'no delete button on my own row');
   check(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).isVisible(), 'owner can edit own row');
   check(errors.length === 0, `users: no page errors ${errors.join(' | ')}`);
   await context.close();

@@ -4,7 +4,7 @@
 // database functions hold the rules (only owners touch owners, last owner,
 // people with records are deactivated instead of deleted).
 import { useEffect, useState, type FormEvent } from 'react';
-import { Ban, CircleCheck, Hourglass, Pencil, UserPlus } from 'lucide-react';
+import { Ban, CircleCheck, Hourglass, Pencil, Trash2, UserPlus } from 'lucide-react';
 import { ROLES, useAuth, useStaff, type PricingTier, type Role, type StaffStatus } from '../auth';
 import { useT } from '../i18n';
 import Layout from '../Layout';
@@ -197,6 +197,18 @@ export default function StaffPage() {
                           <Pencil {...ICON} size={14} />
                           {t('edit')}
                         </Button>
+                        {row.user_id !== me.user_id && (
+                          <Button
+                            variant="secondary"
+                            className="min-h-9 px-3.5 text-[13px]"
+                            disabled={busy}
+                            onClick={() => setPending({ action: 'delete', row })}
+                            aria-label={`${t('deleteUser')}: ${row.full_name}`}
+                          >
+                            <Trash2 {...ICON} size={14} />
+                            {t('delete')}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </li>
