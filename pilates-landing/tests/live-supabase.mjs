@@ -1,4 +1,5 @@
 // Read-only smoke test against the REAL staging Supabase project (studio).
+//   NODE_USE_ENV_PROXY=1 only behind a proxy (cloud sessions).
 //   node tests/live-supabase.mjs                      anonymous checks only
 //   LIVE_EMAIL=... LIVE_PASSWORD=... node tests/live-supabase.mjs   + signed-in checks
 // It reads only, except one Knowledge item it adds and deletes again (not financial data).
@@ -21,11 +22,11 @@ const anon = client();
   check(!error && Array.isArray(data), 'anon: public_training_courses', error?.message ?? `${data?.length} courses`);
   for (const t of ['students', 'payment_transactions', 'expenses', 'staff_profiles', 'training_registrations', 'knowledge_items', 'accounting_periods']) {
     const r = await anon.from(t).select('*', { count: 'exact', head: true });
-    check(Boolean(r.error) || !r.count, `anon: ${t} hidden`, r.error ? r.error.code ?? r.error.message : `count ${r.count}`);
+    check(r.status > 0 && (Boolean(r.error) || !r.count), `anon: ${t} hidden`, r.error ? r.error.code ?? r.error.message : `count ${r.count}`);
   }
   for (const [fn, args] of [['finance_report', { p_from: '2026-01-01', p_to: '2026-12-31' }], ['list_staff', {}], ['search_students', { p_query: 'a' }], ['current_staff', {}]]) {
     const r = await anon.rpc(fn, args);
-    check(Boolean(r.error) || r.data == null || (Array.isArray(r.data) && !r.data.length), `anon: ${fn} refused`, r.error?.code ?? 'empty');
+    check(r.status > 0 && (Boolean(r.error) || r.data == null || (Array.isArray(r.data) && !r.data.length)), `anon: ${fn} refused`, r.error?.code ?? 'empty');
   }
   const h = await fetch(`${URL}/auth/v1/health`, { headers: { apikey: KEY } });
   check(h.ok, 'auth service up', String(h.status));
