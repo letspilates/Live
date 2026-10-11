@@ -706,7 +706,7 @@ function History({ methods, collectors }: { methods: Method[]; collectors: Colle
         )}
         <Button
           variant="secondary"
-          className="h-12 w-12 justify-self-start px-0 sm:ml-auto"
+          className="h-12 w-12 justify-self-start !px-0 sm:ml-auto"
           onClick={() => setVersion((v) => v + 1)}
           title={t('refresh')}
         >

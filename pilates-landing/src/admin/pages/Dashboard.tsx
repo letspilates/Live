@@ -294,7 +294,7 @@ function RecentPayments({ today, failed, owner }: { today: Today | null; failed:
       ) : (
         <ul className="-mx-2 grid">
           {rows.map((r) => (
-            <li key={r.id} className="flex items-center gap-3 rounded-xl px-2 py-2.5">
+            <li key={r.id} className="flex min-w-0 items-center gap-3 rounded-xl px-2 py-2.5">
               <Initials name={r.payer_name} className="h-9 w-9 rounded-xl text-xs" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">

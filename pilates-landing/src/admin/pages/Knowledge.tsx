@@ -281,8 +281,8 @@ function ItemCard({ item, admin, onWatch, onEdit }: { item: Entry; admin: boolea
           <Chip>{t(item.kind === 'VIDEO' ? 'kindVideo' : 'kindDocument')}</Chip>
           {admin && item.audience === 'SELECTED' && <Chip tone="warn">{t('onlyPeople', { n: String(item.viewer_ids.length) })}</Chip>}
         </div>
-        <h2 className="font-display text-base font-semibold text-ink">{item.title}</h2>
-        {item.description && <p className="line-clamp-3 whitespace-pre-line text-sm text-mute">{item.description}</p>}
+        <h2 className="break-words font-display text-base font-semibold text-ink">{item.title}</h2>
+        {item.description && <p className="line-clamp-3 whitespace-pre-line break-words text-sm text-mute">{item.description}</p>}
         <div className="mt-auto flex items-center gap-2 pt-3">
           <span className="min-w-0 flex-1 truncate text-xs text-mute">{meta}</span>
           {admin && (

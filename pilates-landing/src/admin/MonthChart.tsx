@@ -86,7 +86,7 @@ export default function MonthChart({ months }: { months: MonthRow[] }) {
           </div>
           <div aria-hidden="true" className="mt-2 flex text-xs text-mute">
             {months.map((m, i) => (
-              <span key={m.month} className={`min-w-0 flex-1 truncate text-center ${i % 2 && months.length > 6 ? 'max-sm:invisible' : ''}`}>
+              <span key={m.month} className={`min-w-0 flex-1 truncate text-center max-sm:overflow-visible ${i % 2 && months.length > 6 ? 'max-sm:invisible' : ''}`}>
                 {short(m.month)}
               </span>
             ))}
