@@ -9,8 +9,9 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from 'react';
-import { CircleAlert, CircleCheck, Info, type LucideIcon } from 'lucide-react';
+import { CircleAlert, CircleCheck, Info, X, type LucideIcon } from 'lucide-react';
 import LogoIcon from '../components/LogoIcon';
+import { useT } from './i18n';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 
@@ -180,7 +181,8 @@ export function Skeleton({ className = '' }: { className?: string }) {
   return <div aria-hidden="true" className={`rounded-lg bg-ink/[0.06] motion-safe:animate-pulse ${className}`} />;
 }
 
-/** Native <dialog>: focus trap, Escape and backdrop come from the browser. */
+/** Native <dialog>: focus trap, Escape and backdrop come from the browser.
+ *  The X top right closes it too, so dialogs never add a bottom Cancel button. */
 export function Dialog({
   open,
   onClose,
@@ -192,6 +194,7 @@ export function Dialog({
   title: string;
   children: ReactNode;
 }) {
+  const { t } = useT();
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -207,7 +210,17 @@ export function Dialog({
       className="max-h-[calc(100dvh-2rem)] w-[min(calc(100%-2rem),28rem)] overflow-y-auto rounded-[20px] bg-paper p-0 text-ink shadow-pop backdrop:bg-ink/30"
     >
       <div className="p-6">
-        <h2 className="mb-4 font-display text-lg font-semibold">{title}</h2>
+        <div className="mb-4 flex items-center gap-3">
+          <h2 className="min-w-0 flex-1 font-display text-lg font-semibold">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t('close')}
+            className="-my-2 -mr-3 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-mute hover:bg-ink/[0.05] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
+          >
+            <X {...ICON} />
+          </button>
+        </div>
         {children}
       </div>
     </dialog>

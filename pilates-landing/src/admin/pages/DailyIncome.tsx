@@ -3,7 +3,7 @@
 // The database decides who recorded a payment, its date and who may change it
 // (record_payment / correct_payment / void_payment / record_refund).
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight, CircleCheck, Info, Plus, Receipt, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleCheck, Info, Plus, Receipt, RefreshCw, Search } from 'lucide-react';
 import { isAdmin, useStaff } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
@@ -356,9 +356,6 @@ function RecordPayment({
           {t('duplicateBody', { amount: cents ? formatCents(cents) : '', name: client?.full_name ?? '' })}
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-          <Button variant="secondary" onClick={() => setAskDuplicate(false)}>
-            {t('cancel')}
-          </Button>
           <Button disabled={busy} onClick={() => void save(true)}>
             {t('saveAnyway')}
           </Button>
@@ -1107,14 +1104,6 @@ function PaymentDialog({
 
   return (
     <Dialog open onClose={onClose} title={title}>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={t('close')}
-        className="absolute right-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-ink/[0.05]"
-      >
-        <X {...ICON} />
-      </button>
       {mode === 'view' ? (
         <>
           <dl className="grid gap-2.5">
@@ -1208,9 +1197,11 @@ function PaymentDialog({
           />
           {error && <Notice tone="error">{error}</Notice>}
           <div className="mt-2 flex flex-wrap justify-end gap-3">
-            <Button variant="secondary" onClick={() => (refundFirst ? onClose() : setMode('view'))}>
-              {t(refundFirst ? 'cancel' : 'back')}
-            </Button>
+            {!refundFirst && (
+              <Button variant="secondary" onClick={() => setMode('view')}>
+                {t('back')}
+              </Button>
+            )}
             <Button type="submit" variant={mode === 'void' ? 'danger' : 'primary'} disabled={busy}>
               {busy ? t('saving') : t(mode === 'correct' ? 'save' : mode === 'void' ? 'void' : 'saveRefund')}
             </Button>

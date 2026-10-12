@@ -466,14 +466,6 @@ function ItemDialog({ item, onClose, onDone }: { item: Entry | null; onClose: ()
 
   return (
     <Dialog open onClose={onClose} title={item ? t('editKnowledge') : t('addKnowledge')}>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={t('close')}
-        className="absolute right-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-ink/[0.05]"
-      >
-        <X {...ICON} />
-      </button>
       <form
         className="grid gap-4"
         onSubmit={(e) => {
@@ -596,9 +588,6 @@ function ItemDialog({ item, onClose, onDone }: { item: Entry | null; onClose: ()
               </Button>
             ))}
           <span className="flex-1" />
-          <Button variant="secondary" onClick={onClose}>
-            {t('cancel')}
-          </Button>
           <Button type="submit" disabled={Boolean(busy)}>
             {busy === 'uploading' ? t('uploading') : busy === 'saving' ? t('saving') : t('save')}
           </Button>

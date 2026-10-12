@@ -659,9 +659,6 @@ function CloseDialog({ open, month, report: r, onClose, onDone }: { open: boolea
         </div>
       )}
       <div className="flex justify-end gap-3">
-        <Button variant="secondary" onClick={onClose}>
-          {t('cancel')}
-        </Button>
         <Button
           disabled={busy}
           onClick={() => {
@@ -706,9 +703,6 @@ function ReopenDialog({ open, month, onClose, onDone }: { open: boolean; month: 
         <p className="mb-4 text-sm text-mute">{t('reopenBody')}</p>
         <TextField label={t('reason')} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} error={error} />
         <div className="mt-5 flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>
-            {t('cancel')}
-          </Button>
           <Button type="submit" disabled={busy}>
             {t('reopen')}
           </Button>

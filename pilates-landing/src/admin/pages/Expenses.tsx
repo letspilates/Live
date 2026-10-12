@@ -3,7 +3,7 @@
 // directly (RLS: owner only, no deletes); the database locks closed months and
 // keeps every change in the audit log.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Download, Plus, RefreshCw, Repeat, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Plus, RefreshCw, Repeat, Search } from 'lucide-react';
 import {
   PAY_METHODS,
   addMonths,
@@ -439,7 +439,6 @@ function ExpenseDialog({
 
   return (
     <Dialog open onClose={onClose} title={e ? (paying ? t('markPaid') : t('editExpense')) : t('addExpense')}>
-      <CloseButton onClose={onClose} />
       {locked ? (
         <div className="grid gap-3">
           <p className="text-sm">
@@ -535,9 +534,6 @@ function ExpenseDialog({
           <TextField label={t('note')} maxLength={1000} value={form.notes} error={errors.notes} onChange={(ev) => set('notes', ev.target.value)} />
           {errors.form && <Notice tone="error">{errors.form}</Notice>}
           <div className="flex flex-wrap justify-end gap-3">
-            <Button variant="secondary" onClick={onClose}>
-              {t('cancel')}
-            </Button>
             <Button type="submit" disabled={busy}>
               {busy ? t('saving') : t('saveExpense')}
             </Button>
@@ -717,7 +713,6 @@ function RuleDialog({ rule: r, lists, onClose, onDone }: { rule: Rule | null; li
 
   return (
     <Dialog open onClose={onClose} title={r ? t('editRule') : t('addRule')}>
-      <CloseButton onClose={onClose} />
       <form
         className="grid gap-4"
         onSubmit={(ev) => {
@@ -787,9 +782,6 @@ function RuleDialog({ rule: r, lists, onClose, onDone }: { rule: Rule | null; li
         )}
         {errors.form && <Notice tone="error">{errors.form}</Notice>}
         <div className="flex flex-wrap justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>
-            {t('cancel')}
-          </Button>
           <Button type="submit" disabled={busy}>
             {busy ? t('saving') : t('save')}
           </Button>
@@ -815,20 +807,6 @@ function DateTile({ day }: { day: string }) {
       <span className="font-display text-base font-semibold leading-none tabular-nums">{d.getUTCDate()}</span>
       <span className="mt-0.5 text-[10px] uppercase leading-none tracking-wide text-mute">{month}</span>
     </span>
-  );
-}
-
-function CloseButton({ onClose }: { onClose: () => void }) {
-  const { t } = useT();
-  return (
-    <button
-      type="button"
-      onClick={onClose}
-      aria-label={t('close')}
-      className="absolute right-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-ink/[0.05]"
-    >
-      <X {...ICON} />
-    </button>
   );
 }
 

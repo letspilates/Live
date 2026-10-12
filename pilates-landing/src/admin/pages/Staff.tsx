@@ -242,9 +242,6 @@ export default function StaffPage() {
           <>
             <p className="text-sm text-ink">{confirmText(pending)}</p>
             <div className="mt-6 flex justify-end gap-3">
-              <Button variant="secondary" onClick={() => setPending(null)}>
-                {t('cancel')}
-              </Button>
               <Button
                 variant={pending.action === 'reactivate' ? 'primary' : 'danger'}
                 disabled={busy}
@@ -538,9 +535,6 @@ function UserDialog({
         )}
 
         <div className="mt-2 flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>
-            {t('cancel')}
-          </Button>
           <Button type="submit" disabled={saving}>
             {saving ? t('saving') : adding ? t(f.join === 'invite' ? 'sendInvite' : 'addUser') : t('save')}
           </Button>

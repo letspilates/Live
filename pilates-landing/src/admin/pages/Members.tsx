@@ -3,7 +3,7 @@
 // Every member shows which system they came from. Import and edits go through
 // owner-only database functions (import_members / update_member).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Plus, RefreshCw, Search, Upload, X } from 'lucide-react';
+import { Plus, RefreshCw, Search, Upload } from 'lucide-react';
 import { isAdmin, useStaff } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
@@ -285,9 +285,6 @@ export default function Members() {
               <p className="mt-2 text-sm text-mute">{t('rowsWithoutName', { n: String(pending.rows.skipped) })}</p>
             )}
             <div className="mt-6 flex flex-wrap justify-end gap-3">
-              <Button variant="secondary" onClick={() => setPending(null)}>
-                {t('cancel')}
-              </Button>
               <Button disabled={busy} onClick={() => void runImport()}>
                 {busy ? t('saving') : t('importNow')}
               </Button>
@@ -426,14 +423,6 @@ function MemberDialog({
 
   return (
     <Dialog open onClose={onClose} title={m ? m.full_name : t('addStudent')}>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={t('close')}
-        className="absolute right-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-ink/[0.05]"
-      >
-        <X {...ICON} />
-      </button>
       {m && (
         <div className="mb-5 flex flex-wrap gap-1.5">
           <SourceBadges m={m} />
@@ -509,16 +498,13 @@ function MemberDialog({
           )}
         </fieldset>
         {error && <Notice tone="error">{error}</Notice>}
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>
-            {t(editable ? 'cancel' : 'close')}
-          </Button>
-          {editable && (
+        {editable && (
+          <div className="flex justify-end gap-3">
             <Button type="submit" disabled={busy}>
               {busy ? t('saving') : m ? t('save') : t('addStudent')}
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </form>
     </Dialog>
   );

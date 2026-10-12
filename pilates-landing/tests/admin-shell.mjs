@@ -383,6 +383,13 @@ async function open(who, width, path = '', options = {}) {
 // SHOTS=<dir> saves screenshots of the Daily Income screens for a visual check.
 const shot = async (page, name) => process.env.SHOTS && (await page.waitForTimeout(400), page.screenshot({ path: `${process.env.SHOTS}/${name}.png`, fullPage: true }));
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+// Every modal closes with an X at its top right (or Escape / the backdrop); no bottom Cancel button.
+const closesTopRight = async (dlg) => {
+  const x = dlg.getByRole('button', { name: 'Close', exact: true });
+  if ((await x.count()) !== 1 || (await dlg.getByRole('button', { name: 'Cancel', exact: true }).count())) return false;
+  const [d, b] = [await dlg.boundingBox(), await x.boundingBox()];
+  return d.x + d.width - (b.x + b.width) < 24 && b.y - d.y < 24;
+};
 const navLabels = (page) =>
   page.locator('aside nav a').evaluateAll((links) => links.map((a) => a.getAttribute('title')));
 
@@ -773,6 +780,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await dlg.getByRole('button', { name: 'Edit' }).click();
     check(await dlg.getByText('Edit payment').isVisible() && await dlg.getByLabel('Payment date').inputValue() === LA_TODAY, 'desktop owner: edit shows the payment date');
     await dlg.getByLabel('Payment date').fill(LA_YESTERDAY);
+    check(await closesTopRight(dlg), 'desktop owner: edit payment closes with the X top right, no Cancel');
     await dlg.getByRole('button', { name: 'Save' }).click();
     await page.getByText('Payment updated.').waitFor();
     check(calls.find(([n]) => n === 'correct_payment')?.[1].p_business_date === LA_YESTERDAY, 'desktop owner: edit sends the new date');
@@ -955,6 +963,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await dialog.getByLabel('Description').fill('Ana, September');
     await dialog.getByLabel('Amount ($)').fill('1,300');
     await dialog.getByLabel('Paid to (staff)').selectOption('u-ins');
+    check(await closesTopRight(dialog), 'add expense: closes with the X top right, no Cancel');
     await shot(page, 'desktop-add-expense');
     await dialog.getByRole('button', { name: 'Save expense' }).click();
     await page.getByText('Expense saved.').waitFor();
@@ -1149,6 +1158,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   await dlg.getByLabel('Staff', { exact: true }).check();
   check(await dlg.getByLabel('Pricing tier').isVisible(), 'add user: tier shows while Instructor is ticked');
   check(await dlg.getByLabel('Send an invitation email').isChecked(), 'add user: invitation is the default');
+  check(await closesTopRight(dlg), 'add user: closes with the X top right, no Cancel');
   check(await noOverflow(page), 'add user: dialog fits the phone');
   await dlg.getByRole('button', { name: 'Send invitation' }).click();
   await page.getByText('Invitation sent to Nina New.').waitFor();
@@ -1183,7 +1193,9 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   check(true, 'delete: user with records is told to deactivate instead');
   await page.getByRole('button', { name: 'Delete user: Ana Park' }).click();
   check(await page.locator('dialog[open]').last().getByRole('button', { name: 'Delete', exact: true }).isVisible(), 'delete button on the user row asks first');
-  await page.locator('dialog[open]').last().getByRole('button', { name: 'Cancel' }).click();
+  check(await closesTopRight(page.locator('dialog[open]').last()), 'delete user: confirm has the X top right, no Cancel');
+  await page.locator('dialog[open]').last().getByRole('button', { name: 'Close', exact: true }).click();
+  check(await page.locator('dialog[open]').waitFor({ state: 'detached', timeout: 2000 }).then(() => true, () => false), 'delete user: the X closes the confirm');
   check(!(await page.getByRole('button', { name: 'Delete user: Calvin Kim' }).count()), 'no delete button on my own row');
   check(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).isVisible(), 'owner can edit own row');
   check(errors.length === 0, `users: no page errors ${errors.join(' | ')}`);
@@ -1347,7 +1359,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await dlg.getByLabel('File').setInputFiles(big);
   await dlg.getByRole('button', { name: 'Save' }).click();
   check(await dlg.getByText(/over 50 MB/).isVisible(), 'knowledge: over 50 MB asks for a link');
-  await dlg.getByRole('button', { name: 'Cancel' }).click();
+  await dlg.getByRole('button', { name: 'Close', exact: true }).click();
   // Only for chosen people
   check(await page.getByText('Selected · 2').isVisible(), 'knowledge: card shows it is for selected people');
   knowledgeCalls.length = 0;

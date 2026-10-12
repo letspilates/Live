@@ -362,9 +362,6 @@ export function CourseEditor({ initial, reload }: { initial: Course[]; reload: (
           <p role="alert" className="min-w-0 flex-1 basis-40 text-sm text-red-700">
             {error}
           </p>
-          <Button variant="secondary" onClick={() => setForm(null)}>
-            {t('cancel')}
-          </Button>
           <Button onClick={saveForm} disabled={busy} className="px-7">
             {busy ? t('saving') : t('save')}
           </Button>
@@ -376,9 +373,6 @@ export function CourseEditor({ initial, reload }: { initial: Course[]; reload: (
           {t('confirmDeleteCourse', { name: form?.name_en || form?.name_kr || t('untitledCourse') })}
         </p>
         <div className="mt-6 flex justify-end gap-3">
-          <Button variant="secondary" onClick={() => setDeleting(false)}>
-            {t('cancel')}
-          </Button>
           <Button variant="danger" onClick={remove}>
             {t('delete')}
           </Button>

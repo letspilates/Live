@@ -377,9 +377,6 @@ function Registrants({
               </p>
             )}
             <div className="mt-2 flex justify-end gap-3">
-              <Button variant="secondary" onClick={() => setAdding(null)}>
-                {t('cancel')}
-              </Button>
               <Button onClick={addRegistrant} disabled={busy}>
                 {busy ? t('saving') : t('add')}
               </Button>
@@ -391,9 +388,6 @@ function Registrants({
       <Dialog open={deleting !== null} onClose={() => setDeleting(null)} title={t('deleteApplicant')}>
         <p className="text-sm text-mute">{t('confirmDeleteApplicant', { name: deleting?.full_name || t('noName') })}</p>
         <div className="mt-6 flex justify-end gap-3">
-          <Button variant="secondary" onClick={() => setDeleting(null)}>
-            {t('cancel')}
-          </Button>
           <Button variant="danger" onClick={deleteApplicant} disabled={busy}>
             {busy ? t('saving') : t('delete')}
           </Button>
