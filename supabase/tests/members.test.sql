@@ -183,6 +183,15 @@ select t.check('merge: re-import of the second Mindbody ID updates the kept clie
 ]$$) = '{"added":0,"linked":0,"updated":1,"skipped":0}');
 reset role;
 
+-- Same phone, names differ only by a space inside the given name
+insert into public.students (full_name, phone) values ('Yuhee Moon', '2135550950'), ('Moon Yu Hee', '213-555-0950'),
+  ('Ian Moon', '2135550951'), ('Moon Ian 2', '2135550952');
+select t.check('merge: letters key', app.client_letters_key('Yu Hee Moon') = app.client_letters_key('moon, yuhee'));
+select t.check('merge: space inside a name, same phone', app.merge_duplicate_clients() = '{"merged":1,"left_apart":2}');
+select t.check('merge: one Yuhee', (select count(*) = 1 from public.students where merged_into is null and phone like '%0950'));
+select t.check('merge: same name, different phone still apart', (select count(*) = 2 from public.students
+  where merged_into is null and app.client_name_key(full_name) = 'ian moon'));
+
 select app.check_api_exposure();
 
 rollback;
