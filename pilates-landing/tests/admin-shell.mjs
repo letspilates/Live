@@ -160,13 +160,13 @@ const APPTS = [
       booking({ id: 'b-4', client_name: 'Ana Lee', notes: 'Knee' })] },
   { id: 'a-3', starts_at: laISO(LA_TODAY, 720), minutes: 120, staff_id: null, service: 'Workshop', capacity: 8, series_id: null, series_changed: false,
     status: 'BOOKED', appointment_clients: [] },
-  // The client cancelled the same day: stays on the calendar, striped.
+  // The client cancelled the same day: folded into the day's circle, striped when opened.
   { id: 'a-4', starts_at: laISO(LA_TODAY, 900), minutes: 50, staff_id: 'i-sun', service: 'Private', capacity: 1, series_id: null, series_changed: false,
     status: 'BOOKED', appointment_clients: [booking({ id: 'b-5', client_name: 'Kai Moon', status: 'LATE_CANCEL' })] },
   // Starts while the 9:00 blocks are still running: drawn on top, pushed in by half.
   { id: 'a-5', starts_at: laISO(LA_TODAY, 570), minutes: 30, staff_id: 'i-sun', service: 'Gyrotonic', capacity: 1, series_id: null, series_changed: false,
     status: 'BOOKED', appointment_clients: [booking({ id: 'b-6', client_name: 'Noa Han' })] },
-  // The client didn't come: striped like a late cancel.
+  // The client didn't come: folded and striped like a late cancel.
   { id: 'a-6', starts_at: laISO(LA_TODAY, 1020), minutes: 50, staff_id: 'i-suk', service: 'Private', capacity: 1, series_id: null, series_changed: false,
     status: 'BOOKED', appointment_clients: [booking({ id: 'b-7', client_name: 'Rio Song', status: 'NO_SHOW' })] },
 ];
@@ -1553,14 +1553,14 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await page.getByRole('heading', { name: 'Edit Event' }).waitFor({ state: 'detached' });
   const c = sched.find(([n]) => n === 'cancel_appointment')?.[1];
   check(c?.p_id === 'a-3' && c.p_scope === 'one', 'schedule: cancel sends the appointment');
-  // Cancelled ones fold away; the day's circle says how many and opens them, striped.
-  const showCancelled = page.getByRole('button', { name: 'Show 1 cancelled' });
+  // Cancelled ones fold away (with the late cancel and no-show); the day's circle says how many and opens them, striped.
+  const showCancelled = page.getByRole('button', { name: 'Show 3 cancelled' });
   await showCancelled.waitFor();
   check(!(await workshop.count()), 'schedule: a cancelled appointment folds away behind a circle on its day');
   await shot(page, 'schedule-cancel-dot');
   await showCancelled.click();
   check(await workshop.isVisible() && await workshop.evaluate((el) => getComputedStyle(el).backgroundImage.includes('repeating-linear-gradient'))
-    && await page.getByRole('button', { name: 'Hide 1 cancelled' }).getAttribute('aria-pressed') === 'true',
+    && await page.getByRole('button', { name: 'Hide 3 cancelled' }).getAttribute('aria-pressed') === 'true',
     'schedule: tapping the circle shows it striped');
   check(!(await workshop.locator('[data-resize]').count()), 'schedule: a cancelled one has no length handle');
   await workshop.click();
@@ -1568,15 +1568,17 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     && !(await page.getByRole('button', { name: 'Cancel Event' }).count()), 'schedule: a cancelled one says so and has no cancel button');
   await shot(page, 'schedule-cancelled');
   await page.locator('dialog[open]').getByRole('button', { name: 'Close' }).click();
-  await page.getByRole('button', { name: 'Hide 1 cancelled' }).click();
+  await page.getByRole('button', { name: 'Hide 3 cancelled' }).click();
   check(!(await workshop.count()), 'schedule: tapping it again folds it away');
   a3.status = 'BOOKED';
   await page.reload();
   await workshop.waitFor();
 
-  // Late cancel: striped block, the hover details say so; the cancel step can mark it instead of removing it.
+  // Late cancel and no-show fold into the same circle; opened, they're striped and the hover details say so.
   const late = page.getByRole('button', { name: /Kai Moon - Private/ });
   const noShow = page.getByRole('button', { name: /Rio Song - Private/ });
+  check(!(await late.count()) && !(await noShow.count()), 'schedule: late cancel and no-show fold away like cancels');
+  await page.getByRole('button', { name: 'Show 2 cancelled' }).click();
   const stripes = (el) => getComputedStyle(el).backgroundImage.includes('repeating-linear-gradient');
   check(await late.evaluate(stripes) && await noShow.evaluate(stripes) && !(await mina.evaluate((el) => getComputedStyle(el).backgroundImage)).includes('gradient'),
     'schedule: late cancel and no-show are striped, others are not');

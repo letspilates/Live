@@ -178,10 +178,10 @@ export default function Schedule() {
   const instructors = setup?.instructors ?? [];
   const byId = new Map(instructors.map((i) => [i.user_id, i]));
   const listed = (appts ?? []).filter((a) => !hidden.has(a.staff_id ?? ''));
-  // Cancelled ones are folded away; a circle on their day says how many and opens them (striped).
+  // Cancelled, late-cancelled and no-show ones are folded away; a circle on their day says how many and opens them (striped).
   const cancels = new Map<string, number>();
-  for (const a of listed) if (a.status === 'CANCELLED') cancels.set(a.day, (cancels.get(a.day) ?? 0) + 1);
-  const shown = listed.filter((a) => a.status !== 'CANCELLED' || openDays.has(a.day));
+  for (const a of listed) if (striped(a)) cancels.set(a.day, (cancels.get(a.day) ?? 0) + 1);
+  const shown = listed.filter((a) => !striped(a) || openDays.has(a.day));
   const toggleDay = (d: string) =>
     setOpenDays((s) => {
       const next = new Set(s);
