@@ -1,32 +1,33 @@
-// Settings › Schedule (Owner/Admin): instructor colors, the services offered
-// for new appointments, the change-text delay and the Schedulista CSV import.
-// Every save goes through an owner-only database function.
-import { useEffect, useRef, useState } from 'react';
-import { Check, MessageSquare, Plus, Sparkles, Upload, Users, X } from 'lucide-react';
+// Settings › Schedule (Owner/Admin): the services offered for new appointments in their categories
+// (laid out like Schedulista's settings), instructor colors, the change-text delay and the Schedulista
+// CSV import. Every save goes through an owner-only database function.
+import { useEffect, useId, useRef, useState, type DragEvent } from 'react';
+import { GripVertical, MessageSquare, Plus, Sparkles, Upload, Users } from 'lucide-react';
 import { useT } from '../i18n';
 import Layout from '../Layout';
-import { loadInstructors, PALETTE, type Instructor } from '../schedule';
+import MinutesInput from '../MinutesInput';
+import { loadInstructors, loadServices, PALETTE, type Category, type Instructor, type Service } from '../schedule';
 import { scheduleFromCsv, type ImportProblem, type ScheduleImportRow } from '../scheduleImport';
 import { supabase } from '../supabase';
-import { Button, Card, CardTitle, Chip, Notice, Skeleton, Stat, Switch, inputCls } from '../ui';
+import { Button, Card, CardTitle, Chip, Dialog, Notice, Skeleton, Stat, Switch, TextArea, TextField, inputCls } from '../ui';
 
 const ICON = { size: 16, strokeWidth: 1.75, 'aria-hidden': true } as const;
 
-type Service = { name: string; minutes: number; capacity: number; active: boolean };
-type Note = { card: 'colors' | 'services' | 'text'; tone: 'success' | 'error'; text: string };
+type Note = { card: 'colors' | 'text'; tone: 'success' | 'error'; text: string };
 type ImportResult = { total: number; importable: number; duplicates: number; failed: number; errors: ImportProblem[] };
+type Data = Awaited<ReturnType<typeof loadAll>>;
+type List = 'categories' | 'services';
 
 async function loadAll() {
-  const [instructors, services, settings] = await Promise.all([
+  const [instructors, lists, settings] = await Promise.all([
     loadInstructors(),
-    supabase!.from('schedule_services').select('name, minutes, capacity, active').order('sort').order('name'),
+    loadServices(true),
     supabase!.from('schedule_settings').select('change_text_minutes').maybeSingle(),
   ]);
-  if (services.error) throw services.error;
   if (settings.error) throw settings.error;
   return {
     instructors,
-    services: services.data as Service[],
+    ...lists,
     textMinutes: (settings.data?.change_text_minutes ?? null) as number | null,
   };
 }
@@ -35,11 +36,10 @@ const TEXT_DELAYS = ['', '0', '5', '15', '30', '60'];
 
 export default function ScheduleSettings() {
   const { t } = useT();
-  const [data, setData] = useState<Awaited<ReturnType<typeof loadAll>> | null>(null);
+  const [data, setData] = useState<Data | null>(null);
   const [failed, setFailed] = useState(false);
   const [version, setVersion] = useState(0);
   const [note, setNote] = useState<Note | null>(null);
-  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const reload = () => setVersion((v) => v + 1);
 
@@ -75,28 +75,6 @@ export default function ScheduleSettings() {
     });
   };
 
-  const saveService = async (s: Service, isNew: boolean) => {
-    const ok =
-      s.name.length >= 1 &&
-      s.name.length <= 60 &&
-      Number.isInteger(s.minutes) &&
-      s.minutes >= 5 &&
-      s.minutes <= 720 &&
-      Number.isInteger(s.capacity) &&
-      s.capacity >= 1 &&
-      s.capacity <= 50;
-    if (!ok) return setNote({ card: 'services', tone: 'error', text: t('ssServiceInvalid') });
-    // Same name = edit (save_schedule_service upserts by name), so a new one must not reuse a name.
-    if (isNew && data?.services.some((x) => x.name.toLowerCase() === s.name.toLowerCase())) {
-      return setNote({ card: 'services', tone: 'error', text: t('ssServiceExists') });
-    }
-    const { error } = await supabase!.rpc('save_schedule_service', { p: s });
-    if (error) return setNote({ card: 'services', tone: 'error', text: t('saveFailed', { reason: error.message }) });
-    setNote({ card: 'services', tone: 'success', text: t('ssSaved') });
-    if (isNew) setAdding(false);
-    reload();
-  };
-
   const setTextDelay = async (value: string) => {
     if (!data) return;
     const minutes = value === '' ? null : Number(value);
@@ -124,6 +102,8 @@ export default function ScheduleSettings() {
   return (
     <Layout title={t('navScheduleSettings')}>
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
+        <ServicesCard data={data} reload={reload} onReorder={(lists) => setData((d) => d && { ...d, ...lists })} />
+
         <Card>
           <CardTitle icon={Users} title={t('ssInstructors')} />
           {show('colors')}
@@ -164,52 +144,13 @@ export default function ScheduleSettings() {
         </Card>
 
         <Card>
-          <CardTitle
-            icon={Sparkles}
-            title={t('ssServices')}
-            action={
-              <Button variant="secondary" className="!min-h-10 !px-4" disabled={adding} onClick={() => setAdding(true)}>
-                <Plus {...ICON} />
-                {t('add')}
-              </Button>
-            }
-          />
-          {show('services')}
-          {!data ? (
-            <Skeleton className="h-40 w-full" />
-          ) : (
-            <div className="-mx-1 overflow-x-auto px-1">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-mute">
-                  <tr>
-                    <th scope="col" className="py-2 pr-2 font-medium">{t('ssService')}</th>
-                    <th scope="col" className="pr-2 font-medium">{t('ssMinutes')}</th>
-                    <th scope="col" className="pr-2 font-medium">{t('capacity')}</th>
-                    <th scope="col" className="pr-2 font-medium">{t('ACTIVE')}</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-ink/[0.06] tabular-nums">
-                  {data.services.map((s) => (
-                    // Saved values in the key: a saved row starts fresh from what the database has.
-                    <ServiceRow key={`${s.name}|${s.minutes}|${s.capacity}|${s.active}`} svc={s} onSave={saveService} />
-                  ))}
-                  {adding && <ServiceRow onSave={saveService} onCancel={() => setAdding(false)} />}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="mt-3 text-xs text-mute">{t('ssServicesHint')}</p>
-        </Card>
-
-        <Card className="lg:col-span-2">
           <CardTitle icon={MessageSquare} title={t('ssTextTitle')} />
           {show('text')}
           {!data ? (
             <Skeleton className="h-12 w-full max-w-xs" />
           ) : (
-            <div className="grid gap-5 md:grid-cols-3">
-              <div>
+            <div className="grid gap-4">
+              <div className="max-w-xs">
                 <select
                   aria-label={t('ssTextTitle')}
                   value={data.textMinutes == null ? '' : String(data.textMinutes)}
@@ -231,7 +172,7 @@ export default function ScheduleSettings() {
                 </select>
                 <p className="mt-1.5 text-xs text-mute">{t('ssTextHint')}</p>
               </div>
-              <p className="text-sm text-mute md:col-span-2 md:pt-3">{t('ssTextTwilio')}</p>
+              <p className="text-sm text-mute">{t('ssTextTwilio')}</p>
             </div>
           )}
         </Card>
@@ -242,100 +183,495 @@ export default function ScheduleSettings() {
   );
 }
 
-/** One service: minutes, capacity and active edit in place; a new row also takes a name. */
-function ServiceRow({
-  svc,
-  onSave,
-  onCancel,
+const NONE = ''; // category_id null: the "No category" row and option
+// Text links in sage, like Schedulista's green "+ Add" and "Edit".
+const LINK =
+  'inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-medium text-sage transition-colors hover:text-sage-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40';
+const HANDLE =
+  'inline-flex h-10 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg text-mute/60 hover:text-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40';
+const PICK =
+  'min-h-11 min-w-0 flex-1 truncate rounded-lg px-1 text-left text-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40';
+// Picked category: raised like the service rows; the others sit back (Schedulista's grey rows).
+const categoryRow = (picked: boolean, dragged: boolean) =>
+  `flex items-center gap-1 rounded-xl px-1 ring-1 transition-[background-color,box-shadow,opacity] ${
+    picked ? 'bg-paper text-ink shadow-card ring-ink/[0.1]' : 'bg-ink/[0.035] text-mute ring-ink/[0.05]'
+  } ${dragged ? 'opacity-50' : ''}`;
+
+/** The list with the item at `from` moved to `to`. */
+function moved<T>(list: T[], from: number, to: number) {
+  const out = [...list];
+  out.splice(to, 0, ...out.splice(from, 1));
+  return out;
+}
+
+/** Categories on the left, the picked one's services on the right. Drag a row (or ↑ / ↓ on its handle) to reorder. */
+function ServicesCard({
+  data,
+  reload,
+  onReorder,
 }: {
-  svc?: Service;
-  onSave: (s: Service, isNew: boolean) => Promise<void>;
-  onCancel?: () => void;
+  data: Data | null;
+  reload: () => void;
+  onReorder: (lists: Partial<Pick<Data, List>>) => void;
 }) {
   const { t } = useT();
-  const [form, setForm] = useState({
-    name: svc?.name ?? '',
-    minutes: String(svc?.minutes ?? 50),
-    capacity: String(svc?.capacity ?? 1),
-    active: svc?.active ?? true,
-  });
-  const [busy, setBusy] = useState(false);
-  const dirty =
-    !svc || form.minutes !== String(svc.minutes) || form.capacity !== String(svc.capacity) || form.active !== svc.active;
-  const num = `${inputCls} !px-3 !py-2 text-center`;
+  const [picked, setPicked] = useState<string | null>(null);
+  const [note, setNote] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [drag, setDrag] = useState<{ list: List; index: number } | null>(null);
+  const [editCategory, setEditCategory] = useState<Category | 'new' | null>(null);
+  const [editService, setEditService] = useState<Service | 'new' | null>(null);
 
-  const save = async () => {
-    setBusy(true);
-    await onSave(
-      { name: form.name.trim(), minutes: Number(form.minutes), capacity: Number(form.capacity), active: form.active },
-      !svc,
+  if (!data) {
+    return (
+      <Card className="lg:col-span-2">
+        <CardTitle icon={Sparkles} title={t('ssServices')} />
+        <Skeleton className="h-40 w-full" />
+      </Card>
     );
-    setBusy(false);
+  }
+
+  const { categories, services, instructors } = data;
+  const inCategory = (id: string) => services.filter((s) => (s.category_id ?? NONE) === id);
+  const loose = inCategory(NONE).length;
+  // The picked row, or the first one while nothing (or a deleted category) is picked.
+  const current =
+    picked !== null && (picked === NONE ? loose > 0 : categories.some((c) => c.id === picked))
+      ? picked
+      : (categories[0]?.id ?? NONE);
+  const shown = inCategory(current);
+
+  const reorder = async (list: List, from: number, to: number) => {
+    if (from === to || to < 0 || to >= (list === 'categories' ? categories : shown).length) return;
+    setNote(null);
+    let order: { p_categories: string[] | null; p_services: string[] | null };
+    if (list === 'categories') {
+      const next = moved(categories, from, to);
+      onReorder({ categories: next });
+      order = { p_categories: next.map((c) => c.id), p_services: null };
+    } else {
+      // The category's services trade places among the slots they hold in the overall order.
+      const mine = moved(shown, from, to);
+      let k = 0;
+      const next = services.map((s) => ((s.category_id ?? NONE) === current ? mine[k++] : s));
+      onReorder({ services: next });
+      order = { p_categories: null, p_services: next.map((s) => s.id) };
+    }
+    const { error } = await supabase!.rpc('set_schedule_order', order);
+    if (error) {
+      setNote({ tone: 'error', text: t('saveFailed', { reason: error.message }) });
+      reload();
+    }
+  };
+
+  // Native drag and drop between rows of the same list.
+  const dnd = (list: List, index: number) => ({
+    draggable: true,
+    onDragStart: (e: DragEvent) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(index)); // Firefox only drags with data set
+      setDrag({ list, index });
+    },
+    onDragOver: (e: DragEvent) => drag?.list === list && e.preventDefault(),
+    onDrop: (e: DragEvent) => {
+      e.preventDefault();
+      if (drag?.list === list) void reorder(list, drag.index, index);
+      setDrag(null);
+    },
+    onDragEnd: () => setDrag(null),
+  });
+
+  const handle = (list: List, index: number, id: string, name: string) => (
+    <button
+      type="button"
+      data-handle={id}
+      aria-label={t('ssMove', { name })}
+      className={HANDLE}
+      onKeyDown={(e) => {
+        const to = e.key === 'ArrowUp' ? index - 1 : e.key === 'ArrowDown' ? index + 1 : null;
+        if (to === null) return;
+        e.preventDefault();
+        void reorder(list, index, to);
+        // Moving the row moves its element, which drops focus: put it back on this handle.
+        requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-handle="${id}"]`)?.focus());
+      }}
+    >
+      <GripVertical {...ICON} />
+    </button>
+  );
+
+  const done = (pick?: string) => {
+    setEditCategory(null);
+    setEditService(null);
+    setNote({ tone: 'success', text: t('ssSaved') });
+    if (pick !== undefined) setPicked(pick);
+    reload();
   };
 
   return (
-    <tr>
-      <th scope="row" className="py-2 pr-2 text-left font-medium">
-        {svc ? (
-          svc.name
-        ) : (
-          <input
-            aria-label={t('ssService')}
-            value={form.name}
-            maxLength={60}
-            autoFocus
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className={`${inputCls} !w-32 !px-3 !py-2`}
-          />
-        )}
-      </th>
-      <td className="py-2 pr-2">
-        <input
-          type="number"
-          inputMode="numeric"
-          min={5}
-          max={720}
-          aria-label={t('ssMinutes')}
-          value={form.minutes}
-          onChange={(e) => setForm({ ...form, minutes: e.target.value })}
-          className={`${num} !w-[4.5rem]`}
-        />
-      </td>
-      <td className="py-2 pr-2">
-        <input
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={50}
-          aria-label={t('capacity')}
-          value={form.capacity}
-          onChange={(e) => setForm({ ...form, capacity: e.target.value })}
-          className={`${num} !w-16`}
-        />
-      </td>
-      <td className="py-2 pr-2">
-        <Switch label={t('ACTIVE')} checked={form.active} onChange={(active) => setForm({ ...form, active })} />
-      </td>
-      <td className="py-2">
-        {dirty && (
-          <span className="flex justify-end gap-1">
-            {onCancel && (
-              <Button variant="secondary" aria-label={t('cancel')} className="!min-h-10 !w-10 !px-0" onClick={onCancel}>
-                <X {...ICON} />
-              </Button>
+    <Card className="lg:col-span-2">
+      <CardTitle icon={Sparkles} title={t('ssServices')} />
+      {note && (
+        <div className="mb-4">
+          <Notice tone={note.tone}>{note.text}</Notice>
+        </div>
+      )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div className="min-w-0">
+          <button type="button" onClick={() => setEditCategory('new')} className={`${LINK} -ml-2 mb-2 text-[15px]`}>
+            <Plus {...ICON} />
+            {t('ssAddCategory')}
+          </button>
+          <ul className="grid gap-2">
+            {categories.map((c, i) => (
+              <li key={c.id} {...dnd('categories', i)} className={categoryRow(c.id === current, drag?.list === 'categories' && drag.index === i)}>
+                {handle('categories', i, c.id, c.name)}
+                <button type="button" aria-pressed={c.id === current} onClick={() => setPicked(c.id)} className={PICK}>
+                  {c.name} ({inCategory(c.id).length})
+                </button>
+                <button type="button" aria-label={t('ssEditNamed', { name: c.name })} onClick={() => setEditCategory(c)} className={LINK}>
+                  {t('edit')}
+                </button>
+              </li>
+            ))}
+            {loose > 0 && (
+              <li className={categoryRow(current === NONE, false)}>
+                <span className="w-8 shrink-0" />
+                <button type="button" aria-pressed={current === NONE} onClick={() => setPicked(NONE)} className={PICK}>
+                  {t('ssNoCategory')} ({loose})
+                </button>
+              </li>
             )}
-            <Button
-              aria-label={svc ? t('save') : t('add')}
-              className="!min-h-10 !w-10 !px-0"
-              disabled={busy}
-              onClick={() => void save()}
-            >
-              <Check {...ICON} />
+          </ul>
+        </div>
+
+        <div className="min-w-0">
+          <button type="button" onClick={() => setEditService('new')} className={`${LINK} -ml-2 mb-2 text-[15px]`}>
+            <Plus {...ICON} />
+            {t('ssAddService')}
+          </button>
+          {!shown.length ? (
+            <p className="py-3 text-sm text-mute">{t('ssNoServices')}</p>
+          ) : (
+            <ul className="grid gap-2">
+              {shown.map((s, i) => {
+                const teachers = instructors.filter((p) => (s.staff_ids ? s.staff_ids.includes(p.user_id) : p.active));
+                return (
+                  <li
+                    key={s.id}
+                    {...dnd('services', i)}
+                    className={`flex items-center gap-1 rounded-xl bg-paper px-1 shadow-[0_1px_2px_rgb(var(--c-shadow)/0.06)] ring-1 ring-ink/[0.08] transition-opacity ${
+                      drag?.list === 'services' && drag.index === i ? 'opacity-50' : ''
+                    }`}
+                  >
+                    {handle('services', i, s.id, s.name)}
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 px-1 py-2.5">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-[15px] font-medium">{s.name}</span>
+                        {teachers.length > 0 && (
+                          <span role="img" aria-label={teachers.map((p) => p.full_name).join(', ')} className="flex shrink-0 items-center gap-1">
+                            {teachers.slice(0, 5).map((p) => (
+                              <span key={p.user_id} className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} />
+                            ))}
+                            {teachers.length > 5 && <span className="text-xs text-mute">+{teachers.length - 5}</span>}
+                          </span>
+                        )}
+                        {!s.active && <Chip>{t('INACTIVE')}</Chip>}
+                      </span>
+                      <span className="ml-auto whitespace-nowrap text-sm tabular-nums">
+                        {t('ssMinutesLong', { n: String(s.minutes) })}
+                        {s.cleanup_minutes > 0 && (
+                          <span className="text-mute"> {t('ssCleanupShort', { n: String(s.cleanup_minutes) })}</span>
+                        )}
+                      </span>
+                    </div>
+                    <button type="button" aria-label={t('ssEditNamed', { name: s.name })} onClick={() => setEditService(s)} className={LINK}>
+                      {t('edit')}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+      <div className="mt-5 grid gap-1 text-xs text-mute">
+        <p>{t('ssCategoriesHint')}</p>
+        <p>{t('ssDragHint')}</p>
+        <p>{t('ssServicesHint')}</p>
+      </div>
+
+      {editCategory && (
+        <CategoryDialog
+          category={editCategory === 'new' ? null : editCategory}
+          count={editCategory === 'new' ? 0 : inCategory(editCategory.id).length}
+          onClose={() => setEditCategory(null)}
+          onDone={done}
+        />
+      )}
+      {editService && (
+        <ServiceDialog
+          service={editService === 'new' ? null : editService}
+          data={data}
+          category={current}
+          onClose={() => setEditService(null)}
+          onDone={done}
+        />
+      )}
+    </Card>
+  );
+}
+
+/** Add or rename a category; an empty one can be deleted. */
+function CategoryDialog({
+  category,
+  count,
+  onClose,
+  onDone,
+}: {
+  category: Category | null;
+  count: number;
+  onClose: () => void;
+  onDone: (pick?: string) => void;
+}) {
+  const { t } = useT();
+  const [name, setName] = useState(category?.name ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const save = async () => {
+    if (!name.trim()) return setError(t('enterName'));
+    setBusy(true);
+    const { data, error } = await supabase!.rpc('save_schedule_category', { p: { id: category?.id, name: name.trim() } });
+    setBusy(false);
+    if (error) return setError(t('saveFailed', { reason: error.message }));
+    onDone(data as string);
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    const { error } = await supabase!.rpc('delete_schedule_category', { p_id: category!.id });
+    setBusy(false);
+    if (error) return setError(t('deleteFailed', { reason: error.message }));
+    onDone();
+  };
+
+  return (
+    <Dialog open onClose={onClose} title={t(category ? 'ssEditCategory' : 'ssAddCategory')}>
+      <form
+        className="grid gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <TextField label={t('ssCategoryName')} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
+        {error && <Notice tone="error">{error}</Notice>}
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {category && (
+            <Button variant="danger" className="mr-auto" disabled={busy || count > 0} onClick={() => void remove()}>
+              {t('ssDeleteCategory')}
             </Button>
-          </span>
+          )}
+          <Button type="submit" disabled={busy}>
+            {t('save')}
+          </Button>
+        </div>
+        {category && count > 0 && <p className="text-xs text-mute">{t('ssCategoryNotEmpty')}</p>}
+      </form>
+    </Dialog>
+  );
+}
+
+const TOGGLE = 'flex items-center justify-between gap-4 text-sm font-medium text-ink';
+
+/** Schedulista's "Service Details", the parts that mean something here (no online booking yet). */
+function ServiceDialog({
+  service: svc,
+  data,
+  category,
+  onClose,
+  onDone,
+}: {
+  service: Service | null;
+  data: Data;
+  category: string;
+  onClose: () => void;
+  onDone: (pick?: string) => void;
+}) {
+  const { t } = useT();
+  const id = useId();
+  const active = data.instructors.filter((p) => p.active);
+  // Active instructors, plus an inactive one this service still lists.
+  const listed = data.instructors.filter((p) => p.active || svc?.staff_ids?.includes(p.user_id));
+  const [f, setF] = useState(() => {
+    const cents = svc?.price_cents;
+    return {
+      name: svc?.name ?? '',
+      price: cents == null ? '' : (cents / 100).toFixed(cents % 100 ? 2 : 0),
+      minutes: svc?.minutes ?? 50,
+      cleanupOn: Boolean(svc?.cleanup_minutes),
+      cleanup: svc?.cleanup_minutes || 5,
+      category: svc ? (svc.category_id ?? NONE) : category,
+      description: svc?.description ?? '',
+      isClass: (svc?.capacity ?? 1) > 1,
+      capacity: String(svc && svc.capacity > 1 ? svc.capacity : 5),
+      staff: svc?.staff_ids ?? active.map((p) => p.user_id),
+      active: svc?.active ?? true,
+    };
+  });
+  const set = <K extends keyof typeof f>(key: K, value: (typeof f)[K]) => setF((v) => ({ ...v, [key]: value }));
+  const [errors, setErrors] = useState<{ name?: string; price?: string; capacity?: string; form?: string }>({});
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    const name = f.name.trim();
+    const price = f.price.replace(/[$,\s]/g, '');
+    const capacity = f.isClass ? Number(f.capacity) : 1;
+    const err: typeof errors = {};
+    if (!name) err.name = t('enterName');
+    // Without an id the database edits the service of that name, so a new one must not reuse a name.
+    else if (!svc && data.services.some((s) => s.name.toLowerCase() === name.toLowerCase())) err.name = t('ssServiceExists');
+    if (price && !(/^\d+(\.\d{1,2})?$/.test(price) && Number(price) <= 100000)) err.price = t('ssPriceInvalid');
+    if (!Number.isInteger(capacity) || capacity < (f.isClass ? 2 : 1) || capacity > 50) err.capacity = t('ssCapacityInvalid');
+    setErrors(err);
+    if (Object.keys(err).length) return;
+    setBusy(true);
+    const { error } = await supabase!.rpc('save_schedule_service', {
+      p: {
+        id: svc?.id,
+        name,
+        minutes: f.minutes,
+        capacity,
+        active: f.active,
+        category_id: f.category || null,
+        price_cents: price ? Math.round(Number(price) * 100) : null,
+        cleanup_minutes: f.cleanupOn ? f.cleanup : 0,
+        description: f.description.trim(),
+        // Every active instructor = null, so someone who joins later teaches it too.
+        staff_ids: active.every((p) => f.staff.includes(p.user_id)) ? null : f.staff,
+      },
+    });
+    setBusy(false);
+    if (error) return setErrors({ form: t('saveFailed', { reason: error.message }) });
+    onDone(f.category);
+  };
+
+  return (
+    <Dialog open onClose={onClose} title={t(svc ? 'ssEditService' : 'ssAddService')}>
+      <form
+        className="grid gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <TextField label={t('ssServiceName')} maxLength={60} value={f.name} error={errors.name} onChange={(e) => set('name', e.target.value)} />
+        <TextField
+          label={t('ssPrice')}
+          inputMode="decimal"
+          value={f.price}
+          hint={t('ssPriceHint')}
+          error={errors.price}
+          onChange={(e) => set('price', e.target.value)}
+        />
+        <div className="flex flex-col gap-2">
+          <label htmlFor={`${id}-minutes`} className="text-sm font-medium text-ink">
+            {t('ssDuration')}
+          </label>
+          <MinutesInput id={`${id}-minutes`} value={f.minutes} onChange={(v) => set('minutes', v)} />
+        </div>
+        <div className={TOGGLE}>
+          {t('ssCleanup')}
+          <Switch label={t('ssCleanup')} checked={f.cleanupOn} onChange={(on) => set('cleanupOn', on)} />
+        </div>
+        {f.cleanupOn && (
+          <div>
+            <label htmlFor={`${id}-cleanup`} className="sr-only">
+              {t('ssCleanup')}
+            </label>
+            <MinutesInput id={`${id}-cleanup`} min={5} max={120} value={f.cleanup} onChange={(v) => set('cleanup', v)} />
+          </div>
         )}
-      </td>
-    </tr>
+        <label className="flex flex-col gap-2">
+          <span className="text-sm font-medium text-ink">{t('category')}</span>
+          <select value={f.category} onChange={(e) => set('category', e.target.value)} className={inputCls}>
+            {data.categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+            <option value={NONE}>{t('ssNoCategory')}</option>
+          </select>
+        </label>
+        <TextArea label={t('ssDescription')} maxLength={1000} value={f.description} onChange={(e) => set('description', e.target.value)} />
+
+        <hr className="border-ink/[0.08]" />
+        <div className={TOGGLE}>
+          <span>
+            {t('ssClass')}
+            <span className="mt-0.5 block text-xs font-normal text-mute">{t('ssClassHint')}</span>
+          </span>
+          <Switch label={t('ssClass')} checked={f.isClass} onChange={(on) => set('isClass', on)} />
+        </div>
+        {f.isClass && (
+          <div>
+            <label className={TOGGLE}>
+              {t('capacity')}
+              <input
+                type="number"
+                inputMode="numeric"
+                min={2}
+                max={50}
+                value={f.capacity}
+                onChange={(e) => set('capacity', e.target.value)}
+                className={`${inputCls} !w-24 text-center tabular-nums`}
+              />
+            </label>
+            {errors.capacity && <p className="mt-1.5 text-sm text-red-700">{errors.capacity}</p>}
+          </div>
+        )}
+
+        <hr className="border-ink/[0.08]" />
+        <fieldset>
+          <legend className="mb-1 text-sm font-medium text-ink">{t('ssTaughtBy')}</legend>
+          {!listed.length ? (
+            <p className="text-sm text-mute">{t('ssNoInstructors')}</p>
+          ) : (
+            listed.map((p) => {
+              const on = f.staff.includes(p.user_id);
+              return (
+                <label key={p.user_id} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5 accent-sage"
+                    checked={on}
+                    // At least one instructor stays checked.
+                    disabled={on && f.staff.length === 1}
+                    onChange={() => set('staff', on ? f.staff.filter((x) => x !== p.user_id) : [...f.staff, p.user_id])}
+                  />
+                  <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full" style={{ background: p.color }} />
+                  <span className="min-w-0 flex-1 truncate">{p.full_name}</span>
+                  {!p.active && <Chip>{t('INACTIVE')}</Chip>}
+                </label>
+              );
+            })
+          )}
+        </fieldset>
+
+        <hr className="border-ink/[0.08]" />
+        <div className={TOGGLE}>
+          {t('ssOffered')}
+          <Switch label={t('ssOffered')} checked={f.active} onChange={(on) => set('active', on)} />
+        </div>
+
+        {errors.form && <Notice tone="error">{errors.form}</Notice>}
+        <div className="flex justify-end">
+          <Button type="submit" disabled={busy}>
+            {busy ? t('saving') : t('save')}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 

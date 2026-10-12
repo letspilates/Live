@@ -1637,6 +1637,117 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
   await context.close();
 }
 
+// 24. Settings › Schedule › Services like Schedulista: categories on the left, their services on the right,
+// dialogs that save every field, reorder by keyboard and by dragging
+{
+  sched.length = 0;
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule-settings/');
+  const btn = (name) => page.getByRole('button', { name, exact: true });
+  const dialog = page.locator('dialog[open]');
+  const saved = (rpc) => sched.filter(([n]) => n === rpc).map(([, b]) => b);
+  await btn('Individual Classes (2)').waitFor();
+  check(await btn('Pilates Classes (1)').isVisible() && await btn('Gyrotonic Classes (1)').isVisible()
+    && await btn('Individual Classes (2)').getAttribute('aria-pressed') === 'true', 'services: categories with their counts, the first one picked');
+  check(await btn('Edit Private').isVisible() && await btn('Edit Gyrotonic').isVisible() && !(await btn('Edit Pilates Group').count()),
+    'services: the picked category lists only its services');
+  check(await page.getByRole('img', { name: 'Su kyung YI, Sunnie Lee', exact: true }).count() === 2 && await page.getByText('50 minutes').first().isVisible(),
+    'services: a dot per instructor who teaches it (every active one when not set), and the length');
+  await btn('Pilates Classes (1)').click();
+  check(await btn('Edit Pilates Group').isVisible() && !(await btn('Edit Private').count()), 'services: clicking Pilates Classes shows Pilates Group');
+  await btn('Gyrotonic Classes (1)').click();
+  check(await page.getByRole('img', { name: 'Su kyung YI', exact: true }).isVisible(), 'services: Gyrotonic Group shows only its instructor');
+  await shot(page, 'services-desktop');
+
+  await btn('Add category').click();
+  await page.getByRole('heading', { name: 'Add category' }).waitFor();
+  check(!(await dialog.getByRole('button', { name: 'Cancel' }).count()) && !(await dialog.getByRole('button', { name: 'Delete category' }).count()),
+    'category dialog: Save only, no Cancel or Delete when adding');
+  await dialog.getByLabel('Category name').fill('Workshops');
+  await shot(page, 'services-add-category');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await page.getByText('Saved.', { exact: true }).waitFor();
+  const cat = saved('save_schedule_category')[0]?.p;
+  check(cat?.name === 'Workshops' && !('id' in cat), 'category dialog: Add category sends save_schedule_category with the name');
+  await btn('Edit Pilates Classes').click();
+  await page.getByRole('heading', { name: 'Edit category' }).waitFor();
+  check(await dialog.getByRole('button', { name: 'Delete category' }).isDisabled() && await dialog.getByText('Move its services to another category first.').isVisible(),
+    'category dialog: a category with services cannot be deleted');
+  await page.keyboard.press('Escape');
+  await page.getByRole('heading', { name: 'Edit category' }).waitFor({ state: 'detached' });
+
+  await btn('Individual Classes (2)').click();
+  await btn('Edit Private').click();
+  await page.getByRole('heading', { name: 'Edit service' }).waitFor();
+  await dialog.getByRole('button', { name: '5 minutes longer' }).click();
+  await dialog.getByLabel('Price ($)').fill('90');
+  await shot(page, 'services-edit-service');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('heading', { name: 'Edit service' }).waitFor({ state: 'detached' });
+  const edit = saved('save_schedule_service')[0]?.p;
+  check(edit?.id === 'v-1' && edit.name === 'Private' && edit.minutes === 55 && edit.price_cents === 9000 && edit.category_id === 'c-ind'
+    && edit.staff_ids === null && edit.capacity === 1 && edit.cleanup_minutes === 0 && edit.active === true,
+    'service dialog: Edit Private sends 55 minutes, $90 in cents, its category, every instructor (null)');
+
+  await btn('Pilates Classes (1)').click();
+  await btn('Edit Pilates Group').click();
+  await page.getByRole('heading', { name: 'Edit service' }).waitFor();
+  check(await dialog.getByRole('switch', { name: 'Class' }).isChecked() && await dialog.getByLabel('Capacity').inputValue() === '5', 'service dialog: a group is a class with its capacity');
+  await dialog.getByRole('checkbox', { name: 'Sunnie Lee' }).uncheck();
+  check(await dialog.getByRole('checkbox', { name: 'Su kyung YI' }).isDisabled(), 'service dialog: the last instructor stays checked');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('heading', { name: 'Edit service' }).waitFor({ state: 'detached' });
+  const group = saved('save_schedule_service')[1]?.p;
+  check(group?.id === 'v-3' && group.staff_ids?.join() === 'i-suk' && group.capacity === 5, 'service dialog: unchecking an instructor sends the other one');
+
+  await btn('Add service').click();
+  await page.getByRole('heading', { name: 'Add service' }).waitFor();
+  await dialog.getByLabel('Service name').fill('private');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await dialog.getByText('There is already a service with this name.').waitFor();
+  await dialog.getByLabel('Service name').fill('Mat Class');
+  await dialog.getByLabel('Price ($)').fill('abc');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await dialog.getByText(/Enter dollars from 0 to 100,000/).waitFor();
+  check(saved('save_schedule_service').length === 2, 'service dialog: a taken name or a wrong price sends nothing');
+  await dialog.getByLabel('Price ($)').fill('');
+  await dialog.getByRole('switch', { name: 'Setup/cleanup time' }).check({ force: true });
+  await dialog.getByRole('switch', { name: 'Class' }).check({ force: true });
+  await dialog.getByLabel('Capacity').fill('8');
+  await dialog.getByLabel('Description').fill('Mat work for everyone');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('heading', { name: 'Add service' }).waitFor({ state: 'detached' });
+  const added = saved('save_schedule_service')[2]?.p;
+  check(added && !('id' in added) && added.name === 'Mat Class' && added.category_id === 'c-pil' && added.price_cents === null && added.cleanup_minutes === 5
+    && added.capacity === 8 && added.minutes === 50 && added.description === 'Mat work for everyone' && added.staff_ids === null,
+    'service dialog: a new service goes in the picked category with cleanup, class capacity and description');
+
+  await btn('Move Individual Classes').focus();
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(300);
+  const byKey = saved('set_schedule_order')[0];
+  check(byKey?.p_categories?.join() === 'c-pil,c-ind,c-gyr' && byKey.p_services === null, 'order: ArrowDown on a category handle saves the new category order');
+  check(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')) === 'Move Individual Classes', 'order: focus stays on the moved handle');
+  await btn('Individual Classes (2)').click();
+  await btn('Move Gyrotonic').dragTo(btn('Move Private'));
+  await page.waitForTimeout(300);
+  const byDrag = saved('set_schedule_order')[1];
+  check(byDrag?.p_services?.join() === 'v-2,v-1,v-3,v-4' && byDrag.p_categories === null, 'order: dragging a service saves every service in the new order');
+  check(errors.length === 0, `services: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+for (const colorScheme of ['light', 'dark']) {
+  const { page, context, errors } = await open('OWNER', 393, 'schedule-settings/', { colorScheme });
+  await page.getByRole('button', { name: 'Individual Classes (2)', exact: true }).waitFor();
+  check(await noOverflow(page), `services phone ${colorScheme}: no sideways scroll`);
+  await shot(page, `services-phone-${colorScheme}`);
+  await page.getByRole('button', { name: 'Edit Private', exact: true }).click();
+  await page.getByRole('heading', { name: 'Edit service' }).waitFor();
+  check(await noOverflow(page), `services phone ${colorScheme}: dialog fits`);
+  await shot(page, `services-phone-dialog-${colorScheme}`);
+  check(errors.length === 0, `services phone ${colorScheme}: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
 check(!browserCalledSheet, 'staging never calls the Google Sheet');
 
 await browser.close();
