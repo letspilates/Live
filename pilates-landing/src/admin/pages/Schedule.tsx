@@ -61,6 +61,8 @@ type Drag = Grid & {
   grab: number;
   root: Element | null;
   on: boolean;
+  /** Touch: the press-and-hold timer that picks the block up. */
+  hold?: number;
   col?: HTMLElement;
   day?: string;
   min?: number;
@@ -73,6 +75,11 @@ const DURATIONS = [30, 40, 45, 50, 55, 60, 80, 90, 110, 120, 180, 360];
 const SNAP = 15;
 const LINE = 'rgb(var(--c-ink) / 0.08)';
 const SHADOW = '[text-shadow:0_1px_1px_rgb(0_0_0/0.28)]';
+const STRIPES = 'repeating-linear-gradient(135deg, rgb(255 255 255 / 0.5) 0 5px, transparent 5px 10px)';
+/** Everyone booked cancelled the same day: the block stays on the calendar, striped (like Schedulista). */
+const lateCancelled = (a: Appointment) => a.clients.length > 0 && a.clients.every((b) => b.status === 'LATE_CANCEL');
+const paint = (a: Appointment, color: string) => (lateCancelled(a) ? `${STRIPES}, ${color}` : color);
+const shade = (a: Appointment, color: string) => (isLight(color) || lateCancelled(a) ? SHADOW : '');
 const ROUND =
   'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-paper shadow-[0_1px_2px_rgb(var(--c-shadow)/0.06)] ring-1 ring-ink/[0.12] transition-colors hover:bg-sand/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40';
 // Dialog rows: label column + field column, stacked on phones.
@@ -101,6 +108,13 @@ export default function Schedule() {
   const drag = useRef<Drag | null>(null);
   const dragged = useRef(false); // the click that ends a drag must not open the dialog
   const seq = useRef(0);
+
+  // While a finger holds a block, moving it must not scroll the page.
+  useEffect(() => {
+    const stop = (e: TouchEvent) => drag.current?.on && e.preventDefault();
+    document.addEventListener('touchmove', stop, { passive: false });
+    return () => document.removeEventListener('touchmove', stop);
+  }, []);
 
   const ws = weekStart(day);
   const [from, to] =
@@ -180,8 +194,15 @@ export default function Schedule() {
         : t('calHours', { n: String(a.minutes / 60) }),
       !a.staff_id ? a.service : a.capacity > 1 ? t('calBookedOf', count(a)) : a.clients[0]?.name,
       a.staff_id ? full(a) : t('calStudioEvent'),
+      lateLine(a),
       a.series_id && a.series_changed ? t('calChanged') : '',
     ].filter(Boolean);
+  /** "Late cancel" (one client) or "Late cancel: Ava, Ben" (a class). */
+  const lateLine = (a: Appointment) => {
+    const late = a.clients.filter((b) => b.status === 'LATE_CANCEL');
+    if (!late.length) return '';
+    return a.capacity > 1 ? `${t('calLATE_CANCEL')}: ${late.map((b) => b.name).join(', ')}` : t('calLATE_CANCEL');
+  };
 
   const placeTip = (e: PointerEvent) => {
     const el = tipRef.current;
@@ -190,10 +211,12 @@ export default function Schedule() {
     el.style.top = `${Math.min(e.clientY + 14, window.innerHeight - el.offsetHeight - 8)}px`;
   };
 
-  /* Drag to move (mouse / pen): 5px before it starts, snaps to 15 minutes, any day column of the same grid. */
+  /* Drag to move: a mouse or pen moves 5px, a finger holds still for a moment first (so a swipe still scrolls).
+     Snaps to 15 minutes, any day column of the same grid. */
   const dragMove = (d: Drag, e: PointerEvent) => {
     if (!d.on) {
       if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 5) return;
+      if (d.hold) return dropDrag(); // the finger moved before the hold: that's a scroll
       d.on = true;
       setTip(null);
     }
@@ -211,9 +234,14 @@ export default function Schedule() {
     setGhost({ id: d.a.id, day: d.day, min });
   };
 
+  const dropDrag = () => {
+    window.clearTimeout(drag.current?.hold);
+    drag.current = null;
+  };
+
   const dragEnd = () => {
     const d = drag.current;
-    drag.current = null;
+    dropDrag();
     if (!d?.on) return; // a plain click: onClick opens the dialog
     dragged.current = true;
     if (!d.day || d.min === undefined || (d.day === d.a.day && d.min === d.a.start)) return setGhost(null);
@@ -229,9 +257,9 @@ export default function Schedule() {
     },
     onPointerDown: (e) => {
       dragged.current = false;
-      if (e.button !== 0 || e.pointerType === 'touch') return; // phones: a tap opens the dialog, change the time there
+      if (e.button !== 0) return;
       const el = e.currentTarget;
-      drag.current = {
+      const d: Drag = {
         ...grid,
         a,
         x0: e.clientX,
@@ -240,7 +268,17 @@ export default function Schedule() {
         root: el.closest('[data-grid]'),
         on: false,
       };
+      drag.current = d;
       el.setPointerCapture(e.pointerId);
+      // Touch: press and hold to pick the block up; a quick tap still opens the dialog.
+      if (e.pointerType === 'touch') {
+        d.hold = window.setTimeout(() => {
+          d.hold = undefined;
+          d.on = true;
+          navigator.vibrate?.(15);
+          setGhost({ id: a.id, day: a.day, min: a.start });
+        }, 350);
+      }
     },
     onPointerMove: (e) => {
       if (drag.current?.a.id === a.id) dragMove(drag.current, e);
@@ -250,9 +288,10 @@ export default function Schedule() {
       if (drag.current?.a.id === a.id) dragEnd();
     },
     onPointerCancel: () => {
-      drag.current = null;
+      dropDrag();
       setGhost(null);
     },
+    onContextMenu: (e) => e.preventDefault(), // a long press on Android
     onPointerEnter: (e) => {
       if (e.pointerType !== 'mouse' || drag.current) return;
       setTip(a);
@@ -601,10 +640,11 @@ function Block({
   return (
     <button
       type="button"
-      style={{ ...style, background: color }}
-      className={`absolute flex select-none flex-col overflow-hidden rounded-[3px] px-[5px] py-[3px] text-left leading-[1.22] text-white transition-[filter] duration-150 hover:brightness-[1.06] hover:saturate-[1.05] ${
-        isLight(color) ? SHADOW : ''
-      } ${className}`}
+      style={{ ...style, background: paint(a, color) }}
+      className={`absolute flex select-none flex-col overflow-hidden rounded-[3px] px-[5px] py-[3px] text-left leading-[1.22] text-white transition-[filter] duration-150 [-webkit-touch-callout:none] hover:brightness-[1.06] hover:saturate-[1.05] ${shade(
+        a,
+        color,
+      )} ${className}`}
       {...rest}
     >
       <span className="shrink-0 overflow-hidden whitespace-nowrap text-[11.5px] tabular-nums" style={{ marginRight: icons.length * 14 }}>
@@ -780,10 +820,8 @@ function MonthGrid({
                   key={a.id}
                   type="button"
                   onClick={() => onOpen(a)}
-                  className={`truncate rounded-[3px] px-[5px] py-px text-left text-[11.5px] font-medium text-white ${
-                    isLight(color(a)) ? SHADOW : ''
-                  }`}
-                  style={{ background: color(a) }}
+                  className={`truncate rounded-[3px] px-[5px] py-px text-left text-[11.5px] font-medium text-white ${shade(a, color(a))}`}
+                  style={{ background: paint(a, color(a)) }}
                 >
                   {hm(a.start)} {pill(a)}
                 </button>
@@ -1044,7 +1082,8 @@ function AppointmentDialog({
     if (e) setError(e.message);
     else onSaved();
   };
-  const save = () =>
+  /** status: give every booking this status (Late cancel from the cancel step). */
+  const save = (status?: BookingStatus) =>
     run('save_appointment', {
       p: {
         id: a?.id,
@@ -1066,7 +1105,7 @@ function AppointmentDialog({
             }
           : {}),
         // A booking left out of the list becomes CANCELLED.
-        clients: f.clients.map((c) => ({ id: c.id, student_id: c.student_id, status: c.status, notes: c.notes })),
+        clients: f.clients.map((c) => ({ id: c.id, student_id: c.student_id, status: status ?? c.status, notes: c.notes })),
       },
     });
 
@@ -1403,11 +1442,17 @@ function AppointmentDialog({
       {confirming ? (
         <div className="mt-7 grid gap-4 border-t border-ink/10 pt-6">
           <p className="text-[15px]">{t('calCancelAsk')}</p>
+          {f.clients.length > 0 && <p className="text-sm text-mute">{t('calLateHint')}</p>}
           <div className="flex flex-wrap justify-end gap-3">
             {/* autoFocus also scrolls the question into view */}
             <Button variant="secondary" autoFocus onClick={() => setConfirming(false)}>
               {t('calKeep')}
             </Button>
+            {f.clients.length > 0 && (
+              <Button variant="secondary" disabled={busy} onClick={() => void save('LATE_CANCEL')}>
+                {t('calLATE_CANCEL')}
+              </Button>
+            )}
             <Button variant="danger" disabled={busy} onClick={() => void run('cancel_appointment', { p_id: a!.id, p_scope: f.scope })}>
               {busy ? t('saving') : cancelLabel}
             </Button>

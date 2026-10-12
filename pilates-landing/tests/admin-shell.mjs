@@ -160,6 +160,9 @@ const APPTS = [
       booking({ id: 'b-4', client_name: 'Ana Lee', notes: 'Knee' })] },
   { id: 'a-3', starts_at: laISO(LA_TODAY, 720), minutes: 120, staff_id: null, service: 'Workshop', capacity: 8, series_id: null, series_changed: false,
     status: 'BOOKED', appointment_clients: [] },
+  // The client cancelled the same day: stays on the calendar, striped.
+  { id: 'a-4', starts_at: laISO(LA_TODAY, 900), minutes: 50, staff_id: 'i-sun', service: 'Private', capacity: 1, series_id: null, series_changed: false,
+    status: 'BOOKED', appointment_clients: [booking({ id: 'b-5', client_name: 'Kai Moon', status: 'LATE_CANCEL' })] },
 ];
 const INSTRUCTORS = [{ user_id: 'i-suk', full_name: 'Su kyung YI', calendar_color: '#EEBC43', active: true },
   { user_id: 'i-sun', full_name: 'Sunnie Lee', calendar_color: null, active: true }];
@@ -1464,6 +1467,25 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const c = sched.find(([n]) => n === 'cancel_appointment')?.[1];
   check(c?.p_id === 'a-3' && c.p_scope === 'one', 'schedule: cancel sends the appointment');
 
+  // Late cancel: striped block, the hover details say so; the cancel step can mark it instead of removing it.
+  const late = page.getByRole('button', { name: /Kai Moon - Private/ });
+  check((await late.evaluate((el) => getComputedStyle(el).backgroundImage)).includes('repeating-linear-gradient')
+    && !(await mina.evaluate((el) => getComputedStyle(el).backgroundImage)).includes('gradient'), 'schedule: late cancel is striped, others are not');
+  await late.hover();
+  await page.getByText('Late cancel', { exact: true }).waitFor();
+  await shot(page, 'schedule-week-late-cancel');
+  check(true, 'schedule: hover details say Late cancel');
+  await page.mouse.move(5, 5);
+  sched.length = 0;
+  await mina.click();
+  await page.getByRole('button', { name: 'Cancel Appointment' }).click();
+  await page.getByText(/Late cancel keeps it on the calendar/).waitFor();
+  await page.getByRole('button', { name: 'Late cancel', exact: true }).click();
+  await page.getByRole('heading', { name: 'Edit Appointment' }).waitFor({ state: 'detached' });
+  const lc = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
+  check(lc?.id === 'a-1' && lc.clients[0].id === 'b-1' && lc.clients[0].status === 'LATE_CANCEL' && !sched.some(([n]) => n === 'cancel_appointment'),
+    'schedule: Late cancel keeps the appointment and marks the booking');
+
   // New appointment: client search uses the Schedule search (no payment data).
   await page.getByRole('button', { name: 'New Appointment' }).click();
   await page.getByPlaceholder(/Search/).first().fill('leo');
@@ -1477,6 +1499,45 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await page.getByRole('button', { name: /Mina Cho - Private/ }).waitFor();
   check(await noOverflow(page), 'schedule phone: day view, no sideways scroll');
   check(errors.length === 0, `schedule phone: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+// Phone: a tap opens the dialog, press and hold then drag moves the block.
+{
+  sched.length = 0;
+  const { page, context, errors } = await open('OWNER', 393, 'schedule/', { timezoneId: 'Asia/Seoul', hasTouch: true, isMobile: true });
+  const mina = page.getByRole('button', { name: /Mina Cho - Private/ });
+  await mina.waitFor();
+  await mina.tap();
+  await page.getByRole('heading', { name: 'Edit Appointment' }).waitFor();
+  check(true, 'schedule phone: a tap opens the dialog');
+  await page.keyboard.press('Escape');
+  await page.getByRole('heading', { name: 'Edit Appointment' }).waitFor({ state: 'detached' });
+  const workshop = page.getByRole('button', { name: /^12:00 - 2:00\s*Workshop/ });
+  await workshop.scrollIntoViewIfNeeded();
+  const w = await workshop.boundingBox();
+  const cdp = await context.newCDPSession(page);
+  const touch = (type, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: w.x + w.width / 2, y }] });
+  const y0 = w.y + 15;
+  // A quick swipe scrolls, it doesn't pick the block up.
+  await touch('touchStart', y0);
+  for (let i = 1; i <= 6; i++) await touch('touchMove', y0 - i * 8);
+  await touch('touchEnd');
+  await page.waitForTimeout(300);
+  check(!(await page.getByRole('heading', { name: 'Move Event' }).count()), 'schedule phone: a swipe does not move the block');
+  await workshop.scrollIntoViewIfNeeded();
+  const w2 = await workshop.boundingBox();
+  const y1 = w2.y + 15;
+  const touch2 = (type, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: w2.x + w2.width / 2, y }] });
+  await touch2('touchStart', y1);
+  await page.waitForTimeout(500); // hold
+  for (let i = 1; i <= 8; i++) await touch2('touchMove', y1 + (w2.height / 2) * (i / 8));
+  await touch2('touchEnd');
+  await page.getByRole('heading', { name: 'Move Event' }).waitFor();
+  await page.getByRole('button', { name: 'Move', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo' }).waitFor();
+  const mv = sched.find(([n]) => n === 'move_appointment')?.[1];
+  check(mv?.p_id === 'a-3' && mv.p_start === `${LA_TODAY} 13:00`, 'schedule phone: press, hold and drag one hour down moves to 13:00');
+  check(errors.length === 0, `schedule phone touch: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'schedule/', true], ['STAFF', 'schedule-settings/', false]]) {
