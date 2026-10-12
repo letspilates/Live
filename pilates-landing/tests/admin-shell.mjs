@@ -1661,7 +1661,8 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await mina.waitFor();
   await mina.tap();
   await page.getByRole('heading', { name: 'Edit Appointment' }).waitFor();
-  check(true, 'schedule phone: a tap opens the dialog');
+  check(await page.evaluate(() => document.activeElement?.tagName) === 'DIALOG',
+    'schedule phone: a tap opens the dialog with focus on the dialog, not the Instructor list (iPhone would pop it open)');
   await page.keyboard.press('Escape');
   await page.getByRole('heading', { name: 'Edit Appointment' }).waitFor({ state: 'detached' });
   const workshop = page.getByRole('button', { name: /^12:00 - 2:00\s*Workshop/ });
@@ -1883,6 +1884,20 @@ for (const colorScheme of ['light', 'dark']) {
   check(await noOverflow(page), `services phone ${colorScheme}: delete confirm fits`);
   await shot(page, `services-phone-delete-${colorScheme}`);
   check(errors.length === 0, `services phone ${colorScheme}: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// Phone: a long service and guest name wrap inside the row instead of pushing the page sideways.
+{
+  const { page, context, errors } = await open('OWNER', 393, 'schedule-settings/');
+  await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) => r.fulfill({ json: [...SERVICES, { ...SERVICES[0], id: 'v-long',
+    name: 'Gyrotonic Level 1 Apprentice Review', guest_instructor: "Rich O'Connor", cleanup_minutes: 5, sort: 9 }] }));
+  await page.reload();
+  await page.getByRole('button', { name: 'Individual Classes (3)', exact: true }).waitFor();
+  const del = page.getByRole('button', { name: 'Delete Gyrotonic Level 1 Apprentice Review', exact: true });
+  check(await noOverflow(page) && (await del.boundingBox()).x + 40 <= 393, 'services phone: a long name wraps, its pencil and trash stay on screen');
+  await shot(page, 'services-phone-long');
+  check(errors.length === 0, `services phone long: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 

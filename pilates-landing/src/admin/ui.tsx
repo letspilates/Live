@@ -199,15 +199,20 @@ export function Dialog({
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      // Focus the dialog itself, not its first field: on iPhone a focused <select> pops its list open.
+      dialog.focus();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
   return (
     <dialog
       ref={ref}
+      tabIndex={-1}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
-      className="max-h-[calc(100dvh-2rem)] w-[min(calc(100%-2rem),28rem)] overflow-y-auto rounded-[20px] bg-paper p-0 text-ink shadow-pop backdrop:bg-ink/30"
+      className="max-h-[calc(100dvh-2rem)] w-[min(calc(100%-2rem),28rem)] overflow-y-auto rounded-[20px] bg-paper p-0 text-ink shadow-pop outline-none backdrop:bg-ink/30"
     >
       <div className="p-6">
         <div className="mb-4 flex items-center gap-3">

@@ -462,15 +462,20 @@ function Panel({ open, title, letter, onClose, children }: { open: boolean; titl
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) d.showModal();
+    if (open && !d.open) {
+      d.showModal();
+      // Focus the dialog itself, not its first field: on iPhone a focused <select> pops its list open.
+      d.focus();
+    }
     if (!open && d.open) d.close();
   }, [open]);
   return (
     <dialog
       ref={ref}
+      tabIndex={-1}
       onClose={onClose}
       aria-label={title}
-      className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-full bg-paper p-0 text-ink shadow-pop backdrop:bg-ink/30 sm:max-w-xl sm:rounded-l-[20px]"
+      className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-full bg-paper p-0 text-ink shadow-pop outline-none backdrop:bg-ink/30 sm:max-w-xl sm:rounded-l-[20px]"
     >
       <div className="flex min-h-full flex-col">
         <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-ink/10 bg-paper px-5 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">

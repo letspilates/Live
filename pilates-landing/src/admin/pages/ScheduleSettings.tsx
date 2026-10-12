@@ -329,7 +329,7 @@ function ServicesCard({
             <Plus {...ICON} />
             {t('ssAddCategory')}
           </button>
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
             {categories.map((c, i) => (
               <li key={c.id} {...dnd('categories', i)} className={categoryRow(c.id === current, drag?.list === 'categories' && drag.index === i)}>
                 {handle('categories', i, c.id, c.name)}
@@ -361,7 +361,7 @@ function ServicesCard({
           {!shown.length ? (
             <p className="py-3 text-sm text-mute">{t('ssNoServices')}</p>
           ) : (
-            <ul className="grid gap-2">
+            <ul className="grid grid-cols-1 gap-2">
               {shown.map((s, i) => {
                 const teachers = instructors.filter((p) => (s.staff_ids ? s.staff_ids.includes(p.user_id) : p.active));
                 return (
@@ -374,10 +374,10 @@ function ServicesCard({
                   >
                     {handle('services', i, s.id, s.name)}
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 px-1 py-2.5">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-[15px] font-medium">{s.name}</span>
+                      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="min-w-0 break-words text-[15px] font-medium">{s.name}</span>
                         {guestCats.has(s.category_id ?? NONE) ? (
-                          <span className="truncate text-sm text-mute">{s.guest_instructor || t('ssOthers')}</span>
+                          <span className="min-w-0 break-words text-sm text-mute">{s.guest_instructor || t('ssOthers')}</span>
                         ) : teachers.length > 0 && (
                           <span role="img" aria-label={teachers.map((p) => p.full_name).join(', ')} className="flex shrink-0 items-center gap-1">
                             {teachers.slice(0, 5).map((p) => (
@@ -388,7 +388,7 @@ function ServicesCard({
                         )}
                         {!s.active && <Chip>{t('INACTIVE')}</Chip>}
                       </span>
-                      <span className="ml-auto whitespace-nowrap text-sm tabular-nums">
+                      <span className="whitespace-nowrap text-sm tabular-nums sm:ml-auto">
                         {t('ssMinutesLong', { n: String(s.minutes) })}
                         {s.cleanup_minutes > 0 && (
                           <span className="text-mute"> {t('ssCleanupShort', { n: String(s.cleanup_minutes) })}</span>

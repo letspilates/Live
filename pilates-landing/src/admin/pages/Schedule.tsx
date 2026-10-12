@@ -1010,16 +1010,21 @@ function Modal({ title, width, onClose, children }: { title: string; width: stri
   const ref = useRef<HTMLDialogElement>(null);
   const downOnBackdrop = useRef(false);
   useEffect(() => {
-    if (!ref.current?.open) ref.current?.showModal();
+    const d = ref.current;
+    if (!d || d.open) return;
+    d.showModal();
+    // Focus the dialog itself, not its first field: on iPhone a focused <select> pops its list open.
+    d.focus();
   }, []);
   return (
     <dialog
       ref={ref}
+      tabIndex={-1}
       onClose={onClose}
       // Only a click that starts and ends on the backdrop closes it (not the end of a drag or a text selection).
       onPointerDown={(e) => (downOnBackdrop.current = e.target === ref.current)}
       onClick={(e) => downOnBackdrop.current && e.target === ref.current && onClose()}
-      className={`max-h-[calc(100dvh-2rem)] ${width} overflow-y-auto rounded-[20px] bg-paper p-0 text-ink shadow-pop backdrop:bg-ink/30`}
+      className={`max-h-[calc(100dvh-2rem)] ${width} overflow-y-auto rounded-[20px] bg-paper p-0 text-ink shadow-pop outline-none backdrop:bg-ink/30`}
     >
       <button
         type="button"
