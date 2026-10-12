@@ -341,7 +341,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Trainings' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access', `${device}: owner menu`);
+    check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Backup', `${device}: owner menu`);
     if (device === 'desktop') check(await page.locator('aside').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
@@ -426,7 +426,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
   }
-  for (const path of ['trainings/', 'users/', 'access/', 'expenses/', 'reports/', 'notifications/']) {
+  for (const path of ['trainings/', 'users/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/']) {
     const { page, context } = await open(who, 1280, path);
     await page.waitForURL(/\/admin\/$/);
     check(!(await page.getByRole('tab').count()), `${who}: /${path} redirects to dashboard`);
@@ -1132,7 +1132,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 {
   const { page, context, errors } = await open('ADMIN', 1280, 'users/');
   await page.getByText('Ana Park').waitFor();
-  check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access', 'admin: full menu');
+  check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Backup', 'admin: full menu');
   check(!(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).count()), 'admin: cannot edit the owner');
   check(await page.getByRole('button', { name: 'Edit user: Ana Park' }).isVisible(), 'admin: can edit others');
   await page.getByRole('button', { name: 'Add user' }).click();
@@ -1327,6 +1327,40 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await shot(page, `desktop-sidebar-${mode}`);
   }
   await page.getByRole('button', { name: 'Light mode' }).click();
+  await context.close();
+}
+
+// 21. Settings → Backup: owner downloads clients, payments and everything as files
+{
+  const { page, context, errors } = await open('OWNER', 1280, 'backup/');
+  check((await page.locator('h1').innerText()) === 'Backup', 'backup: page opens');
+  await page.getByRole('button', { name: 'Prepare backup' }).click();
+  await page.getByText(`Ready: ${MEMBERS.length} clients, ${PAYMENTS.length} payments.`).waitFor();
+  check(true, 'backup: counts what it read');
+  const fs = await import('node:fs');
+  const day = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+  const grab = async (name) => {
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name }).click()]);
+    return [download.suggestedFilename(), fs.readFileSync(await download.path(), 'utf8')];
+  };
+  const [clientsName, clients] = await grab('Clients (CSV)');
+  check(clientsName === `clients-${day}.csv` && clients.startsWith('\ufeff') && clients.split('\n')[0].split(',').includes('full_name') && clients.includes('Mina Cho') && clients.includes('(213) 555-0142'),
+    'backup: clients CSV with every column (Excel-ready)');
+  check(clients.includes('"[""Private with Sunnie""]"'), 'backup: list columns kept as JSON');
+  const [paymentsName, payments] = await grab('Payments (CSV)');
+  check(paymentsName === `payments-${day}.csv` && payments.split('\n')[0].includes('amount_cents') && payments.includes('REFUND'),
+    'backup: payments CSV includes refunds and every column');
+  const [fullName, full] = await grab('Everything (JSON)');
+  const json = JSON.parse(full);
+  check(fullName === `backup-${day}.json` && json.students.length === MEMBERS.length && json.payment_transactions.length === PAYMENTS.length
+    && json.payment_methods.length === METHODS.length && Array.isArray(json.accounting_periods) && json.exported_at,
+    'backup: JSON holds all four tables');
+  check(await page.getByText(/client names and phone numbers/).isVisible(), 'backup: warns the files are private');
+  await shot(page, 'desktop-backup');
+  await page.setViewportSize({ width: 393, height: 852 });
+  check(await noOverflow(page), 'backup phone: no sideways scroll');
+  await shot(page, 'phone-backup');
+  check(errors.length === 0, `backup: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 

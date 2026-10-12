@@ -18,6 +18,7 @@ import Notifications from './pages/Notifications';
 import Reports from './pages/Reports';
 import SetPassword from './pages/SetPassword';
 import Access from './pages/Access';
+import Backup from './pages/Backup';
 import StaffPage from './pages/Staff';
 
 const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType> = {
@@ -31,6 +32,7 @@ const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType>
   users: StaffPage,
   access: Access,
   notifications: Notifications,
+  backup: Backup,
   account: Account,
 };
 

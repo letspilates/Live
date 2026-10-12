@@ -8,6 +8,7 @@ import {
   BookOpen,
   ClipboardList,
   Contact,
+  DatabaseBackup,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -60,6 +61,7 @@ export const NAV: { group: TextKey; items: NavItem[] }[] = [
       { to: 'users', label: 'navUsers', Icon: Users },
       { to: 'notifications', label: 'navNotifications', Icon: Bell },
       { to: 'access', label: 'navAccess', Icon: ShieldCheck },
+      { to: 'backup', label: 'navBackup', Icon: DatabaseBackup },
     ],
   },
 ];

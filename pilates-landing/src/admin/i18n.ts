@@ -491,6 +491,17 @@ const en = {
   // users, roles, Settings → Admin, theme
   ADMIN: 'Admin',
   navAccess: 'Admin access',
+  // Settings → Backup
+  navBackup: 'Backup',
+  backupTitle: 'Download a backup',
+  backupBody:
+    'Saves every client and every payment (edited and voided ones too) to this computer. Open the CSV files in Excel. Keep the JSON file: it is what moves the data to the live site later.',
+  backupPrepare: 'Prepare backup',
+  backupReady: 'Ready: {clients} clients, {payments} payments.',
+  backupClients: 'Clients (CSV)',
+  backupPayments: 'Payments (CSV)',
+  backupFull: 'Everything (JSON)',
+  backupPrivate: 'These files hold client names and phone numbers. Keep them on your own computer and do not email or share them.',
   navSchedule: 'Schedule',
   lightMode: 'Light mode',
   darkMode: 'Dark mode',
@@ -1123,6 +1134,17 @@ const ko: Dict = {
   // users, roles, Settings → Admin, theme
   ADMIN: '어드민',
   navAccess: '권한 (Admin)',
+  // Settings → Backup
+  navBackup: '백업',
+  backupTitle: '백업 내려받기',
+  backupBody:
+    '모든 클라이언트와 모든 결제(수정·무효 기록 포함)를 이 컴퓨터에 저장합니다. CSV 파일은 엑셀에서 열립니다. JSON 파일은 나중에 라이브 사이트로 데이터를 옮길 때 쓰니 꼭 보관하세요.',
+  backupPrepare: '백업 준비',
+  backupReady: '준비 완료: 클라이언트 {clients}명, 결제 {payments}건.',
+  backupClients: '클라이언트 (CSV)',
+  backupPayments: '결제 (CSV)',
+  backupFull: '전체 (JSON)',
+  backupPrivate: '이 파일에는 클라이언트 이름과 전화번호가 들어 있습니다. 본인 컴퓨터에만 보관하고 이메일이나 공유는 하지 마세요.',
   navSchedule: '스케줄',
   lightMode: '라이트 모드',
   darkMode: '다크 모드',
