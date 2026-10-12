@@ -590,6 +590,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   await page.getByRole('button', { name: 'Save payment' }).click();
   check(await page.getByText('Choose a client.').isVisible() && !calls.length, 'payments: nothing saved without a client');
   check(!(await page.getByRole('tab').count()), 'payments: no Transactions tab for instructors');
+  check(!(await page.getByLabel('Payment date').count()), 'payments: instructors record today only (no date field)');
   const day = page.getByRole('region', { name: /^My payments · / });
   await day.getByText('Mina Cho').waitFor();
   check(!(await day.getByText('Leo Park').count()) && !(await day.getByText('Old Friend').count()), "day panel: instructor sees only own payments from today");
@@ -690,6 +691,19 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   } else {
     const [form, panel] = await Promise.all([page.locator('form').boundingBox(), day.boundingBox()]);
     check(panel.y > form.y + form.height - 1, `${device} owner: day panel stacks below the form`);
+  }
+  check(await page.getByLabel('Payment date').inputValue() === LA_TODAY, `${device} owner: payment date starts at today`);
+  if (device === 'desktop') {
+    // Owner records a past day: the date is sent; today is not
+    calls.length = 0;
+    await page.getByPlaceholder('Search name or phone').fill('mina');
+    await page.locator('form').getByRole('button', { name: /Mina Cho/ }).click();
+    await page.getByLabel('Payment date').fill(LA_YESTERDAY);
+    await page.getByRole('button', { name: /Received \$100\.00/ }).click();
+    await page.getByText('Payment saved').waitFor();
+    check(calls.find(([n]) => n === 'record_payment')?.[1].p_business_date === LA_YESTERDAY, 'desktop owner: back-dated payment sends the date');
+    await page.getByRole('button', { name: 'Record another' }).click();
+    check(await page.getByLabel('Payment date').inputValue() === LA_TODAY, 'desktop owner: date resets to today');
   }
   await shot(page, `${device}-owner-record`);
   await day.getByRole('button', { name: 'All transactions' }).click();

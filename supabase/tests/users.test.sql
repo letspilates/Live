@@ -143,6 +143,13 @@ select t.check('my profile: details saved, roles untouched', (select phone = '42
   and certifications = 'Pilates Level 2' and roles = '{INSTRUCTOR}' from public.current_staff()));
 reset role;
 
+-- Admin picks the payment date like the owner (Mindbody is a method)
+select t.login('00000000-0000-0000-0000-0000000000a2');
+select t.check('admin: back-dates a Mindbody payment', (select business_date = (now() at time zone 'America/Los_Angeles')::date - 1
+  and method = 'MINDBODY' from public.record_payment(gen_random_uuid(), 2500, 'MINDBODY', p_payer_name => 'X',
+  p_business_date => (now() at time zone 'America/Los_Angeles')::date - 1)));
+reset role;
+
 select app.check_api_exposure();
 
 rollback;

@@ -153,6 +153,9 @@ function RecordPayment({
   const me = useStaff();
   // Who was handed the money: the person typing, unless they pick someone else.
   const [collector, setCollector] = useState(me.user_id);
+  // Owners/admins may record a past day (the database checks it); everyone else records today.
+  const canPickDate = isAdmin(me);
+  const [day, setDay] = useState(laToday);
   const [client, setClient] = useState<StudentHit | null>(null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState(() => readLastMethod(methods));
@@ -194,6 +197,7 @@ function RecordPayment({
       p_notes: notes.trim(),
       p_confirm_duplicate: confirmDuplicate,
       p_collected_by: collector,
+      ...(canPickDate && day !== laToday() ? { p_business_date: day } : {}),
     });
     setBusy(false);
     if (dbError) {
@@ -221,6 +225,7 @@ function RecordPayment({
     setError('');
     setSaved(null);
     setCollector(me.user_id);
+    setDay(laToday());
     setRequestId(crypto.randomUUID());
   };
 
@@ -233,7 +238,8 @@ function RecordPayment({
             <h2 className="font-display text-xl font-semibold">{t('paymentSaved')}</h2>
             <p className="mt-2 text-2xl font-semibold tabular-nums">{formatCents(saved.amount_cents)}</p>
             <p className="mt-1 text-sm text-mute">
-              {methodLabel(methods, saved.method, lang, saved.method_other)} · {saved.payer_name} · {formatTime(saved.recorded_at)}
+              {methodLabel(methods, saved.method, lang, saved.method_other)} · {saved.payer_name} ·{' '}
+              {saved.business_date === laToday() ? formatTime(saved.recorded_at) : formatDay(saved.business_date, lang)}
             </p>
             <p className="mt-1 text-sm text-mute">{t('receivedByName', { name: saved.collected_by_name })}</p>
           </div>
@@ -282,6 +288,16 @@ function RecordPayment({
 
       <Card>
         <div className="grid gap-5">
+          {canPickDate && (
+            <TextField
+              label={t('paymentDate')}
+              hint={t('paymentDateHint')}
+              type="date"
+              max={laToday()}
+              value={day}
+              onChange={(e) => e.target.value && setDay(e.target.value)}
+            />
+          )}
           <TextField
             label={t('amount')}
             inputMode="decimal"

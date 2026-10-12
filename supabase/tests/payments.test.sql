@@ -117,7 +117,8 @@ select t.check('S1 B: cannot read A''s payment by id', (select count(*) = 0 from
 select t.expect_error('B: cannot reuse A''s request id', '23505',
   $$select public.record_payment('11111111-0000-0000-0000-000000000001', 10000, 'CASH', current_setting('t.mina')::uuid)$$);
 select t.check('B: periods hidden', (select count(*) = 0 from public.accounting_periods));
-select t.check('B: payment methods visible', (select count(*) = 7 from public.payment_methods));
+select t.check('B: payment methods visible (incl. Mindbody, Other last)', (select count(*) = 8
+  and max(sort_order) filter (where code = 'OTHER') = max(sort_order) from public.payment_methods));
 select t.check('search: recently paid list', (select count(*) = 2 from public.search_students('')));
 select t.check('search: last payment shown', (select last_amount_cents = 15000 and last_method = 'ZELLE'
   from public.search_students('leo')));
