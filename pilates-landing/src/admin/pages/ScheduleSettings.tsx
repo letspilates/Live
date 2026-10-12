@@ -766,7 +766,7 @@ function DeleteServiceDialog({ service, onClose, onDone }: { service: Service; o
           </p>
         )}
         <p className="font-medium">{t('ssDeleteSure', { name: service.name })}</p>
-        <p className="text-sm text-mute">{count ? `${t('ssDeleteKeeps')} ${t('ssDeleteTrash')}` : t('ssDeleteTrash')}</p>
+        {!!count && <p className="text-sm text-mute">{t('ssDeleteKeeps')}</p>}
         {error && <Notice tone="error">{error}</Notice>}
       </div>
       <div className="mt-6 flex flex-wrap justify-end gap-3">

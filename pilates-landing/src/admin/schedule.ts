@@ -24,7 +24,7 @@ export interface Appointment {
   id: string;
   starts_at: string;
   minutes: number;
-  /** null = studio event (no instructor). */
+  /** null = Other (a guest, or nobody named). */
   staff_id: string | null;
   /** A guest who leads it (Other); only without staff_id. '' = none. */
   guest_instructor: string;
@@ -32,6 +32,8 @@ export interface Appointment {
   capacity: number;
   series_id: string | null;
   series_changed: boolean;
+  /** CANCELLED stays on the calendar, striped. */
+  status: 'BOOKED' | 'CANCELLED';
   /** Bookings that are not cancelled. */
   clients: Booking[];
   /** Studio day (YYYY-MM-DD) and start in minutes after midnight. */
@@ -96,14 +98,13 @@ type Row = Omit<Appointment, 'clients' | 'day' | 'start'> & {
   }[];
 };
 
-/** Booked appointments starting on studio days from (inclusive) to (exclusive). */
+/** Appointments (booked and cancelled) starting on studio days from (inclusive) to (exclusive). */
 export async function loadAppointments(from: string, to: string): Promise<Appointment[]> {
   const { data, error } = await supabase!
     .from('appointments')
     .select(
       'id, starts_at, minutes, staff_id, guest_instructor, service, capacity, series_id, series_changed, status, appointment_clients(id, student_id, client_name, client_phone, status, notes, students(full_name))',
     )
-    .eq('status', 'BOOKED')
     .gte('starts_at', laInstant(from))
     .lt('starts_at', laInstant(to))
     .order('starts_at')

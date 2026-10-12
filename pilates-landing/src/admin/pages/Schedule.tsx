@@ -84,8 +84,9 @@ const GUTTER = 16; // px kept free on the right of each day, to click for a new 
 const LINE = 'rgb(var(--c-ink) / 0.08)';
 const SHADOW = '[text-shadow:0_1px_1px_rgb(0_0_0/0.28)]';
 const STRIPES = 'repeating-linear-gradient(135deg, rgb(255 255 255 / 0.5) 0 5px, transparent 5px 10px)';
-/** Everyone booked cancelled the same day or didn't come: the block stays on the calendar, striped (like Schedulista). */
-const striped = (a: Appointment) => a.clients.length > 0 && a.clients.every((b) => b.status === 'LATE_CANCEL' || b.status === 'NO_SHOW');
+/** Cancelled, or everyone booked cancelled the same day or didn't come: the block stays on the calendar, striped. */
+const striped = (a: Appointment) =>
+  a.status === 'CANCELLED' || (a.clients.length > 0 && a.clients.every((b) => b.status === 'LATE_CANCEL' || b.status === 'NO_SHOW'));
 const paint = (a: Appointment, color: string) => (striped(a) ? `${STRIPES}, ${color}` : color);
 const shade = (a: Appointment, color: string) => (isLight(color) || striped(a) ? SHADOW : '');
 const ROUND =
@@ -206,6 +207,7 @@ export default function Schedule() {
         : t('calHours', { n: String(a.minutes / 60) }),
       !a.staff_id ? a.service : a.capacity > 1 ? t('calBookedOf', count(a)) : a.clients[0]?.name,
       a.staff_id ? full(a) : a.guest_instructor ? t('calGuestBy', { name: a.guest_instructor }) : t('calStudioEvent'),
+      a.status === 'CANCELLED' ? t('calCancelled') : '',
       statusLine(a, 'LATE_CANCEL'),
       statusLine(a, 'NO_SHOW'),
       a.series_id && a.series_changed ? t('calChanged') : '',
@@ -282,7 +284,8 @@ export default function Schedule() {
     },
     onPointerDown: (e) => {
       dragged.current = false;
-      if (e.button !== 0) return;
+      // A cancelled block stays put.
+      if (e.button !== 0 || a.status === 'CANCELLED') return;
       const el = e.currentTarget;
       const d: Drag = {
         ...grid,
@@ -428,7 +431,7 @@ export default function Schedule() {
     const end = min + minutes;
     const c =
       a.staff_id &&
-      appts?.find((x) => x.id !== a.id && x.staff_id === a.staff_id && x.day === d && x.start < end && min < x.start + x.minutes);
+      appts?.find((x) => x.id !== a.id && x.status === 'BOOKED' && x.staff_id === a.staff_id && x.day === d && x.start < end && min < x.start + x.minutes);
     return c
       ? t('calClash', {
           name: firstName(a),
@@ -1149,12 +1152,12 @@ function AppointmentDialog({
   // Services of an Others category are led by a guest (Other), never by staff.
   const guestCats = new Set(categories.filter((c) => c.guest).map((c) => c.id));
   const isGuest = (s: Service) => guestCats.has(s.category_id ?? '');
-  // What an instructor teaches (staff_ids null = everyone); a studio event (no instructor) can be any service.
+  // What an instructor teaches (staff_ids null = everyone); Other can be any service.
   const teaches = (s: Service, staff: string) =>
-    staff === OTHER ? isGuest(s) : !staff || (!isGuest(s) && (!s.staff_ids || s.staff_ids.includes(staff)));
-  const first = services.find((s) => teaches(s, defaultStaff));
+    staff === OTHER || (!isGuest(s) && (!s.staff_ids || s.staff_ids.includes(staff)));
+  const first = services.find((s) => teaches(s, defaultStaff || OTHER));
   const [f, setF] = useState(() => ({
-    staff: a ? (a.staff_id ?? (a.guest_instructor ? OTHER : '')) : defaultStaff,
+    staff: a ? (a.staff_id ?? OTHER) : defaultStaff || OTHER,
     guest: a?.guest_instructor ?? '',
     service: a?.service ?? first?.name ?? '',
     date: a?.day ?? day,
@@ -1177,7 +1180,8 @@ function AppointmentDialog({
   const [error, setError] = useState('');
 
   const svc = services.find((s) => s.name === f.service);
-  const offered = services.filter((s) => teaches(s, f.staff));
+  // Guest services are always listed; picking one switches the instructor to Other.
+  const offered = services.filter((s) => teaches(s, f.staff) || isGuest(s));
   const option = (s: Service) => (
     <option key={s.name} value={s.name}>
       {s.name}
@@ -1188,7 +1192,7 @@ function AppointmentDialog({
   const client = f.clients[0];
   const title = !a ? t('calNew') : !a.staff_id ? t('calEditEvent') : a.capacity > 1 ? t('calEditClass') : t('calEditAppt');
   const cancelLabel = a && t(!a.staff_id ? 'calCancelEvent' : a.capacity > 1 ? 'calCancelClass' : 'calCancelAppt');
-  const dot = f.staff && f.staff !== OTHER ? (instructors.find((i) => i.user_id === f.staff)?.color ?? PALETTE[8]) : EVENT_COLOR;
+  const dot = f.staff !== OTHER ? (instructors.find((i) => i.user_id === f.staff)?.color ?? PALETTE[8]) : EVENT_COLOR;
   const valid = Boolean(f.service && f.date && f.time) && (!f.repeat || (f.days.length > 0 && (f.ends !== 'until' || f.until)));
   const statusOptions = BOOKING_STATUSES.map((s) => (
     <option key={s} value={s}>
@@ -1211,7 +1215,7 @@ function AppointmentDialog({
         id: a?.id,
         start: wallText(f.date, toMin(f.time)),
         minutes: f.minutes,
-        staff_id: f.staff && f.staff !== OTHER ? f.staff : null,
+        staff_id: f.staff !== OTHER ? f.staff : null,
         guest_instructor: f.staff === OTHER ? f.guest.trim() : '',
         service: f.service,
         capacity: f.capacity,
@@ -1254,8 +1258,10 @@ function AppointmentDialog({
               value={f.staff}
               onChange={(e) => {
                 const v = e.target.value;
-                // A service the new instructor doesn't teach switches to the first one they do (an old name stays).
-                const next = svc && !teaches(svc, v) ? services.find((x) => teaches(x, v)) : undefined;
+                // A service the new instructor doesn't teach switches to the first one they do (an old name stays);
+                // Other starts on a guest-led service.
+                const fits = (s: Service) => (v === OTHER ? isGuest(s) : teaches(s, v));
+                const next = svc && !fits(svc) ? services.find(fits) : undefined;
                 set({
                   staff: v,
                   ...(next ? { service: next.name, minutes: next.minutes, capacity: next.capacity } : {}),
@@ -1273,7 +1279,6 @@ function AppointmentDialog({
                   </option>
                 ))}
               <option value={OTHER}>{t('calOther')}</option>
-              <option value="">{t('calNoInstructor')}</option>
             </select>
             <span className="h-6 w-6 shrink-0 rounded-full" style={{ background: dot }} />
           </div>
@@ -1614,7 +1619,9 @@ function AppointmentDialog({
         </div>
       ) : (
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 pt-6">
-          {a ? (
+          {a?.status === 'CANCELLED' ? (
+            <p className="text-sm font-medium text-red-700">{t('calCancelled')}</p>
+          ) : a ? (
             <Button variant="danger" onClick={() => setConfirming(true)}>
               {cancelLabel}
             </Button>

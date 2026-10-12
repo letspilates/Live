@@ -34,7 +34,6 @@ const TABLES = {
   knowledge_items: ['id'],
   knowledge_item_viewers: ['item_id', 'user_id'],
   role_menu_access: ['role', 'menu'],
-  trash: ['deleted_at', 'id'],
 } as const;
 type Table = keyof typeof TABLES;
 type Data = Record<Table | 'staff' | 'schedule_instructors', Row[]>;

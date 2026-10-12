@@ -356,7 +356,6 @@ async function open(who, width, path = '', options = {}) {
   await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) => r.fulfill({ json: SERVICES }));
   await context.route(`${SUPABASE}/rest/v1/schedule_categories?**`, (r) => r.fulfill({ json: SERVICE_CATEGORIES }));
   await context.route(`${SUPABASE}/rest/v1/schedule_settings?**`, (r) => r.fulfill({ json: [{ change_text_minutes: 15 }] }));
-  await context.route(`${SUPABASE}/rest/v1/trash?**`, (r) => r.fulfill({ json: [] }));
   await context.route(`${SUPABASE}/rest/v1/rpc/schedule_instructors`, (r) => r.fulfill({ json: INSTRUCTORS }));
   await context.route(`${SUPABASE}/rest/v1/rpc/schedule_search_clients`, (r) => {
     sched.push(['schedule_search_clients', r.request().postDataJSON()]);
@@ -421,7 +420,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Trainings' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup,Trash', `${device}: owner menu`);
+    check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup', `${device}: owner menu`);
     if (device === 'desktop') check(await page.locator('aside').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
@@ -506,7 +505,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
   }
-  for (const path of ['trainings/', 'users/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/', 'trash/']) {
+  for (const path of ['trainings/', 'users/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/']) {
     const { page, context } = await open(who, 1280, path);
     await page.waitForURL(/\/admin\/$/);
     check(!(await page.getByRole('tab').count()), `${who}: /${path} redirects to dashboard`);
@@ -1217,7 +1216,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 {
   const { page, context, errors } = await open('ADMIN', 1280, 'users/');
   await page.getByText('Ana Park').waitFor();
-  check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup,Trash', 'admin: full menu');
+  check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup', 'admin: full menu');
   check(!(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).count()), 'admin: cannot edit the owner');
   check(await page.getByRole('button', { name: 'Edit user: Ana Park' }).isVisible(), 'admin: can edit others');
   await page.getByRole('button', { name: 'Add user' }).click();
@@ -1448,7 +1447,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const dir = new URL('../../supabase/migrations/', import.meta.url);
   const made = [...new Set(fs.readdirSync(dir)
     .flatMap((f) => [...fs.readFileSync(new URL(f, dir), 'utf8').matchAll(/create table public\.(\w+)/g)].map((m) => m[1])))];
-  const missing = made.filter((t) => !['audit_logs', 'staff_profiles'].includes(t) && !Array.isArray(json[t]));
+  const missing = made.filter((t) => !['audit_logs', 'staff_profiles', 'trash'].includes(t) && !Array.isArray(json[t]));
   check(made.length > 15 && !missing.length, `backup: every table is in the JSON (missing: ${missing.join(', ') || 'none'})`);
   check(await page.getByText(/client names and phone numbers/).isVisible(), 'backup: warns the files are private');
   await shot(page, 'desktop-backup');
@@ -1546,12 +1545,23 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await workshop.click();
   await page.getByRole('heading', { name: 'Edit Event' }).waitFor();
   await page.getByRole('button', { name: 'Cancel Event' }).click();
-  await page.getByText('Take it off the calendar?').waitFor();
+  await page.getByText('Cancel it? It stays on the calendar, striped, so you can follow up.').waitFor();
   check(!sched.some(([n]) => n === 'cancel_appointment'), 'schedule: cancel asks before doing anything');
+  const a3 = APPTS.find((x) => x.id === 'a-3');
+  a3.status = 'CANCELLED';
   await page.getByRole('button', { name: 'Cancel Event' }).click();
   await page.getByRole('heading', { name: 'Edit Event' }).waitFor({ state: 'detached' });
   const c = sched.find(([n]) => n === 'cancel_appointment')?.[1];
   check(c?.p_id === 'a-3' && c.p_scope === 'one', 'schedule: cancel sends the appointment');
+  await page.waitForTimeout(300);
+  check(await workshop.isVisible() && await workshop.evaluate((el) => getComputedStyle(el).backgroundImage.includes('repeating-linear-gradient')),
+    'schedule: a cancelled appointment stays on the calendar, striped');
+  await workshop.click();
+  check(await page.locator('dialog[open]').getByText('Cancelled', { exact: true }).isVisible()
+    && !(await page.getByRole('button', { name: 'Cancel Event' }).count()), 'schedule: a cancelled one says so and has no cancel button');
+  await shot(page, 'schedule-cancelled');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Close' }).click();
+  a3.status = 'BOOKED';
 
   // Late cancel: striped block, the hover details say so; the cancel step can mark it instead of removing it.
   const late = page.getByRole('button', { name: /Kai Moon - Private/ });
@@ -1573,7 +1583,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await group.click();
   await dlg.getByRole('button', { name: 'Cancel Class' }).click();
   await dlg.getByText(/Late cancel and No-show keep it on the calendar/).waitFor();
-  const steps = await dlg.locator('div', { has: page.getByText('Take it off the calendar?') }).last().getByRole('button').allInnerTexts();
+  const steps = await dlg.locator('div', { has: page.getByText('Cancel it? It stays on the calendar, striped, so you can follow up.') }).last().getByRole('button').allInnerTexts();
   check(steps.join(' · ') === 'Keep it · No-show · Late cancel · Cancel Class', `schedule: cancel step buttons in order (${steps.join(' · ')})`);
   await dlg.getByRole('button', { name: 'No-show', exact: true }).click();
   await dlg.waitFor({ state: 'detached' });
@@ -1834,7 +1844,7 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
   await btn('Delete Private').click();
   const confirm = page.locator('dialog[open]').last();
   await confirm.getByText('This service has 312 appointments on the calendar.').waitFor();
-  check(await confirm.getByText('It goes to Trash in Settings, where you can restore it.', { exact: false }).isVisible(), 'delete: the confirm says it goes to Trash');
+  check(await confirm.getByText('They stay on the calendar under this name.').isVisible(), 'delete: the confirm says its appointments stay');
   check(await confirm.getByRole('heading', { name: 'Delete service' }).isVisible() && await confirm.getByText('Are you sure you want to delete Private?').isVisible()
     && await confirm.getByRole('button', { name: 'Cancel', exact: true }).isVisible() && await confirm.getByRole('button', { name: 'Delete', exact: true }).isVisible(),
     'delete: the confirm says how many appointments use it and asks, with Delete and Cancel at the bottom');
@@ -1853,7 +1863,7 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
     'delete: Cancel on the confirm goes back to the edit dialog');
   await dialog.getByRole('button', { name: 'Delete service' }).click();
   await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
-  await page.getByText('Moved to Trash.', { exact: true }).waitFor();
+  await page.getByText('Deleted.', { exact: true }).waitFor();
   check(saved('delete_schedule_service')[0]?.p_id === 'v-2' && !(await page.locator('dialog[open]').count()),
     'delete: Delete in the edit dialog, then confirm, deletes that service and closes both dialogs');
   check(errors.length === 0, `services: no page errors ${errors.join(' | ')}`);
@@ -1977,7 +1987,6 @@ const withGuests = async (context) => {
   await dlg.getByRole('heading', { name: 'Edit Event' }).waitFor();
   check(await dlg.getByLabel('Instructor', { exact: true }).inputValue() === 'other' && await dlg.getByLabel('Guest instructor').inputValue() === 'Ana Guest',
     'others: the dialog shows Other with the guest');
-  check((await offered()).join() === 'Reformer Workshop', 'others: Other is offered only guest-led services');
   await shot(page, 'others-appointment');
   await dlg.getByLabel('Guest instructor').fill('Bo Guest');
   await dlg.getByRole('button', { name: 'Save', exact: true }).click();
@@ -1990,8 +1999,10 @@ const withGuests = async (context) => {
   await page.getByRole('button', { name: 'New Appointment' }).click();
   await dlg.getByRole('heading', { name: 'New Appointment' }).waitFor();
   await dlg.getByLabel('Instructor', { exact: true }).selectOption({ label: 'Sunnie Lee' });
-  check(!(await offered()).includes('Reformer Workshop') && !(await dlg.getByLabel('Guest instructor').count()),
-    'others: our instructors are not offered a guest-led service');
+  check((await offered()).includes('Reformer Workshop') && !(await dlg.getByLabel('Guest instructor').count()),
+    'others: a guest-led service is listed for our instructors too');
+  check(!(await dlg.getByLabel('Instructor', { exact: true }).evaluate((el) => [...el.options].some((o) => o.value === ''))),
+    'others: no "No instructor" option, Other replaces it');
   await dlg.getByLabel('Instructor', { exact: true }).selectOption('other');
   check(await dlg.getByLabel('Service').inputValue() === 'Reformer Workshop' && await dlg.getByLabel('Guest instructor').inputValue() === 'Ana Guest',
     'others: choosing Other picks a guest-led service and fills its guest');
@@ -2003,65 +2014,14 @@ const withGuests = async (context) => {
 
   await page.getByRole('button', { name: 'New Appointment' }).click();
   await dlg.getByRole('heading', { name: 'New Appointment' }).waitFor();
-  await dlg.getByLabel('Instructor', { exact: true }).selectOption({ label: 'No instructor (studio event)' });
+  await dlg.getByLabel('Instructor', { exact: true }).selectOption({ label: 'Sunnie Lee' });
   await dlg.getByLabel('Service').selectOption('Reformer Workshop');
   check(await dlg.getByLabel('Instructor', { exact: true }).inputValue() === 'other' && await dlg.getByLabel('Guest instructor').inputValue() === 'Ana Guest',
-    'others: a studio event that picks a guest-led service becomes Other with its guest');
+    'others: picking a guest-led service under our instructor switches to Other with its guest');
   await dlg.getByLabel('Instructor', { exact: true }).selectOption({ label: 'Sunnie Lee' });
   check(await dlg.getByLabel('Service').inputValue() !== 'Reformer Workshop', 'others: switching from Other to our instructor picks one of their services');
   await dlg.getByRole('button', { name: 'Close' }).click();
   check(errors.length === 0, `others schedule: no page errors ${errors.join(' | ')}`);
-  await context.close();
-}
-
-// 26. Settings › Trash: restore, a taken name says so, delete forever asks first
-for (const width of [1280, 393]) {
-  sched.length = 0;
-  const { page, context, errors } = await open('OWNER', width, 'trash/');
-  let trash = [
-    { id: 't-1', kind: 'schedule_service', label: 'Private with Ivy', deleted_at: '2026-10-12T20:15:00Z', staff_profiles: { full_name: 'Olive Owner' } },
-    { id: 't-2', kind: 'schedule_category', label: 'Workshops', deleted_at: '2026-10-11T18:00:00Z', staff_profiles: null },
-  ];
-  await context.route(`${SUPABASE}/rest/v1/trash?**`, (r) => r.fulfill({ json: trash }));
-  for (const name of ['restore_trash', 'purge_trash']) {
-    await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
-      const body = r.request().postDataJSON();
-      sched.push([name, body]);
-      if (name === 'restore_trash' && body.p_id === 't-2')
-        return r.fulfill({ status: 409, json: { code: '23505', message: 'A category named "Workshops" already exists. Rename it first.', details: null, hint: null } });
-      trash = trash.filter((x) => x.id !== body.p_id);
-      return r.fulfill({ status: 204 });
-    });
-  }
-  await page.reload();
-  const btn = (name) => page.getByRole('button', { name, exact: true });
-  await btn('Restore Private with Ivy').waitFor();
-  check((await page.locator('h1').innerText()) === 'Trash', `trash ${width}: page opens`);
-  check(await page.getByText(/Deleted Oct 12, 2026, 1:15\sPM by Olive Owner/).isVisible() && await page.getByText('Service', { exact: true }).isVisible()
-    && await page.getByText(/^Deleted Oct 11, 2026/).isVisible() && await page.getByText('Category', { exact: true }).isVisible(),
-    `trash ${width}: each item with its kind, when (studio time) and who deleted it`);
-  check(await noOverflow(page), `trash ${width}: no sideways scroll`);
-  await shot(page, `trash-${width}`);
-  await btn('Restore Private with Ivy').click();
-  await page.getByText('Restored "Private with Ivy".').waitFor();
-  await btn('Restore Private with Ivy').waitFor({ state: 'detached' });
-  check(sched[0]?.[0] === 'restore_trash' && sched[0][1].p_id === 't-1', `trash ${width}: Restore sends that item and it leaves the list`);
-  await btn('Restore Workshops').click();
-  await page.getByText('Another service or category is already named "Workshops". Rename that one first, then restore.').waitFor();
-  check(await btn('Restore Workshops').isVisible(), `trash ${width}: a taken name says so and the item stays`);
-  await btn('Delete Workshops forever').click();
-  const dlg = page.locator('dialog[open]');
-  await dlg.getByText('"Workshops" will be deleted for good. This can\'t be undone.').waitFor();
-  check(await noOverflow(page), `trash ${width}: confirm fits`);
-  await shot(page, `trash-confirm-${width}`);
-  await dlg.getByRole('button', { name: 'Cancel', exact: true }).click();
-  check(!sched.some(([n]) => n === 'purge_trash'), `trash ${width}: Cancel deletes nothing`);
-  await btn('Delete Workshops forever').click();
-  await dlg.getByRole('button', { name: 'Delete forever', exact: true }).click();
-  await page.getByText('Trash is empty.').waitFor();
-  check(sched.find(([n]) => n === 'purge_trash')?.[1]?.p_id === 't-2' && await page.getByText('Deleted "Workshops" forever.').isVisible(),
-    `trash ${width}: Delete forever after the confirm, then the list is empty`);
-  check(errors.length === 0, `trash ${width}: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 
