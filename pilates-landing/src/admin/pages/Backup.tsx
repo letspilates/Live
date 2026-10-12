@@ -55,10 +55,10 @@ export default function Backup() {
     setFailed(false);
     try {
       setData({
-        students: await readAll('students', 'id'),
-        payment_transactions: await readAll('payment_transactions', 'id'),
-        payment_methods: await readAll('payment_methods', 'code'),
-        accounting_periods: await readAll('accounting_periods', 'month'),
+        students: await readAll('students', ['full_name', 'id']),
+        payment_transactions: await readAll('payment_transactions', ['business_date', 'recorded_at', 'id']),
+        payment_methods: await readAll('payment_methods', ['sort_order', 'code']),
+        accounting_periods: await readAll('accounting_periods', ['month']),
       });
     } catch {
       setFailed(true);
