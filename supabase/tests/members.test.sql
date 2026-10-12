@@ -164,6 +164,25 @@ select t.check('merge: import keeps same name with another phone apart', public.
 ]$$) = '{"added":1,"linked":0,"updated":0,"skipped":0}');
 reset role;
 
+-- Same name + same phone is one person, even with two Mindbody accounts and two emails
+insert into public.students (full_name, phone, email, mindbody_id) values
+  ('Rae Yoon', '213-555-0900', 'rae@a.com', '910'),
+  ('Rae  Yoon', '(213) 555-0900', 'rae@b.com', '911'),
+  ('Hye-soo Bang', '', '', '912');
+insert into public.students (full_name, phone, schedulista_key) values ('Bang, Hyesoo', '2135550901', 'bang, hyesoo|2135550901');
+select t.check('merge: hyphen ignored in names', app.client_name_key('Hye-soo Bang') = app.client_name_key('Bang, Hyesoo'));
+select t.check('merge: same phone pass', app.merge_duplicate_clients() = '{"merged":2,"left_apart":1}');
+select t.check('merge: one Rae, second Mindbody ID kept', (select count(*) = 1 and bool_and(
+    array['MINDBODY:' || mindbody_id] || extra_source_keys @> '{MINDBODY:910,MINDBODY:911}' and email like 'rae@%')
+  from public.students where merged_into is null and app.client_name_key(full_name) = 'rae yoon'));
+select t.check('merge: one Hyesoo', (select count(*) = 1 from public.students
+  where merged_into is null and app.client_name_key(full_name) = 'bang hyesoo'));
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.check('merge: re-import of the second Mindbody ID updates the kept client', public.import_members('MINDBODY', $$[
+  {"mindbody_id":"911","full_name":"Rae Yoon"}
+]$$) = '{"added":0,"linked":0,"updated":1,"skipped":0}');
+reset role;
+
 select app.check_api_exposure();
 
 rollback;
