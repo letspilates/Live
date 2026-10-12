@@ -26,6 +26,7 @@ async function loadMembers(): Promise<Member[]> {
     const { data, error } = await supabase!
       .from('students')
       .select('*')
+      .is('merged_into', null) // duplicates merged into another client stay hidden
       .order('full_name')
       .order('id') // unique tiebreak: pages must not skip or repeat clients with the same name
       .range(from, from + 999);

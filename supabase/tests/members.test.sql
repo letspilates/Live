@@ -122,6 +122,48 @@ select t.as_anon();
 select t.expect_error('anon: no import', '42501', $$select public.import_members('MINDBODY', '[]')$$);
 reset role;
 
+-- Merge duplicates (same name from both systems) ------------------------------------------------
+reset role;
+insert into public.students (full_name, phone, email, mindbody_id) values
+  ('Jiwoo Han', '', 'jiwoo@example.com', '900'),              -- Mindbody, email only
+  ('Lena Park', '3105550001', '', '901'),                      -- same name, different phone: maybe two people
+  ('Lena Park', '3105550002', '', '902'),
+  ('김하나', '2135550777', '', '903');
+insert into public.students (full_name, phone, schedulista_key, schedulista_visits, notes) values
+  ('han, jiwoo', '(323) 555-0123', 'han, jiwoo|3235550123', 7, 'prefers evenings'),   -- Schedulista, phone only
+  ('김하나', '', '김하나|', 2, '');
+insert into public.payment_transactions (student_id, payer_name, amount_cents, method, business_date, recorded_by, recorded_by_name, client_request_id, collected_by, collected_by_name)
+select id, full_name, 5000, 'CASH', '2026-10-01', '00000000-0000-0000-0000-0000000000a1', 'Owner', gen_random_uuid(), '00000000-0000-0000-0000-0000000000a1', 'Owner'
+  from public.students where schedulista_key = 'han, jiwoo|3235550123';
+select t.check('merge: name key', app.client_name_key('Han,  JIWOO 2') = 'han jiwoo' and app.client_name_key('김하나') = '김하나');
+select t.check('merge: result', app.merge_duplicate_clients() = '{"merged":2,"left_apart":1}');
+select t.check('merge: one Jiwoo from both systems, payment kept on it', (select count(*) = 1 and bool_and(
+    mindbody_id = '900' and schedulista_key = 'han, jiwoo|3235550123' and schedulista_visits = 7
+    and email = 'jiwoo@example.com' and phone = '(323) 555-0123' and notes = 'prefers evenings' and status = 'ACTIVE'
+    and (select count(*) = 1 from public.payment_transactions p where p.student_id = s.id))
+  from public.students s where merged_into is null and app.client_name_key(full_name) = 'han jiwoo'));
+select t.check('merge: hidden row kept, not deleted', (select count(*) = 2 and bool_and(status = 'INACTIVE'
+    and mindbody_id is null and schedulista_key is null)
+  from public.students where merged_into is not null));
+select t.check('merge: Korean name merged', (select count(*) = 1 from public.students where full_name = '김하나' and merged_into is null));
+select t.check('merge: same name, different phones left apart', (select count(*) = 2 from public.students
+  where full_name = 'Lena Park' and merged_into is null));
+select t.check('merge: running again changes nothing', app.merge_duplicate_clients() = '{"merged":0,"left_apart":1}');
+-- Re-import after merging matches the kept client; a new same-name person from the other system links instead of duplicating
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.check('merge: merged client leaves staff search', (select count(*) = 1 from public.search_students('jiwoo')));
+select t.check('merge: re-import finds the kept client', public.import_members('SCHEDULISTA', $$[
+  {"full_name":"han, jiwoo","phone":"(323) 555-0123","visits":"8"},
+  {"full_name":"김하나","visits":"3"}
+]$$) = '{"added":0,"linked":0,"updated":2,"skipped":0}');
+select t.check('merge: import links by name when nothing conflicts', public.import_members('MINDBODY', $$[
+  {"mindbody_id":"904","full_name":"Grace Lee","email":"grace@example.com"}
+]$$) = '{"added":0,"linked":1,"updated":0,"skipped":0}');
+select t.check('merge: import keeps same name with another phone apart', public.import_members('SCHEDULISTA', $$[
+  {"full_name":"Lena Park","phone":"3105550003"}
+]$$) = '{"added":1,"linked":0,"updated":0,"skipped":0}');
+reset role;
+
 select app.check_api_exposure();
 
 rollback;
