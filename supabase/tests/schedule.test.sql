@@ -250,6 +250,16 @@ select t.check('rename keeps the other details and renames its appointments',
   (select service = 'Mat Class' from public.appointments where id = current_setting('t.mw')::uuid)
   and exists (select 1 from public.schedule_services where id = current_setting('t.svc')::uuid and name = 'Mat Class'
                and price_cents = 4500 and category_id = current_setting('t.cat')::uuid and staff_ids is not null));
+-- A rename takes only the appointments of the instructors who teach the service; the others keep the old name.
+select set_config('t.r1', public.save_appointment('{"start":"2026-11-04 10:00","minutes":55,
+  "staff_id":"00000000-0000-0000-0000-0000000000b2","service":"Duet","capacity":2,"clients":[]}')::text, true);
+select set_config('t.r2', public.save_appointment('{"start":"2026-11-04 12:00","minutes":55,
+  "staff_id":"00000000-0000-0000-0000-0000000000a1","service":"Duet","capacity":2,"clients":[]}')::text, true);
+select public.save_schedule_service(jsonb_build_object('id', (select id from public.schedule_services where name = 'Duet'),
+  'name', 'Duet with Ivy', 'minutes', 55, 'capacity', 2, 'staff_ids', json_build_array('00000000-0000-0000-0000-0000000000b2')));
+select t.check('rename: only its instructors'' appointments take the new name',
+  (select service = 'Duet with Ivy' from public.appointments where id = current_setting('t.r1')::uuid)
+  and (select service = 'Duet' from public.appointments where id = current_setting('t.r2')::uuid));
 select t.expect_error('rename onto another service', '23505', $$select public.save_schedule_service(
   jsonb_build_object('id', current_setting('t.svc'), 'name', 'private', 'minutes', 90, 'capacity', 8))$$);
 select t.expect_error('at least one instructor', '22023',
@@ -443,6 +453,14 @@ select public.import_schedule('[{"row":2,"start":"2026-01-09 11:00","minutes":50
   "price_cents":null,"created":""}]', true);
 select t.check('import: Schedulista''s whole service name picks that service', (select service = 'Private with Ivy'
   from public.appointments where source_key = 'SCHEDULISTA|2026-01-09 11:00|private with ivy -'));
+-- Once the renamed service is Ivy's only, another instructor's rows keep the plain name.
+select public.save_schedule_service(jsonb_build_object('id', (select id from public.schedule_services where name = 'Gyro Tower Group'),
+  'name', 'Gyro Tower Group', 'minutes', 50, 'capacity', 3, 'staff_ids', json_build_array('00000000-0000-0000-0000-0000000000b2')));
+select public.import_schedule('[{"row":2,"start":"2026-01-09 12:00","minutes":50,"service":"Gyrotonic Group","instructor":"jo ann",
+  "source_service":"Gyrotonic Group with Jo","client_name":"Pat Doe","client_phone":"","client_email":"","notes":"",
+  "price_cents":null,"created":""}]', true);
+select t.check('import: a service only takes the rows of an instructor who teaches it', (select service = 'Gyrotonic Group'
+  from public.appointments where source_key = 'SCHEDULISTA|2026-01-09 12:00|gyrotonic group with jo'));
 -- Merging two clients moves the dropped one's bookings to the kept one.
 select public.merge_clients('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000c2', 'Mina Park');
 select t.check('merge: bookings follow the kept client', not exists (select 1 from public.appointment_clients
