@@ -339,13 +339,13 @@ function ServiceRow({
   );
 }
 
-/** Calls of about 1,000 rows stay well under the API's time limit. Rows with the same start
+/** Calls of about 500 rows stay well under the API's time limit (1,000 rows took up to ~5 s of the 8 s on Staging). Rows with the same start
  *  stay in one call, so a dry run counts exactly what the import will do. */
 function chunks(rows: ScheduleImportRow[]) {
   const out: ScheduleImportRow[][] = [];
   for (const r of [...rows].sort((a, b) => a.start.localeCompare(b.start))) {
     const last = out[out.length - 1];
-    if (last && (last.length < 1000 || last[last.length - 1].start === r.start)) last.push(r);
+    if (last && (last.length < 500 || last[last.length - 1].start === r.start)) last.push(r);
     else out.push([r]);
   }
   return out;
