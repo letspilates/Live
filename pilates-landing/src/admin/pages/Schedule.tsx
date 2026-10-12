@@ -108,6 +108,7 @@ export default function Schedule() {
   const [failed, setFailed] = useState(false);
   const [version, setVersion] = useState(0);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set());
   const [edit, setEdit] = useState<{ a: Appointment | null; day: string; min: number } | null>(null);
   const [move, setMove] = useState<Spot | null>(null);
   const [ghost, setGhost] = useState<{ id: string; day: string; min: number; minutes?: number } | null>(null);
@@ -176,7 +177,19 @@ export default function Schedule() {
 
   const instructors = setup?.instructors ?? [];
   const byId = new Map(instructors.map((i) => [i.user_id, i]));
-  const shown = (appts ?? []).filter((a) => !hidden.has(a.staff_id ?? ''));
+  const listed = (appts ?? []).filter((a) => !hidden.has(a.staff_id ?? ''));
+  // Cancelled ones are folded away; a circle on their day says how many and opens them (striped).
+  const cancels = new Map<string, number>();
+  for (const a of listed) if (a.status === 'CANCELLED') cancels.set(a.day, (cancels.get(a.day) ?? 0) + 1);
+  const shown = listed.filter((a) => a.status !== 'CANCELLED' || openDays.has(a.day));
+  const toggleDay = (d: string) =>
+    setOpenDays((s) => {
+      const next = new Set(s);
+      if (next.has(d)) next.delete(d);
+      else next.add(d);
+      return next;
+    });
+  const dot = (d: string) => cancels.has(d) && <CancelDot n={cancels.get(d)!} open={openDays.has(d)} onToggle={() => toggleDay(d)} />;
   const today = now.day;
 
   const otherColor = setup?.otherColor ?? '';
@@ -581,6 +594,7 @@ export default function Schedule() {
                       pill={(a) => (!a.staff_id ? full(a) : a.capacity > 1 ? `${who(a)} ${a.service}` : (who(a) ?? a.service))}
                       onOpen={(a) => setEdit({ a, day: a.day, min: a.start })}
                       onDay={showDay}
+                      dot={dot}
                     />
                   ) : (
                     <TimeGrid
@@ -591,6 +605,7 @@ export default function Schedule() {
                       now={now}
                       block={block}
                       onSlot={newAt}
+                      dot={dot}
                     />
                   )}
                 </div>
@@ -744,6 +759,7 @@ function TimeGrid({
   now,
   block,
   onSlot,
+  dot,
 }: {
   days: string[];
   /** pixels per minute at least; wider screens stretch the hours to fill the window */
@@ -753,6 +769,7 @@ function TimeGrid({
   now: { day: string; min: number };
   block: (a: Appointment, start: number, style: CSSProperties, grid: Grid | null) => ReactNode;
   onSlot: (day: string, min: number) => void;
+  dot: (day: string) => ReactNode;
 }) {
   const { lang } = useT();
   // 6 am – 10 pm, longer when something starts earlier or ends later.
@@ -791,11 +808,12 @@ function TimeGrid({
         {days.map((d) => (
           <div
             key={d}
-            className={`relative flex h-11 items-center justify-center border-l border-ink/[0.08] text-[13px] ${
+            className={`relative flex h-11 items-center justify-center gap-1 border-l border-ink/[0.08] text-[13px] ${
               d === now.day ? 'font-medium' : ''
             }`}
           >
             {dayText(d, lang, { weekday: 'short' })} {Number(d.slice(8))}
+            {dot(d)}
             {d === now.day && <span className="absolute inset-x-0 bottom-0 h-1" style={{ background: TODAY_COLOR }} />}
           </div>
         ))}
@@ -874,6 +892,7 @@ function MonthGrid({
   pill,
   onOpen,
   onDay,
+  dot,
 }: {
   day: string;
   appts: Appointment[];
@@ -882,6 +901,7 @@ function MonthGrid({
   pill: (a: Appointment) => string;
   onOpen: (a: Appointment) => void;
   onDay: (day: string) => void;
+  dot: (day: string) => ReactNode;
 }) {
   const { t, lang } = useT();
   const first = `${day.slice(0, 8)}01`;
@@ -908,20 +928,23 @@ function MonthGrid({
                 inMonth ? '' : 'bg-ink/[0.025]'
               }`}
             >
-              <button
-                type="button"
-                onClick={() => onDay(d)}
-                className={`mb-1 self-start text-xs tabular-nums ${
-                  d === today
-                    ? 'inline-flex h-6 w-6 items-center justify-center rounded-full font-semibold text-[#1c1a16]'
-                    : inMonth
-                      ? 'px-1 text-ink'
-                      : 'px-1 text-mute/60'
-                }`}
-                style={d === today ? { background: TODAY_COLOR } : undefined}
-              >
-                {Number(d.slice(8))}
-              </button>
+              <div className="mb-1 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => onDay(d)}
+                  className={`text-xs tabular-nums ${
+                    d === today
+                      ? 'inline-flex h-6 w-6 items-center justify-center rounded-full font-semibold text-[#1c1a16]'
+                      : inMonth
+                        ? 'px-1 text-ink'
+                        : 'px-1 text-mute/60'
+                  }`}
+                  style={d === today ? { background: TODAY_COLOR } : undefined}
+                >
+                  {Number(d.slice(8))}
+                </button>
+                {inMonth && dot(d)}
+              </div>
               {list.slice(0, 3).map((a) => (
                 <button
                   key={a.id}
@@ -1044,6 +1067,33 @@ function Modal({ title, width, onClose, children }: { title: string; width: stri
         {children}
       </div>
     </dialog>
+  );
+}
+
+/** How many of a day's appointments were cancelled; a tap opens them on the calendar (striped) or folds them again. */
+function CancelDot({ n, open, onToggle }: { n: number; open: boolean; onToggle: () => void }) {
+  const { t } = useT();
+  const label = t(open ? 'calHideCancelled' : 'calShowCancelled', { n: String(n) });
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={open}
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className="inline-flex h-7 min-w-7 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
+    >
+      <span
+        className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-semibold tabular-nums transition-colors ${
+          open ? 'bg-ink text-paper' : 'bg-ink/[0.1] text-ink hover:bg-ink/[0.16]'
+        }`}
+      >
+        {n}
+      </span>
+    </button>
   );
 }
 

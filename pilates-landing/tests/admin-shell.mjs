@@ -1553,16 +1553,26 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await page.getByRole('heading', { name: 'Edit Event' }).waitFor({ state: 'detached' });
   const c = sched.find(([n]) => n === 'cancel_appointment')?.[1];
   check(c?.p_id === 'a-3' && c.p_scope === 'one', 'schedule: cancel sends the appointment');
-  await page.waitForTimeout(300);
-  check(await workshop.isVisible() && await workshop.evaluate((el) => getComputedStyle(el).backgroundImage.includes('repeating-linear-gradient')),
-    'schedule: a cancelled appointment stays on the calendar, striped');
+  // Cancelled ones fold away; the day's circle says how many and opens them, striped.
+  const showCancelled = page.getByRole('button', { name: 'Show 1 cancelled' });
+  await showCancelled.waitFor();
+  check(!(await workshop.count()), 'schedule: a cancelled appointment folds away behind a circle on its day');
+  await shot(page, 'schedule-cancel-dot');
+  await showCancelled.click();
+  check(await workshop.isVisible() && await workshop.evaluate((el) => getComputedStyle(el).backgroundImage.includes('repeating-linear-gradient'))
+    && await page.getByRole('button', { name: 'Hide 1 cancelled' }).getAttribute('aria-pressed') === 'true',
+    'schedule: tapping the circle shows it striped');
   check(!(await workshop.locator('[data-resize]').count()), 'schedule: a cancelled one has no length handle');
   await workshop.click();
   check(await page.locator('dialog[open]').getByText('Cancelled', { exact: true }).isVisible()
     && !(await page.getByRole('button', { name: 'Cancel Event' }).count()), 'schedule: a cancelled one says so and has no cancel button');
   await shot(page, 'schedule-cancelled');
   await page.locator('dialog[open]').getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Hide 1 cancelled' }).click();
+  check(!(await workshop.count()), 'schedule: tapping it again folds it away');
   a3.status = 'BOOKED';
+  await page.reload();
+  await workshop.waitFor();
 
   // Late cancel: striped block, the hover details say so; the cancel step can mark it instead of removing it.
   const late = page.getByRole('button', { name: /Kai Moon - Private/ });
