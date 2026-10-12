@@ -1240,7 +1240,11 @@ function AppointmentDialog({
             <select
               id={`${id}-staff`}
               value={f.staff}
-              onChange={(e) => set({ staff: e.target.value })}
+              onChange={(e) => {
+                // A service the new instructor doesn't teach switches to the first one they do (an old name stays).
+                const next = svc && !teaches(svc, e.target.value) ? services.find((x) => teaches(x, e.target.value)) : undefined;
+                set({ staff: e.target.value, ...(next ? { service: next.name, minutes: next.minutes, capacity: next.capacity } : {}) });
+              }}
               className={`${inputCls} font-medium`}
             >
               {instructors

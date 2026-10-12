@@ -48,7 +48,6 @@ export default function MinutesInput({
           inputMode="numeric"
           min={min}
           max={max}
-          step={step}
           value={draft ?? String(value)}
           onChange={(e) => {
             setDraft(e.target.value);

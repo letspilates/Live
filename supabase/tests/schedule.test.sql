@@ -420,6 +420,14 @@ select t.check('import: phone match never takes a client who has their own key',
   where client_name = 'Mina Lee' and student_id is null));
 select t.expect_error('repeat until more than a year ahead', '22023', $$select public.save_appointment('{"start":"2026-10-30 12:00",
   "minutes":50,"service":"Private","capacity":1,"clients":[],"repeat":{"every":1,"days":[5],"ends":"until","until":"2099-12-31"}}')$$);
+-- A service renamed in Settings still takes the rows Schedulista exports under its old name.
+select public.save_schedule_service(jsonb_build_object('id', (select id from public.schedule_services where name = 'Gyrotonic Group'),
+  'name', 'Gyro Tower Group', 'minutes', 50, 'capacity', 3));
+select public.import_schedule('[{"row":2,"start":"2026-01-09 10:00","minutes":50,"service":"Gyrotonic Group","instructor":"Ivy",
+  "source_service":"Gyrotonic Group with Ivy","client_name":"Pat Doe","client_phone":"","client_email":"","notes":"",
+  "price_cents":null,"created":""}]', true);
+select t.check('import: a renamed service keeps taking its Schedulista rows', (select service = 'Gyro Tower Group' and capacity = 3
+  from public.appointments where source_key = 'SCHEDULISTA|2026-01-09 10:00|gyrotonic group with ivy'));
 -- Merging two clients moves the dropped one's bookings to the kept one.
 select public.merge_clients('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000c2', 'Mina Park');
 select t.check('merge: bookings follow the kept client', not exists (select 1 from public.appointment_clients

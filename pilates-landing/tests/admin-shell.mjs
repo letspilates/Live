@@ -1491,6 +1491,9 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const groups = await dlg.getByLabel('Service').evaluate((el) => [...el.querySelectorAll('optgroup')].map((g) => `${g.label}: ${[...g.children].map((o) => o.value).join(', ')}`));
   check(groups.join(' | ') === 'Individual Classes: Private, Gyrotonic | Pilates Classes: Pilates Group | Gyrotonic Classes: Gyrotonic Group',
     `schedule: services grouped by category in order ${groups.join(' | ')}`);
+  await dlg.getByLabel('Service').selectOption('Gyrotonic Group');
+  await dlg.getByLabel('Instructor').selectOption({ label: 'Sunnie Lee' });
+  check(await dlg.getByLabel('Service').inputValue() === 'Private', 'schedule: switching to an instructor who does not teach the service picks one they do');
   await dlg.getByRole('button', { name: 'Close' }).click();
   await dlg.waitFor({ state: 'detached' });
   check(!sched.some(([n]) => n === 'save_appointment'), 'schedule: the Close X closes without saving');
@@ -1817,6 +1820,28 @@ for (const colorScheme of ['light', 'dark']) {
   check(await noOverflow(page), `services phone ${colorScheme}: dialog fits`);
   await shot(page, `services-phone-dialog-${colorScheme}`);
   check(errors.length === 0, `services phone ${colorScheme}: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// An inactive instructor left off a service's list stays off when the service is saved for another reason;
+// a typed length that isn't a multiple of 5 still saves.
+{
+  sched.length = 0;
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule-settings/');
+  await context.route(`${SUPABASE}/rest/v1/rpc/schedule_instructors`, (r) =>
+    r.fulfill({ json: [...INSTRUCTORS, { user_id: 'i-old', full_name: 'Gia Moon', calendar_color: null, active: false }] }));
+  await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) =>
+    r.fulfill({ json: SERVICES.map((v) => (v.name === 'Pilates Group' ? { ...v, staff_ids: ['i-suk', 'i-sun'] } : v)) }));
+  await page.reload();
+  await page.getByRole('button', { name: 'Pilates Classes (1)', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Pilates Group', exact: true }).click();
+  const dialog = page.locator('dialog[open]');
+  await dialog.getByLabel('Duration').fill('52');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('heading', { name: 'Edit service' }).waitFor({ state: 'detached' });
+  const p = sched.find(([n]) => n === 'save_schedule_service')?.[1]?.p;
+  check(p?.staff_ids?.join() === 'i-suk,i-sun' && p.minutes === 52, 'service dialog: saving keeps a list that leaves out an inactive instructor; 52 minutes saves');
+  check(errors.length === 0, `services inactive: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 

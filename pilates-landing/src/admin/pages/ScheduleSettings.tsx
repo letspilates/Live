@@ -547,8 +547,9 @@ function ServiceDialog({
         price_cents: price ? Math.round(Number(price) * 100) : null,
         cleanup_minutes: f.cleanupOn ? f.cleanup : 0,
         description: f.description.trim(),
-        // Every active instructor = null, so someone who joins later teaches it too.
-        staff_ids: active.every((p) => f.staff.includes(p.user_id)) ? null : f.staff,
+        // Every instructor = null, so someone who joins later teaches it too. An inactive one only counts when the
+        // service had no list: an edit that leaves the boxes as they were never widens a saved list.
+        staff_ids: data.instructors.every((p) => f.staff.includes(p.user_id) || (!p.active && !svc?.staff_ids)) ? null : f.staff,
       },
     });
     setBusy(false);
