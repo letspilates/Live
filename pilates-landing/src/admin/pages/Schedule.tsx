@@ -367,6 +367,7 @@ export default function Schedule() {
         start: wallText(a.day, a.start),
         minutes,
         staff_id: a.staff_id,
+        guest_instructor: a.guest_instructor,
         service: a.service,
         capacity: a.capacity,
         ...(a.series_id ? { scope } : {}),
@@ -1169,7 +1170,8 @@ function AppointmentDialog({
   const first = services.find((s) => teaches(s, defaultStaff || OTHER));
   const [f, setF] = useState(() => ({
     staff: a ? (a.staff_id ?? OTHER) : defaultStaff || OTHER,
-    guest: a?.guest_instructor ?? '',
+    // An Other appointment without a name takes its service's guest.
+    guest: a?.guest_instructor || (a && !a.staff_id ? (services.find((s) => s.name === a.service)?.guest_instructor ?? '') : ''),
     service: a?.service ?? first?.name ?? '',
     date: a?.day ?? day,
     time: hhmm(a?.start ?? min),
@@ -1191,6 +1193,19 @@ function AppointmentDialog({
   const [error, setError] = useState('');
 
   const svc = services.find((s) => s.name === f.service);
+  // Other: start and end picked from 15-minute lists (a time off the list stays listed); the length follows.
+  const start = f.time ? toMin(f.time) : 0;
+  const end = start + f.minutes;
+  const quarters = (from: number, to: number) =>
+    Array.from({ length: Math.max(0, Math.floor(to / 15) - Math.floor(from / 15)) }, (_, i) => (Math.floor(from / 15) + i + 1) * 15);
+  const starts = [...new Set([...quarters(-15, 1425), start])].sort((x, y) => x - y);
+  const ends = [...new Set([...quarters(start, Math.min(start + 720, 1425)), end])].sort((x, y) => x - y);
+  const length = (n: number) =>
+    n < 60
+      ? t('calMinutes', { n: String(n) })
+      : n % 60
+        ? t('hoursMinutes', { h: String(Math.floor(n / 60)), m: String(n % 60) })
+        : t('hoursOnly', { h: String(n / 60) });
   // Guest services are always listed; picking one switches the instructor to Other.
   const offered = services.filter((s) => teaches(s, f.staff) || isGuest(s));
   const option = (s: Service) => (
@@ -1357,27 +1372,70 @@ function AppointmentDialog({
           <label htmlFor={`${id}-time`} className={LABEL}>
             {t('calTime')}
           </label>
-          <div className="flex items-center gap-3">
-            <input
-              id={`${id}-time`}
-              type="time"
-              step={300}
-              value={f.time}
-              onChange={(e) => set({ time: e.target.value })}
-              className={`${inputCls} !w-40 font-medium tabular-nums`}
-            />
-            {f.time && (
-              <span className="whitespace-nowrap text-[15px] tabular-nums">
-                {t('calUntil', { time: ampm(toMin(f.time) + f.minutes) })}
-              </span>
-            )}
-          </div>
+          {f.staff === OTHER ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                id={`${id}-time`}
+                value={hhmm(start)}
+                onChange={(e) => {
+                  // A new start keeps the end time when it can.
+                  const minutes = end - toMin(e.target.value);
+                  set({ time: e.target.value, ...(minutes >= 5 && minutes <= 720 ? { minutes } : {}) });
+                }}
+                className={`${inputCls} !w-36 font-medium tabular-nums`}
+              >
+                {starts.map((m) => (
+                  <option key={m} value={hhmm(m)}>
+                    {ampm(m)}
+                  </option>
+                ))}
+              </select>
+              <span aria-hidden="true">-</span>
+              <select
+                aria-label={t('calEndTime')}
+                value={hhmm(end)}
+                onChange={(e) => set({ minutes: toMin(e.target.value) - start })}
+                className={`${inputCls} !w-36 font-medium tabular-nums`}
+              >
+                {ends.map((m) => (
+                  <option key={m} value={hhmm(m)}>
+                    {ampm(m)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <input
+                id={`${id}-time`}
+                type="time"
+                step={300}
+                value={f.time}
+                onChange={(e) => set({ time: e.target.value })}
+                className={`${inputCls} !w-40 font-medium tabular-nums`}
+              />
+              {f.time && (
+                <span className="whitespace-nowrap text-[15px] tabular-nums">
+                  {t('calUntil', { time: ampm(toMin(f.time) + f.minutes) })}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className={ROW}>
-          <label htmlFor={`${id}-dur`} className={LABEL}>
-            {t('calDuration')}
-          </label>
-          <MinutesInput id={`${id}-dur`} value={f.minutes} onChange={(minutes) => set({ minutes })} />
+          {f.staff === OTHER ? (
+            <>
+              <span className={LABEL}>{t('calDuration')}</span>
+              <span className="text-[15px] font-medium tabular-nums">{length(f.minutes)}</span>
+            </>
+          ) : (
+            <>
+              <label htmlFor={`${id}-dur`} className={LABEL}>
+                {t('calDuration')}
+              </label>
+              <MinutesInput id={`${id}-dur`} value={f.minutes} onChange={(minutes) => set({ minutes })} />
+            </>
+          )}
         </div>
         {showCapacity && (
           <div className={ROW}>

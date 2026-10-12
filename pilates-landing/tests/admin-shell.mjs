@@ -2008,7 +2008,8 @@ const withGuests = async (context) => {
   await withGuests(context);
   await context.route(`${SUPABASE}/rest/v1/appointments?**`, (r) => r.fulfill({ json: [...APPTS, { id: 'a-g', starts_at: laISO(LA_TODAY, 1140), minutes: 120,
     staff_id: null, guest_instructor: 'Ana Guest', service: 'Reformer Workshop', capacity: 10, series_id: null, series_changed: false, status: 'BOOKED',
-    appointment_clients: [] }] }));
+    appointment_clients: [] }, { id: 'a-h', starts_at: laISO(LA_TODAY, 420), minutes: 60, staff_id: null, guest_instructor: '', service: 'Reformer Workshop',
+    capacity: 10, series_id: null, series_changed: false, status: 'BOOKED', appointment_clients: [] }] }));
   await context.route(`${SUPABASE}/rest/v1/schedule_settings?**`, (r) => r.fulfill({ json: [{ change_text_minutes: 15, other_color: '#2E9AA6' }] }));
   await page.reload();
   const dlg = page.locator('dialog[open]');
@@ -2023,13 +2024,41 @@ const withGuests = async (context) => {
   await dlg.getByRole('heading', { name: 'Edit Event' }).waitFor();
   check(await dlg.getByLabel('Instructor', { exact: true }).inputValue() === 'other' && await dlg.getByLabel('Guest instructor').inputValue() === 'Ana Guest',
     'others: the dialog shows Other with the guest');
+  // Other: start and end times from lists, the length follows.
+  const startSel = dlg.getByLabel('Time', { exact: true });
+  const endSel = dlg.getByLabel('End time');
+  check(await startSel.inputValue() === '19:00' && await endSel.inputValue() === '21:00' && await dlg.getByText('2 hr', { exact: true }).isVisible()
+    && !(await dlg.getByLabel('Duration').count()), 'others: Other shows start and end time lists and the length as text');
+  await endSel.selectOption('21:30');
+  check(await dlg.getByText('2 hr 30 min', { exact: true }).isVisible(), 'others: a later end makes it longer');
+  await startSel.selectOption('18:00');
+  check(await endSel.inputValue() === '21:30' && await dlg.getByText('3 hr 30 min', { exact: true }).isVisible(), 'others: an earlier start keeps the end time');
   await shot(page, 'others-appointment');
   await dlg.getByLabel('Guest instructor').fill('Bo Guest');
   await dlg.getByRole('button', { name: 'Save', exact: true }).click();
   await dlg.waitFor({ state: 'detached' });
   const edited = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
-  check(edited?.id === 'a-g' && edited.staff_id === null && edited.guest_instructor === 'Bo Guest' && edited.service === 'Reformer Workshop',
-    'others: saving sends no staff and the typed guest');
+  check(edited?.id === 'a-g' && edited.staff_id === null && edited.guest_instructor === 'Bo Guest' && edited.service === 'Reformer Workshop'
+    && edited.start === `${LA_TODAY} 18:00` && edited.minutes === 210, 'others: saving sends no staff, the typed guest, the start and the length');
+
+  // Changing the length by dragging the bottom edge keeps the guest.
+  sched.length = 0;
+  const gb = await ev.boundingBox();
+  await ev.hover();
+  await page.mouse.move(gb.x + gb.width / 2, gb.y + gb.height - 3);
+  await page.mouse.down();
+  await page.mouse.move(gb.x + gb.width / 2, gb.y + gb.height - 3 + gb.height / 4, { steps: 4 });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo' }).waitFor();
+  const resized = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
+  check(resized?.id === 'a-g' && resized.minutes === 150 && resized.guest_instructor === 'Ana Guest', 'others: a new length keeps the guest');
+
+  // An Other appointment saved without a name opens with its service's guest.
+  await page.getByRole('button', { name: /^7:00 - 8:00\s*Reformer Workshop/ }).click();
+  await dlg.getByRole('heading', { name: 'Edit Event' }).waitFor();
+  check(await dlg.getByLabel('Guest instructor').inputValue() === 'Ana Guest', 'others: a blank guest is filled from the service');
+  await dlg.getByRole('button', { name: 'Close' }).click();
 
   sched.length = 0;
   await page.getByRole('button', { name: 'New Appointment' }).click();
