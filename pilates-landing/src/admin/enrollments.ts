@@ -22,6 +22,8 @@ export interface Course {
   conducted_by: string;
   desc_en: string;
   desc_kr: string;
+  /** Last day (YYYY-MM-DD) saved with the course; after it the site hides the course. */
+  ends_on: string;
 }
 
 /** public.training_courses row */
@@ -42,6 +44,7 @@ export interface CourseRow {
   desc_en: string;
   desc_kr: string;
   active: boolean;
+  ends_on: string | null;
 }
 
 /** public.training_registrations row */
@@ -149,11 +152,14 @@ function nearestYear(month: number, day: number, today: string): number {
   return best;
 }
 
-/** First date in free-form schedule text as YYYY-MM-DD, or ''.
- *  7/24, 7/24/2026, 7/24/26, 2026-07-24, Jul 24, July 24 2026, 7월 24일 */
-export function firstDateOf(text: string, today = studioToday()): string {
+/** Every date in free-form schedule text as YYYY-MM-DD, in order.
+ *  7/24, 7/24/2026, 7/24/26, 2026-07-24, Jul 24, July 24 2026, 7월 24일.
+ *  A missing year: the first date takes the year nearest today, later ones follow
+ *  it (rolling into the next year when the month/day goes backwards). */
+export function datesIn(text: string, today = studioToday()): string[] {
   const re =
     /(\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?|(\d{1,2})월\s*(\d{1,2})일|([A-Za-z]{3,9})\.?\s+(\d{1,2})(?!\d)(?:,?\s*(\d{4}))?/g;
+  const out: string[] = [];
   for (const m of String(text || '').matchAll(re)) {
     let y: number | null = null;
     let mo: number;
@@ -170,11 +176,20 @@ export function firstDateOf(text: string, today = studioToday()): string {
       if (m[11]) y = Number(m[11]);
     }
     if (!(mo >= 1 && mo <= 12 && d >= 1 && d <= 31)) continue;
+    const md = `${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const prev = out.at(-1);
+    if (y === null && prev) y = Number(prev.slice(0, 4)) + (md < prev.slice(5) ? 1 : 0);
     y ??= nearestYear(mo, d, today);
-    return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    out.push(`${y}-${md}`);
   }
-  return '';
+  return out;
 }
+
+/** First date in free-form schedule text as YYYY-MM-DD, or ''. */
+export const firstDateOf = (text: string, today = studioToday()): string => datesIn(text, today)[0] ?? '';
+
+/** Last date in the schedule text (the course's last day), or ''. */
+export const lastDateOf = (text: string, today = studioToday()): string => datesIn(text, today).at(-1) ?? '';
 
 /** 0 → A … 25 → Z, 26 → AA */
 export function letterOf(i: number): string {
@@ -258,6 +273,7 @@ export function fromRow(r: CourseRow, regs: Registration[]): Course {
     conducted_by: r.conducted_by,
     desc_en: r.desc_en,
     desc_kr: r.desc_kr,
+    ends_on: r.ends_on ?? '',
   };
 }
 
@@ -356,6 +372,7 @@ export function coursesFromCsv(text: string): Course[] {
         conducted_by: get('conducted_by'),
         desc_en: get('desc_en'),
         desc_kr: get('desc_kr'),
+        ends_on: '',
       };
     })
     .filter((c) => c.name_en || c.name_kr || c.dates);

@@ -11,9 +11,11 @@ import {
   daysOf,
   earlyState,
   fromRow,
+  lastDateOf,
   money,
   registrationsFromCsv,
   studioDateTime,
+  studioToday,
   type Course,
   type CourseRow,
   type Registration,
@@ -40,7 +42,7 @@ async function loadAll(): Promise<{ courses: Course[]; regs: Registration[] }> {
 }
 
 /** A course as edited on screen: early-bird switch and day count are form-only. */
-type Draft = Course & { key: string; early_on: boolean; days: string };
+type Draft = Course & { key: string; early_on: boolean; days: string; saved_dates: string };
 
 let nextKey = 0;
 const toDraft = (c: Course): Draft => ({
@@ -49,6 +51,7 @@ const toDraft = (c: Course): Draft => ({
   key: String(nextKey++),
   early_on: Boolean(c.fee_early.trim() || c.early_until.trim()),
   days: daysOf(c),
+  saved_dates: c.dates,
 });
 
 const BLANK: Course = {
@@ -70,6 +73,7 @@ const BLANK: Course = {
   conducted_by: '',
   desc_en: '',
   desc_kr: '',
+  ends_on: '',
 };
 
 /** What save_training_courses takes: empty cards dropped, early bird blanked when switched off. */
@@ -93,8 +97,17 @@ function toRows(drafts: Draft[]) {
     // Not editable here, but kept so saving does not wipe it.
     desc_kr: c.desc_kr,
     active: c.active,
+    // Keep the saved last day while the schedule text is unchanged, so the guessed
+    // year never shifts on a later save.
+    ends_on: (c.dates.trim() === c.saved_dates.trim() && c.ends_on) || lastDateOf(c.dates),
   }));
 }
+
+/** Last day already passed (studio time): the site hides the course automatically. */
+const isPast = (c: Draft) => {
+  const end = (c.dates.trim() === c.saved_dates.trim() && c.ends_on) || lastDateOf(c.dates);
+  return Boolean(end) && end < studioToday();
+};
 
 export default function Enrollments() {
   const { t } = useT();
@@ -434,6 +447,7 @@ function CourseCard({
         <div className="flex min-w-0 flex-1 flex-wrap gap-1.5 pt-2">
           <SeatChips c={c} />
           {!c.active && <Chip tone="clay">{t('hiddenOnSite')}</Chip>}
+          {c.active && isPast(c) && <Chip tone="clay">{t('pastHidden')}</Chip>}
         </div>
         <button
           type="button"

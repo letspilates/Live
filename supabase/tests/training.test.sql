@@ -84,6 +84,15 @@ select t.expect_error('owner: not a list', '22023', $$select public.save_trainin
 reset role;
 
 -- Public form ---------------------------------------------------------------------
+-- A course whose last day has passed is hidden; a future or unknown last day stays.
+update public.training_courses set ends_on = '2000-01-01' where code = 'B';
+select t.check('past course hidden from the site', not exists (
+  select 1 from jsonb_array_elements(public.public_training_courses()) c where c ->> 'id' = 'B'));
+update public.training_courses set ends_on = '2099-01-01' where code = 'B';
+select t.check('owner: save keeps ends_on', (select public.save_training_courses((
+  select jsonb_agg(to_jsonb(c) - 'updated_at' || jsonb_build_object('class_time', c.class_time))
+    from public.training_courses c)) >= 1
+  and (select ends_on = '2099-01-01' from public.training_courses where code = 'B')));
 select set_config('t.course_a', (select id::text from public.training_courses where code = 'A'), true);
 select t.as_anon();
 select t.check('anon: sees open courses only', (select jsonb_array_length(public.public_training_courses()) = 2));
