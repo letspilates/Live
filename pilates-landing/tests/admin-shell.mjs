@@ -93,7 +93,7 @@ let duplicateOnce = false;
 
 // Expenses (this month at the studio)
 const MONTH = `${LA_TODAY.slice(0, 8)}01`;
-const CATEGORIES = [['RENT', 'Studio Rent'], ['INSTRUCTOR_PAY', 'Instructor Compensation'], ['UTILITIES', 'Utilities'], ['SOFTWARE', 'Software Subscriptions'], ['OTHER', 'Other Expenses']]
+const CATEGORIES = [['RENT', 'Studio Rent'], ['INSTRUCTOR_PAY', 'Salary'], ['UTILITIES', 'Utilities'], ['SOFTWARE', 'Software Subscriptions'], ['OTHER', 'Other Expenses']]
   .map(([code, name_en]) => ({ code, name_en, name_ko: name_en }));
 const exp = (e) => ({ vendor: '', due_date: null, payment_status: 'UNPAID', paid_on: null, payment_method: null, status: 'ACTIVE', void_reason: '',
   recurring_rule_id: null, is_estimate: false, payee_staff_id: null, notes: '', period_month: MONTH, ...e });
@@ -1006,7 +1006,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const statement = await main.locator('dl').first().innerText();
   check(['$20,000.00', '$200.00', '$19,800.00', '$8,000.00', '$11,800.00', 'paid $5,000.00 · unpaid $3,000.00'].every((x) => statement.includes(x)), `${device} reports: statement`);
   check(await main.getByText(/management estimate, not your bank balance/).isVisible(), `${device} reports: basis explained`);
-  check(await main.getByText('Zelle').isVisible() && await main.getByText('Instructor Compensation').isVisible() && await main.getByText('Ana Park').isVisible(), `${device} reports: breakdowns named`);
+  check(await main.getByText('Zelle').isVisible() && await main.getByText('Salary').isVisible() && await main.getByText('Ana Park').isVisible(), `${device} reports: breakdowns named`);
   check(finance.some(([, b]) => b.p_from === MONTH), `${device} reports: opens on this month`);
   check(await noOverflow(page), `${device} reports: no sideways scroll`);
   await shot(page, `${device}-reports`);
@@ -1020,7 +1020,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export CSV' }).click()]);
     const csv = (await import('node:fs')).readFileSync(await download.path(), 'utf8');
     check(download.suggestedFilename() === `report-${MONTH.slice(0, 4)}.csv` && csv.includes('Gross revenue,20000') && csv.includes('Estimated operating profit,11800')
-      && csv.includes('Instructor Compensation,3500,2') && csv.includes('Month,Net revenue'), 'reports: CSV has summary, breakdowns and months');
+      && csv.includes('Salary,3500,2') && csv.includes('Month,Net revenue'), 'reports: CSV has summary, breakdowns and months');
   }
   check(errors.length === 0, `${device} reports: no page errors ${errors.join(' | ')}`);
   await context.close();
