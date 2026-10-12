@@ -428,6 +428,13 @@ select public.import_schedule('[{"row":2,"start":"2026-01-09 10:00","minutes":50
   "price_cents":null,"created":""}]', true);
 select t.check('import: a renamed service keeps taking its Schedulista rows', (select service = 'Gyro Tower Group' and capacity = 3
   from public.appointments where source_key = 'SCHEDULISTA|2026-01-09 10:00|gyrotonic group with ivy'));
+-- A service named like Schedulista's whole name wins over the plain one.
+select public.save_schedule_service('{"name":"Private with Ivy","minutes":50,"capacity":1}');
+select public.import_schedule('[{"row":2,"start":"2026-01-09 11:00","minutes":50,"service":"Private","instructor":"Ivy",
+  "source_service":"Private with Ivy -","client_name":"Pat Doe","client_phone":"","client_email":"","notes":"",
+  "price_cents":null,"created":""}]', true);
+select t.check('import: Schedulista''s whole service name picks that service', (select service = 'Private with Ivy'
+  from public.appointments where source_key = 'SCHEDULISTA|2026-01-09 11:00|private with ivy -'));
 -- Merging two clients moves the dropped one's bookings to the kept one.
 select public.merge_clients('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000c2', 'Mina Park');
 select t.check('merge: bookings follow the kept client', not exists (select 1 from public.appointment_clients
