@@ -356,6 +356,7 @@ async function open(who, width, path = '', options = {}) {
   await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) => r.fulfill({ json: SERVICES }));
   await context.route(`${SUPABASE}/rest/v1/schedule_categories?**`, (r) => r.fulfill({ json: SERVICE_CATEGORIES }));
   await context.route(`${SUPABASE}/rest/v1/schedule_settings?**`, (r) => r.fulfill({ json: [{ change_text_minutes: 15 }] }));
+  await context.route(`${SUPABASE}/rest/v1/trash?**`, (r) => r.fulfill({ json: [] }));
   await context.route(`${SUPABASE}/rest/v1/rpc/schedule_instructors`, (r) => r.fulfill({ json: INSTRUCTORS }));
   await context.route(`${SUPABASE}/rest/v1/rpc/schedule_search_clients`, (r) => {
     sched.push(['schedule_search_clients', r.request().postDataJSON()]);
