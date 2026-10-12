@@ -577,6 +577,7 @@ const en = {
   calClash: '{name} already has {what} at {time}. You can still move it.',
   calMove: 'Move',
   calMovedTo: 'Moved to {when}',
+  calLengthTo: 'Now {when}',
   calUndo: 'Undo',
   // schedule settings
   ssInstructors: 'Instructors',
@@ -1332,6 +1333,7 @@ const ko: Dict = {
   calClash: '{name} 강사는 {time}에 {what} 일정이 있어요. 그래도 옮길 수 있어요.',
   calMove: '옮기기',
   calMovedTo: '{when}(으)로 옮겼어요',
+  calLengthTo: '{when}(으)로 바꿨어요',
   calUndo: '되돌리기',
   // schedule settings
   ssInstructors: '강사',

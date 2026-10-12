@@ -163,6 +163,9 @@ const APPTS = [
   // The client cancelled the same day: stays on the calendar, striped.
   { id: 'a-4', starts_at: laISO(LA_TODAY, 900), minutes: 50, staff_id: 'i-sun', service: 'Private', capacity: 1, series_id: null, series_changed: false,
     status: 'BOOKED', appointment_clients: [booking({ id: 'b-5', client_name: 'Kai Moon', status: 'LATE_CANCEL' })] },
+  // Starts while the 9:00 blocks are still running: drawn on top, pushed in by half.
+  { id: 'a-5', starts_at: laISO(LA_TODAY, 570), minutes: 30, staff_id: 'i-sun', service: 'Gyrotonic', capacity: 1, series_id: null, series_changed: false,
+    status: 'BOOKED', appointment_clients: [booking({ id: 'b-6', client_name: 'Noa Han' })] },
 ];
 const INSTRUCTORS = [{ user_id: 'i-suk', full_name: 'Su kyung YI', calendar_color: '#EEBC43', active: true },
   { user_id: 'i-sun', full_name: 'Sunnie Lee', calendar_color: null, active: true }];
@@ -1485,6 +1488,44 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const lc = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
   check(lc?.id === 'a-1' && lc.clients[0].id === 'b-1' && lc.clients[0].status === 'LATE_CANCEL' && !sched.some(([n]) => n === 'cancel_appointment'),
     'schedule: Late cancel keeps the appointment and marks the booking');
+
+  // Half-overlapping: the 9:30 block sits on top of the 9:00 ones, pushed in by half.
+  const noa = page.getByRole('button', { name: /Noa Han - Gyrotonic/ });
+  const [n, col] = [await noa.boundingBox(), await page.locator(`[data-day="${LA_TODAY}"]`).boundingBox()];
+  check(Math.abs(n.x - (col.x + (col.width - 16) / 2)) < 3 && n.y > m.y + 5
+    && (await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('button')?.textContent ?? '', [n.x + n.width / 2, n.y + n.height / 2])).includes('Noa Han'),
+    'schedule: a block starting half way through another is indented and drawn on top');
+
+  // Free strip on the right: hover shows +, a click there books at that time even beside full blocks.
+  await page.mouse.move(col.x + col.width - 6, m.y + 6);
+  await page.locator('[data-grid] .lucide-plus').waitFor();
+  check(true, 'schedule: hover on free space shows the +');
+  await shot(page, 'schedule-hover-plus');
+  await page.mouse.click(col.x + col.width - 6, m.y + 6);
+  await page.getByRole('heading', { name: 'New Appointment' }).waitFor();
+  check((await page.locator('input[type="time"]').inputValue()) === '09:00', 'schedule: the strip beside the 9:00 blocks books at 9:00');
+  await page.keyboard.press('Escape');
+  await page.getByRole('heading', { name: 'New Appointment' }).waitFor({ state: 'detached' });
+
+  // Drag the = at the bottom: new length on a 5-minute grid, confirm with Save, Undo puts it back.
+  sched.length = 0;
+  const ph = w.height / 120;
+  const k = await late.boundingBox();
+  await late.hover();
+  await page.mouse.move(k.x + k.width / 2, k.y + k.height - 3);
+  await page.mouse.down();
+  await page.mouse.move(k.x + k.width / 2, k.y + k.height - 3 + 5 * ph, { steps: 4 });
+  await page.mouse.move(k.x + k.width / 2, k.y + k.height - 3 + 10 * ph, { steps: 4 });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo' }).waitFor();
+  const len = sched.filter(([nm]) => nm === 'save_appointment').map(([, b]) => b.p);
+  check(len[0]?.id === 'a-4' && len[0].start === `${LA_TODAY} 15:00` && len[0].minutes === 60 && len[0].clients[0]?.id === 'b-5'
+    && !sched.some(([nm]) => nm === 'move_appointment'), 'schedule: dragging the bottom edge 10 minutes saves 60 minutes, same start');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.waitForTimeout(300);
+  const back = sched.filter(([nm]) => nm === 'save_appointment').map(([, b]) => b.p)[1];
+  check(back?.id === 'a-4' && back.minutes === 50, 'schedule: Undo puts the length back');
 
   // New appointment: client search uses the Schedule search (no payment data).
   await page.getByRole('button', { name: 'New Appointment' }).click();

@@ -63,16 +63,21 @@ type Drag = Grid & {
   on: boolean;
   /** Touch: the press-and-hold timer that picks the block up. */
   hold?: number;
+  /** Dragging the bottom edge (=) to change the length instead of moving. */
+  resize?: boolean;
+  minutes?: number;
   col?: HTMLElement;
   day?: string;
   min?: number;
 };
-type Spot = { a: Appointment; day: string; min: number };
+/** Where a dragged block goes; minutes = its new length when the bottom edge was dragged. */
+type Spot = { a: Appointment; day: string; min: number; minutes?: number };
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 const MINI = { size: 12, strokeWidth: 2.5, 'aria-hidden': true } as const;
 const DURATIONS = [30, 40, 45, 50, 55, 60, 80, 90, 110, 120, 180, 360];
 const SNAP = 15;
+const GUTTER = 16; // px kept free on the right of each day, to click for a new appointment at that time
 const LINE = 'rgb(var(--c-ink) / 0.08)';
 const SHADOW = '[text-shadow:0_1px_1px_rgb(0_0_0/0.28)]';
 const STRIPES = 'repeating-linear-gradient(135deg, rgb(255 255 255 / 0.5) 0 5px, transparent 5px 10px)';
@@ -101,7 +106,7 @@ export default function Schedule() {
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
   const [edit, setEdit] = useState<{ a: Appointment | null; day: string; min: number } | null>(null);
   const [move, setMove] = useState<Spot | null>(null);
-  const [ghost, setGhost] = useState<{ id: string; day: string; min: number } | null>(null);
+  const [ghost, setGhost] = useState<{ id: string; day: string; min: number; minutes?: number } | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [tip, setTip] = useState<Appointment | null>(null);
   const tipRef = useRef<HTMLDivElement>(null);
@@ -220,6 +225,14 @@ export default function Schedule() {
       d.on = true;
       setTip(null);
     }
+    if (d.resize) {
+      // The bottom edge follows the pointer on a 5-minute grid: at least 5 minutes, not past the bottom of the grid.
+      const minutes = Math.max(5, Math.min(d.g1 - d.a.start, 720, Math.round((d.a.minutes + (e.clientY - d.y0) / d.ph) / 5) * 5));
+      if (d.minutes === minutes) return;
+      d.minutes = minutes;
+      setGhost({ id: d.a.id, day: d.a.day, min: d.a.start, minutes });
+      return;
+    }
     const col = document
       .elementsFromPoint(e.clientX, e.clientY)
       .find((el): el is HTMLElement => el instanceof HTMLElement && Boolean(el.dataset.day) && Boolean(d.root?.contains(el)));
@@ -244,6 +257,10 @@ export default function Schedule() {
     dropDrag();
     if (!d?.on) return; // a plain click: onClick opens the dialog
     dragged.current = true;
+    if (d.resize) {
+      if (d.minutes === undefined || d.minutes === d.a.minutes) return setGhost(null);
+      return setMove({ a: d.a, day: d.a.day, min: d.a.start, minutes: d.minutes });
+    }
     if (!d.day || d.min === undefined || (d.day === d.a.day && d.min === d.a.start)) return setGhost(null);
     setMove({ a: d.a, day: d.day, min: d.min });
   };
@@ -267,6 +284,7 @@ export default function Schedule() {
         grab: e.clientY - el.getBoundingClientRect().top,
         root: el.closest('[data-grid]'),
         on: false,
+        resize: e.pointerType !== 'touch' && Boolean((e.target as Element).closest('[data-resize]')),
       };
       drag.current = d;
       el.setPointerCapture(e.pointerId);
@@ -329,8 +347,43 @@ export default function Schedule() {
   const newAppt = () => newAt(today >= from && today < to ? today : from, 600);
   const mine = instructors.find((i) => i.active && i.user_id === me.user_id) ?? instructors.find((i) => i.active);
 
+  /** Same appointment, new length (the bottom edge was dragged). */
+  const saveLength = (a: Appointment, minutes: number, scope: Scope) =>
+    supabase!.rpc('save_appointment', {
+      p: {
+        id: a.id,
+        start: wallText(a.day, a.start),
+        minutes,
+        staff_id: a.staff_id,
+        service: a.service,
+        capacity: a.capacity,
+        ...(a.series_id ? { scope } : {}),
+        clients: a.clients.map((c) => ({ id: c.id, student_id: c.student_id, status: c.status, notes: c.notes })),
+      },
+    });
+
   const doMove = async (scope: Scope) => {
-    const { a, day: d, min } = move!;
+    const { a, day: d, min, minutes } = move!;
+    if (minutes !== undefined) {
+      const { error } = await saveLength(a, minutes, scope);
+      if (error) return error.message;
+      await reload();
+      setMove(null);
+      setGhost(null);
+      setToast({
+        text: t('calLengthTo', { when: `${hm(a.start)} - ${ampm(a.start + minutes).toUpperCase()}` }),
+        // A repeating date would stay marked as changed, so Undo only for one-off appointments.
+        undo: a.series_id
+          ? undefined
+          : async () => {
+              setToast(null);
+              const { error: undoError } = await saveLength(a, a.minutes, 'one');
+              if (undoError) setToast({ text: undoError.message });
+              setVersion((v) => v + 1);
+            },
+      });
+      return null;
+    }
     const { error } = await supabase!.rpc('move_appointment', {
       p_id: a.id,
       p_start: wallText(d, min),
@@ -363,8 +416,8 @@ export default function Schedule() {
   };
 
   // Same instructor already busy at the new time: a warning, never a block.
-  const clash = ({ a, day: d, min }: Spot) => {
-    const end = min + a.minutes;
+  const clash = ({ a, day: d, min, minutes = a.minutes }: Spot) => {
+    const end = min + minutes;
     const c =
       a.staff_id &&
       appts?.find((x) => x.id !== a.id && x.staff_id === a.staff_id && x.day === d && x.start < end && min < x.start + x.minutes);
@@ -521,7 +574,7 @@ export default function Schedule() {
                       days={view === 'day' ? [day] : [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(ws, i))}
                       ph={view === 'day' ? 1 : 0.8}
                       appts={shown}
-                      ghost={ghostSpot ? { a: ghostSpot, day: ghost.day, min: ghost.min } : null}
+                      ghost={ghostSpot ? { a: { ...ghostSpot, minutes: ghost.minutes ?? ghostSpot.minutes }, day: ghost.day, min: ghost.min } : null}
                       now={now}
                       block={block}
                       onSlot={newAt}
@@ -597,7 +650,8 @@ export default function Schedule() {
                   : full(move.a)
           }
           from={when(move.a.day, move.a.start, move.a.minutes)}
-          to={when(move.day, move.min, move.a.minutes)}
+          to={when(move.day, move.min, move.minutes ?? move.a.minutes)}
+          action={move.minutes === undefined ? t('calMove') : t('save')}
           warn={clash(move)}
           repeats={Boolean(move.a.series_id)}
           onClose={() => {
@@ -641,7 +695,7 @@ function Block({
     <button
       type="button"
       style={{ ...style, background: paint(a, color) }}
-      className={`absolute flex select-none flex-col overflow-hidden rounded-[3px] px-[5px] py-[3px] text-left leading-[1.22] text-white transition-[filter] duration-150 [-webkit-touch-callout:none] hover:brightness-[1.06] hover:saturate-[1.05] ${shade(
+      className={`group absolute flex select-none flex-col overflow-hidden rounded-[3px] px-[5px] py-[3px] text-left leading-[1.22] text-white transition-[filter] duration-150 [-webkit-touch-callout:none] hover:brightness-[1.06] hover:saturate-[1.05] ${shade(
         a,
         color,
       )} ${className}`}
@@ -652,6 +706,14 @@ function Block({
       </span>
       {!short && <span className="shrink-0 text-[12.5px] font-medium">{label}</span>}
       {icons.length > 0 && <span className="absolute right-[3px] top-[3px] flex gap-0.5">{icons}</span>}
+      {/* Drag the = at the bottom to change the length (mouse; on phones change it in the dialog). */}
+      <span
+        data-resize=""
+        aria-hidden
+        className="absolute inset-x-0 bottom-0 flex h-2.5 cursor-ns-resize items-end justify-center pb-[2px] opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:hidden"
+      >
+        <span className="h-[5px] w-3.5 border-y-[1.5px] border-current" />
+      </span>
     </button>
   );
 }
@@ -693,6 +755,10 @@ function TimeGrid({
     return () => window.removeEventListener('resize', measure);
   }, []);
   const ph = Math.max(minPh, room / (g1 - g0));
+  // Mouse over free space: a + on the half hour a click would book (blocks leave a strip free on the right).
+  const [hover, setHover] = useState<{ day: string; min: number } | null>(null);
+  const slotAt = (e: PointerEvent<HTMLDivElement>) =>
+    g0 + Math.floor((e.clientY - e.currentTarget.getBoundingClientRect().top) / ph / 30) * 30;
   const grid = { ph, g0, g1 };
   const height = (g1 - g0) * ph;
   const cols = { gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` };
@@ -739,18 +805,42 @@ function TimeGrid({
             className="relative cursor-cell border-l border-ink/[0.08]"
             style={{ height, backgroundImage: `linear-gradient(${LINE} 1px, transparent 1px)`, backgroundSize: `100% ${60 * ph}px` }}
             onClick={(e) => onSlot(d, g0 + Math.floor((e.clientY - e.currentTarget.getBoundingClientRect().top) / ph / 30) * 30)}
+            onPointerMove={(e) => {
+              const min = e.target === e.currentTarget && e.pointerType === 'mouse' ? slotAt(e) : null;
+              if (min === null ? hover : hover?.day !== d || hover.min !== min) setHover(min === null ? null : { day: d, min });
+            }}
+            onPointerLeave={() => setHover(null)}
           >
+            {hover?.day === d && (
+              <div
+                className="pointer-events-none absolute inset-x-px z-[1] flex items-start justify-end rounded-[3px] bg-ink/[0.05] text-mute"
+                style={{ top: (hover.min - g0) * ph, height: 30 * ph }}
+              >
+                <Plus {...ICON} size={14} className="m-px" />
+              </div>
+            )}
             {d === now.day && nowOn && (
               <div
                 className="pointer-events-none absolute inset-x-0 z-[3] h-[3px]"
                 style={{ top: (now.min - g0) * ph - 1, background: TODAY_COLOR }}
               />
             )}
-            {layout(appts.filter((a) => a.day === d)).map(({ a, c, n }) =>
-              block(a, a.start, { ...pos(a.start, a.minutes), left: `calc(${(c / n) * 100}% + 1px)`, width: `calc(${100 / n}% - 2px)` }, grid),
+            {layout(appts.filter((a) => a.day === d)).map(({ a, left, width, level }) =>
+              block(
+                a,
+                a.start,
+                {
+                  ...pos(a.start, a.minutes),
+                  left: `calc((100% - ${GUTTER}px) * ${left} + 1px)`,
+                  width: `calc((100% - ${GUTTER}px) * ${width} - 2px)`,
+                  // Drawn on top of an earlier block: a thin white edge keeps them apart.
+                  ...(level ? { boxShadow: '0 0 0 1px rgb(255 255 255 / 0.9)' } : {}),
+                },
+                grid,
+              ),
             )}
             {ghost?.day === d &&
-              block(ghost.a, ghost.min, { ...pos(ghost.min, ghost.a.minutes), left: 1, width: 'calc(100% - 2px)' }, null)}
+              block(ghost.a, ghost.min, { ...pos(ghost.min, ghost.a.minutes), left: 1, width: `calc(100% - ${GUTTER + 2}px)` }, null)}
           </div>
         ))}
       </div>
@@ -953,6 +1043,7 @@ function MoveDialog({
   to,
   warn,
   repeats,
+  action,
   onClose,
   onMove,
 }: {
@@ -963,6 +1054,8 @@ function MoveDialog({
   to: string;
   warn: string;
   repeats: boolean;
+  /** The confirm button: Move, or Save for a new length. */
+  action: string;
   onClose: () => void;
   /** Resolves to the database error text, or null when moved. */
   onMove: (scope: Scope) => Promise<string | null>;
@@ -1007,7 +1100,7 @@ function MoveDialog({
           {t('cancel')}
         </Button>
         <Button className="!px-8" disabled={busy} onClick={() => void run()}>
-          {busy ? t('saving') : t('calMove')}
+          {busy ? t('saving') : action}
         </Button>
       </div>
     </Modal>

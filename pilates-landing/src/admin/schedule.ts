@@ -192,34 +192,21 @@ export function dayText(day: string, lang: Lang, opts: Intl.DateTimeFormatOption
   return to ? f.formatRange(noon(day), noon(to)) : f.format(noon(day));
 }
 
-/** Overlapping appointments share the width in equal side-by-side columns (like Schedulista):
- *  c = column, n = columns in its overlap group. */
+/** Where blocks sit in a day column, as fractions of its width (like Schedulista): appointments that
+ *  start together share the width side by side; one that starts while another is still running is
+ *  drawn on top of it, indented by half of the space left. level = how many blocks it sits on. */
 export function layout<T extends { start: number; minutes: number }>(items: T[]) {
-  const out = [...items]
-    .sort((x, y) => x.start - y.start || y.minutes - x.minutes)
-    .map((a) => ({ a, c: 0, n: 1 }));
-  let cols: number[] = [];
-  let group: typeof out = [];
-  let groupEnd = -1;
-  const flush = () => {
-    group.forEach((x) => (x.n = cols.length));
-    group = [];
-    cols = [];
-  };
-  for (const x of out) {
-    const s = x.a.start;
-    const e = s + x.a.minutes;
-    if (s >= groupEnd) {
-      flush();
-      groupEnd = -1;
-    }
-    let c = cols.findIndex((end) => end <= s);
-    if (c < 0) c = cols.push(0) - 1;
-    cols[c] = e;
-    x.c = c;
-    group.push(x);
-    groupEnd = Math.max(groupEnd, e);
+  const sorted = [...items].sort((x, y) => x.start - y.start || y.minutes - x.minutes);
+  const out: { a: T; left: number; width: number; level: number }[] = [];
+  for (let i = 0; i < sorted.length; ) {
+    const s = sorted[i].start;
+    let j = i;
+    while (j < sorted.length && sorted[j].start === s) j++;
+    const level = Math.max(0, ...out.filter((o) => o.a.start < s && o.a.start + o.a.minutes > s).map((o) => o.level + 1));
+    const left = 1 - 0.5 ** level;
+    const n = j - i;
+    sorted.slice(i, j).forEach((a, k) => out.push({ a, level, left: left + ((1 - left) * k) / n, width: (1 - left) / n }));
+    i = j;
   }
-  flush();
   return out;
 }
