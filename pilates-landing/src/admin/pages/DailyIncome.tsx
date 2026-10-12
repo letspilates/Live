@@ -3,7 +3,7 @@
 // The database decides who recorded a payment, its date and who may change it
 // (record_payment / correct_payment / void_payment / record_refund).
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { CircleCheck, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleCheck, Info, Plus, Receipt, RefreshCw, Search, X } from 'lucide-react';
 import { isAdmin, useStaff } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
@@ -27,7 +27,7 @@ import {
   type StudentHit,
 } from '../payments';
 import { supabase } from '../supabase';
-import { Button, Card, Chip, Dialog, Initials, Notice, Skeleton, TextField, inputCls } from '../ui';
+import { Button, Card, CardTitle, Chip, Dialog, Initials, Notice, Skeleton, TextField, inputCls } from '../ui';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 const LAST_METHOD_KEY = 'lp-admin-last-method';
@@ -51,9 +51,11 @@ function errorText(t: T, error: DbError): string {
 export default function DailyIncome() {
   const { t } = useT();
   const owner = isAdmin(useStaff());
+  // Only owners/admins get the Transactions tab; everyone sees the day's payments next to the form.
   const [tab, setTab] = useState<'record' | 'history'>(() =>
-    new URLSearchParams(window.location.search).get('tab') === 'history' ? 'history' : 'record',
+    owner && new URLSearchParams(window.location.search).get('tab') === 'history' ? 'history' : 'record',
   );
+  const [saves, setSaves] = useState(0);
   const [data, setData] = useState<{ methods: Method[]; collectors: Collector[] } | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -72,22 +74,24 @@ export default function DailyIncome() {
 
   return (
     <Layout title={t('navPayments')}>
-      <div role="tablist" aria-label={t('navPayments')} className="mb-6 inline-flex rounded-full bg-ink/[0.06] p-1">
-        {(['record', 'history'] as const).map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            onClick={() => show(id)}
-            className={`min-h-10 rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 ${
-              tab === id ? 'bg-paper text-ink shadow-card' : 'text-mute hover:text-ink'
-            }`}
-          >
-            {t(id === 'record' ? 'tabRecord' : owner ? 'tabTransactions' : 'tabMyHistory')}
-          </button>
-        ))}
-      </div>
+      {owner && (
+        <div role="tablist" aria-label={t('navPayments')} className="mb-6 inline-flex rounded-full bg-ink/[0.06] p-1">
+          {(['record', 'history'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => show(id)}
+              className={`min-h-10 rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 ${
+                tab === id ? 'bg-paper text-ink shadow-card' : 'text-mute hover:text-ink'
+              }`}
+            >
+              {t(id === 'record' ? 'tabRecord' : 'tabTransactions')}
+            </button>
+          ))}
+        </div>
+      )}
 
       {failed ? (
         <div className="max-w-xl">
@@ -109,7 +113,13 @@ export default function DailyIncome() {
           <Skeleton className="h-32 w-full rounded-2xl" />
         </div>
       ) : tab === 'record' ? (
-        <RecordPayment {...data} onShowHistory={() => show('history')} />
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
+          <RecordPayment {...data} onSaved={() => setSaves((n) => n + 1)} onShowHistory={owner ? () => show('history') : undefined} />
+          <aside className="grid min-w-0 gap-4">
+            <DayPayments {...data} saves={saves} onShowAll={owner ? () => show('history') : undefined} />
+            <Guide />
+          </aside>
+        </div>
       ) : (
         <History {...data} />
       )}
@@ -131,11 +141,13 @@ function readLastMethod(methods: Method[]): string {
 function RecordPayment({
   methods,
   collectors,
+  onSaved,
   onShowHistory,
 }: {
   methods: Method[];
   collectors: Collector[];
-  onShowHistory: () => void;
+  onSaved: () => void;
+  onShowHistory?: () => void;
 }) {
   const { t, lang } = useT();
   const me = useStaff();
@@ -196,6 +208,7 @@ function RecordPayment({
       /* storage blocked */
     }
     setSaved(data as Payment);
+    onSaved();
   };
 
   const reset = () => {
@@ -227,9 +240,11 @@ function RecordPayment({
         </div>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button onClick={reset}>{t('recordAnother')}</Button>
-          <Button variant="secondary" onClick={onShowHistory}>
-            {t('seeHistory')}
-          </Button>
+          {onShowHistory && (
+            <Button variant="secondary" onClick={onShowHistory}>
+              {t('seeHistory')}
+            </Button>
+          )}
         </div>
       </Card>
     );
@@ -602,6 +617,181 @@ function ClientPicker({ onPick }: { onPick: (hit: StudentHit) => void }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+/* ───────────────────────────── The day's payments, beside the form ───────────────────────────── */
+
+function DayPayments({
+  methods,
+  collectors,
+  saves,
+  onShowAll,
+}: {
+  methods: Method[];
+  collectors: Collector[];
+  saves: number;
+  onShowAll?: () => void;
+}) {
+  const { t, lang } = useT();
+  const me = useStaff();
+  const owner = isAdmin(me);
+  const [day, setDay] = useState(laToday);
+  // The database shows staff only their own payments; owners and admins see everyone's.
+  const [rows, setRows] = useState<Payment[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [version, setVersion] = useState(0);
+  const [open, setOpen] = useState<Payment | null>(null);
+  const [message, setMessage] = useState('');
+
+  // Moves on to the next day at midnight in Los Angeles.
+  useEffect(() => {
+    const timer = window.setInterval(() => setDay(laToday()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let stale = false;
+    loadPayments(day, day)
+      .then((data) => {
+        if (stale) return;
+        setRows(data);
+        setFailed(false);
+      })
+      .catch(() => !stale && setFailed(true));
+    return () => {
+      stale = true;
+    };
+  }, [day, saves, version]);
+
+  const sum = totals(rows ?? []);
+  const title = t(owner ? 'dayPayments' : 'myDayPayments', { day: formatDay(day, lang) });
+
+  return (
+    <Card pad={false} label={title} className="overflow-hidden">
+      <div className="px-5 pt-5 sm:px-6 sm:pt-6">
+        <CardTitle
+          icon={Receipt}
+          title={title}
+          action={
+            onShowAll && (
+              <button
+                type="button"
+                onClick={onShowAll}
+                className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full text-sm font-medium text-sage-deep hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
+              >
+                {t('allTransactions')}
+                <ChevronRight {...ICON} size={14} />
+              </button>
+            )
+          }
+        />
+      </div>
+      <dl className="grid grid-cols-2 gap-px border-y border-ink/[0.07] bg-ink/[0.07] [&>*]:bg-paper [&>*]:px-5 [&>*]:py-4 sm:[&>*]:px-6">
+        <Stat label={t(owner ? 'netRevenue' : 'myNet')} value={formatCents(sum.net)} />
+        <Stat label={t('paymentCount')} value={String(sum.count)} />
+      </dl>
+      {message && (
+        <div className="px-5 pt-4 sm:px-6">
+          <Notice tone="success">{message}</Notice>
+        </div>
+      )}
+      {failed ? (
+        <div className="p-5 sm:px-6">
+          <Notice tone="error">{t('incomeLoadFailed')}</Notice>
+        </div>
+      ) : !rows ? (
+        <div className="p-5 sm:px-6">
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="px-5 py-6 text-sm text-mute sm:px-6">{t('noPaymentsToday')}</p>
+      ) : (
+        <ul className="divide-y divide-ink/[0.07] px-2 py-1">
+          {rows.map((r) => (
+            <li key={r.id}>
+              <button
+                type="button"
+                onClick={() => setOpen(r)}
+                className="flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-ink/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
+              >
+                <span className="w-16 shrink-0 whitespace-nowrap text-xs tabular-nums text-mute">{formatTime(r.recorded_at)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium">{r.payer_name}</span>
+                    {r.kind === 'REFUND' && <Chip tone="warn">{t('refund')}</Chip>}
+                    {r.status === 'VOID' && <Chip>{t('statusVoid')}</Chip>}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-mute">
+                    {[methodLabel(methods, r.method, lang, r.method_other), owner || r.collected_by !== me.user_id ? r.collected_by_name : '']
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                </span>
+                <span className={`shrink-0 text-sm font-semibold tabular-nums ${r.status === 'VOID' ? 'text-mute line-through' : ''}`}>
+                  {r.kind === 'REFUND' ? '−' : ''}
+                  {formatCents(r.amount_cents)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!owner && <p className="border-t border-ink/[0.07] px-5 py-3 text-xs text-mute sm:px-6">{t('dayEditHint')}</p>}
+
+      {open && (
+        <PaymentDialog
+          payment={open}
+          methods={methods}
+          collectors={collectors}
+          onClose={() => setOpen(null)}
+          onDone={(text) => {
+            setOpen(null);
+            setMessage(text);
+            setVersion((v) => v + 1);
+          }}
+        />
+      )}
+    </Card>
+  );
+}
+
+const GUIDE: [TextKey, TextKey][] = [
+  ['guide1Title', 'guide1Body'],
+  ['guide2Title', 'guide2Body'],
+  ['guide3Title', 'guide3Body'],
+  ['guide4Title', 'guide4Body'],
+];
+
+/** How to record a payment: closed until someone opens it. */
+function Guide() {
+  const { t } = useT();
+  return (
+    <Card pad={false}>
+      <details className="group">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-[20px] p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 sm:px-6 [&::-webkit-details-marker]:hidden">
+          <span aria-hidden="true" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sage/10 text-sage">
+            <Info size={16} strokeWidth={1.75} />
+          </span>
+          <span className="flex-1 font-display text-base font-semibold text-ink">{t('guideTitle')}</span>
+          <ChevronDown {...ICON} size={16} className="text-mute transition-transform group-open:rotate-180" />
+        </summary>
+        <ol className="grid gap-4 px-5 pb-5 sm:px-6 sm:pb-6">
+          {GUIDE.map(([title, body], i) => (
+            <li key={title} className="flex gap-3">
+              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink/[0.06] text-xs font-semibold tabular-nums">
+                {i + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-ink">{t(title)}</span>
+                <span className="mt-0.5 block text-sm text-mute">{t(body)}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <p className="mx-5 mb-5 rounded-xl bg-ink/[0.04] px-4 py-3 text-xs text-mute sm:mx-6 sm:mb-6">{t('guideNote')}</p>
+      </details>
+    </Card>
   );
 }
 

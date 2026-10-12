@@ -538,8 +538,13 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     'payments: staff can add a client; no walk-in or recently-paid list');
   await page.getByRole('button', { name: 'Save payment' }).click();
   check(await page.getByText('Choose a client.').isVisible() && !calls.length, 'payments: nothing saved without a client');
+  check(!(await page.getByRole('tab').count()), 'payments: no Transactions tab for instructors');
+  const day = page.getByRole('region', { name: /^My payments · / });
+  await day.getByText('Mina Cho').waitFor();
+  check(!(await day.getByText('Leo Park').count()) && !(await day.getByText('Old Friend').count()), "day panel: instructor sees only own payments from today");
+  check(await day.locator('dd').first().innerText() === '$100.00', 'day panel: my total for today');
   await page.getByPlaceholder('Search name or phone').fill('mina');
-  await page.getByRole('button', { name: /Mina Cho/ }).click();
+  await page.locator('form').getByRole('button', { name: /Mina Cho/ }).click();
   check((await page.getByLabel('Amount ($)').inputValue()) === '100.00', 'payments: last amount filled in');
   check((await page.getByLabel('Payment method').inputValue()) === 'ZELLE', 'payments: last method picked in the dropdown');
   await page.getByText('Payment history').waitFor();
@@ -549,6 +554,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   check(await noOverflow(page), 'payments: no sideways scroll on the form');
   await save.click();
   await page.getByText('Payment saved').waitFor();
+  check(!(await page.getByRole('button', { name: 'See history' }).count()), 'payments: no history link for instructors');
   await shot(page, 'phone-saved');
   const first = calls.find(([n]) => n === 'record_payment')?.[1];
   check(first?.p_amount_cents === 10000 && first.p_method === 'ZELLE' && first.p_student_id === 's-mina' && first.p_method_other === '' && /^[0-9a-f-]{36}$/.test(first.p_client_request_id),
@@ -611,13 +617,9 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     'payments: instructor adds a new client and it is selected');
   check(await noOverflow(page), 'payments: no sideways scroll on add client');
 
-  // My history: own rows only; today's can be fixed, yesterday's cannot
-    await page.getByRole('tab', { name: 'My history' }).click();
-  await page.getByText('My total').waitFor();
-  check(await page.getByRole('button', { name: /Mina Cho/ }).isVisible() && !(await page.getByText('Leo Park').count()), 'history: instructor sees only own payments');
-  check(await page.locator('dd').first().innerText() === '$100.00', 'history: my total for today');
-  await shot(page, 'phone-history');
-  await page.getByRole('button', { name: /Mina Cho/ }).click();
+  // Today's own payments beside the form can be fixed
+  await shot(page, 'phone-day-panel');
+  await day.getByRole('button', { name: /Mina Cho/ }).click();
   const dialog = page.locator('dialog[open]');
   await shot(page, 'phone-dialog');
   check(await dialog.getByRole('button', { name: 'Correct' }).isVisible() && !(await dialog.getByRole('button', { name: 'Refund' }).count()), 'history: correct today, no refund for staff');
@@ -629,15 +631,37 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   await dialog.getByRole('button', { name: 'Void' }).click();
   await page.getByText('Payment voided.').waitFor();
   check(calls[0]?.[0] === 'void_payment' && calls[0][1].p_id === 'p-1' && calls[0][1].p_reason === 'entered twice', 'history: void sent with reason');
-  await page.getByLabel('Period').selectOption('week');
-  const old = page.getByRole('button', { name: /Old Friend/ });
-  if (await old.count()) {
-    await old.click();
-    check(await dialog.getByText('Only the owner can change').isVisible() && !(await dialog.getByRole('button', { name: 'Correct' }).count()), 'history: yesterday is owner-only');
-    await dialog.getByRole('button', { name: 'Close' }).click();
-  } else check(true, 'history: (today is Monday, yesterday is outside this week)');
-  check(await noOverflow(page), 'history: no sideways scroll on the phone');
+  check(await noOverflow(page), 'day panel: no sideways scroll on the phone');
   check(errors.length === 0, `payments: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 9b. Payments: the day's payments beside the form (owner sees everyone; staff can't open Transactions)
+for (const [device, width] of Object.entries(WIDTHS)) {
+  const { page, context, errors } = await open('OWNER', width, 'payments/');
+  const day = page.getByRole('region', { name: / Payments$/ });
+  await day.getByText('Leo Park').waitFor();
+  check(await day.getByText('Mina Cho').first().isVisible() && await day.getByText('Ben Yoo').first().isVisible(), `${device} owner: day panel shows everyone's payments`);
+  check(await day.locator('dd').first().innerText() === '$230.00', `${device} owner: day panel net total`);
+  check(await page.getByText('How to record a payment').isVisible(), `${device} owner: guide card`);
+  check(await noOverflow(page), `${device} owner: no sideways scroll on record + day panel`);
+  if (device === 'desktop') {
+    const [form, panel] = await Promise.all([page.locator('form').boundingBox(), day.boundingBox()]);
+    check(panel.x > form.x + form.width && Math.abs(panel.y - form.y) < 4, 'desktop owner: day panel sits right of the form');
+  } else {
+    const [form, panel] = await Promise.all([page.locator('form').boundingBox(), day.boundingBox()]);
+    check(panel.y > form.y + form.height - 1, `${device} owner: day panel stacks below the form`);
+  }
+  await shot(page, `${device}-owner-record`);
+  await day.getByRole('button', { name: 'All transactions' }).click();
+  check(await page.getByRole('tab', { name: 'Transactions' }).getAttribute('aria-selected') === 'true', `${device} owner: All transactions opens the tab`);
+  check(errors.length === 0, `${device} owner record: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+{
+  const { page, context } = await open('STAFF', 1280, 'payments/?tab=history');
+  await page.getByPlaceholder('Search name or phone').waitFor();
+  check(!(await page.getByRole('tab').count()) && !(await page.getByText('Net revenue').count()), 'staff: ?tab=history still shows only the form and own day panel');
   await context.close();
 }
 
