@@ -130,6 +130,13 @@ export async function loadAppointments(from: string, to: string): Promise<Appoin
   });
 }
 
+/** Other's color on the calendar (Settings › Schedule settings), or the default. */
+export async function loadOtherColor(): Promise<string> {
+  const { data, error } = await supabase!.from('schedule_settings').select('other_color').maybeSingle();
+  if (error) throw error;
+  return (data?.other_color as string | null) ?? EVENT_COLOR;
+}
+
 export async function loadInstructors(): Promise<Instructor[]> {
   const { data, error } = await supabase!.rpc('schedule_instructors');
   if (error) throw error;

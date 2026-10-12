@@ -23,7 +23,6 @@ import { addDays, formatDay, laToday, type StudentHit } from '../payments';
 import { navigate } from '../router';
 import {
   BOOKING_STATUSES,
-  EVENT_COLOR,
   PALETTE,
   TODAY_COLOR,
   ampm,
@@ -35,6 +34,7 @@ import {
   layout,
   loadAppointments,
   loadInstructors,
+  loadOtherColor,
   loadServices,
   monthCells,
   nextMonth,
@@ -103,7 +103,7 @@ export default function Schedule() {
   const [view, setView] = useState<View>(() => (window.matchMedia('(min-width: 768px)').matches ? 'week' : 'day'));
   const [day, setDay] = useState(laToday);
   const [now, setNow] = useState(() => laWall());
-  const [setup, setSetup] = useState<{ instructors: Instructor[]; categories: Category[]; services: Service[] } | null>(null);
+  const [setup, setSetup] = useState<{ instructors: Instructor[]; categories: Category[]; services: Service[]; otherColor: string } | null>(null);
   const [appts, setAppts] = useState<Appointment[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [version, setVersion] = useState(0);
@@ -143,8 +143,8 @@ export default function Schedule() {
 
   useEffect(() => {
     let stale = false;
-    Promise.all([loadInstructors(), loadServices()])
-      .then(([instructors, { categories, services }]) => !stale && setSetup({ instructors, categories, services }))
+    Promise.all([loadInstructors(), loadServices(), loadOtherColor()])
+      .then(([instructors, { categories, services }, otherColor]) => !stale && setSetup({ instructors, categories, services, otherColor }))
       .catch(() => !stale && setFailed(true));
     return () => {
       stale = true;
@@ -179,7 +179,8 @@ export default function Schedule() {
   const shown = (appts ?? []).filter((a) => !hidden.has(a.staff_id ?? ''));
   const today = now.day;
 
-  const color = (a: Appointment) => (a.staff_id ? (byId.get(a.staff_id)?.color ?? PALETTE[8]) : EVENT_COLOR);
+  const otherColor = setup?.otherColor ?? '';
+  const color = (a: Appointment) => (a.staff_id ? (byId.get(a.staff_id)?.color ?? PALETTE[8]) : otherColor);
   // The name without its last word: "Su kyung YI" → "Su kyung", "Sunnie Lee" → "Sunnie".
   const firstName = (a: Appointment) => {
     const name = byId.get(a.staff_id ?? '')?.full_name ?? '';
@@ -445,7 +446,7 @@ export default function Schedule() {
     ...instructors
       .filter((i) => i.active || appts?.some((a) => a.staff_id === i.user_id))
       .map((i): [string, string, string] => [i.user_id, i.full_name, i.color]),
-    ['', t('calStudioEvent'), EVENT_COLOR],
+    ['', t('calStudioEvent'), otherColor],
   ];
   const toggle = (id: string) =>
     setHidden((h) => {
@@ -639,6 +640,7 @@ export default function Schedule() {
           instructors={setup.instructors}
           categories={setup.categories}
           services={setup.services}
+          otherColor={setup.otherColor}
           defaultStaff={mine?.user_id ?? ''}
           onClose={() => setEdit(null)}
           onSaved={() => {
@@ -718,14 +720,16 @@ function Block({
       </span>
       {!short && <span className="shrink-0 text-[12.5px] font-medium">{label}</span>}
       {icons.length > 0 && <span className="absolute right-[3px] top-[3px] flex gap-0.5">{icons}</span>}
-      {/* Drag the = at the bottom to change the length (mouse; on phones change it in the dialog). */}
-      <span
-        data-resize=""
-        aria-hidden
-        className="absolute inset-x-0 bottom-0 flex h-2.5 cursor-ns-resize items-end justify-center pb-[2px] opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:hidden"
-      >
-        <span className="h-[5px] w-3.5 border-y-[1.5px] border-current" />
-      </span>
+      {/* Drag the = at the bottom to change the length (mouse; on phones change it in the dialog). A cancelled one stays put. */}
+      {a.status !== 'CANCELLED' && (
+        <span
+          data-resize=""
+          aria-hidden
+          className="absolute inset-x-0 bottom-0 flex h-2.5 cursor-ns-resize items-end justify-center pb-[2px] opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:hidden"
+        >
+          <span className="h-[5px] w-3.5 border-y-[1.5px] border-current" />
+        </span>
+      )}
     </button>
   );
 }
@@ -1138,6 +1142,7 @@ function AppointmentDialog({
   instructors,
   categories,
   services,
+  otherColor,
   defaultStaff,
   onClose,
   onSaved,
@@ -1148,6 +1153,7 @@ function AppointmentDialog({
   instructors: Instructor[];
   categories: Category[];
   services: Service[];
+  otherColor: string;
   defaultStaff: string;
   onClose: () => void;
   onSaved: () => void;
@@ -1197,7 +1203,7 @@ function AppointmentDialog({
   const client = f.clients[0];
   const title = !a ? t('calNew') : !a.staff_id ? t('calEditEvent') : a.capacity > 1 ? t('calEditClass') : t('calEditAppt');
   const cancelLabel = a && t(!a.staff_id ? 'calCancelEvent' : a.capacity > 1 ? 'calCancelClass' : 'calCancelAppt');
-  const dot = f.staff !== OTHER ? (instructors.find((i) => i.user_id === f.staff)?.color ?? PALETTE[8]) : EVENT_COLOR;
+  const dot = f.staff !== OTHER ? (instructors.find((i) => i.user_id === f.staff)?.color ?? PALETTE[8]) : otherColor;
   const valid = Boolean(f.service && f.date && f.time) && (!f.repeat || (f.days.length > 0 && (f.ends !== 'until' || f.until)));
   const statusOptions = BOOKING_STATUSES.map((s) => (
     <option key={s} value={s}>

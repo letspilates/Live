@@ -362,7 +362,7 @@ async function open(who, width, path = '', options = {}) {
     return r.fulfill({ json: [{ id: 's-leo', full_name: 'Leo Park', phone_last4: '0199' }] });
   });
   for (const name of ['save_appointment', 'move_appointment', 'cancel_appointment', 'set_calendar_color', 'save_schedule_service', 'set_change_text_minutes', 'import_schedule',
-    'save_schedule_category', 'delete_schedule_category', 'set_schedule_order', 'delete_schedule_service']) {
+    'save_schedule_category', 'delete_schedule_category', 'set_schedule_order', 'delete_schedule_service', 'set_other_color']) {
     await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
       const body = r.request().postDataJSON();
       sched.push([name, body]);
@@ -1556,6 +1556,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await page.waitForTimeout(300);
   check(await workshop.isVisible() && await workshop.evaluate((el) => getComputedStyle(el).backgroundImage.includes('repeating-linear-gradient')),
     'schedule: a cancelled appointment stays on the calendar, striped');
+  check(!(await workshop.locator('[data-resize]').count()), 'schedule: a cancelled one has no length handle');
   await workshop.click();
   check(await page.locator('dialog[open]').getByText('Cancelled', { exact: true }).isVisible()
     && !(await page.getByRole('button', { name: 'Cancel Event' }).count()), 'schedule: a cancelled one says so and has no cancel button');
@@ -1887,6 +1888,24 @@ for (const colorScheme of ['light', 'dark']) {
   await context.close();
 }
 
+// Other's color: picked like an instructor's; a color an instructor uses is greyed out.
+{
+  sched.length = 0;
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule-settings/');
+  const other = page.getByRole('group', { name: 'Other', exact: true });
+  await other.waitFor();
+  check(await other.getByRole('button', { name: '#EB5366' }).getAttribute('aria-pressed') === 'true'
+    && await other.getByRole('button', { name: '#EEBC43' }).isDisabled(), 'other color: default picked, an instructor\'s color is greyed out');
+  await other.getByRole('button', { name: '#2E9AA6' }).click();
+  await page.waitForTimeout(200);
+  check(sched.find(([n]) => n === 'set_other_color')?.[1]?.p_color === '#2E9AA6'
+    && await other.getByRole('button', { name: '#2E9AA6' }).getAttribute('aria-pressed') === 'true'
+    && await page.getByRole('group', { name: 'Sunnie Lee' }).getByRole('button', { name: '#2E9AA6' }).isDisabled(),
+    'other color: a click saves it, and instructors can no longer pick it');
+  check(errors.length === 0, `other color: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
 // Phone: a long service and guest name wrap inside the row instead of pushing the page sideways.
 {
   const { page, context, errors } = await open('OWNER', 393, 'schedule-settings/');
@@ -1990,12 +2009,14 @@ const withGuests = async (context) => {
   await context.route(`${SUPABASE}/rest/v1/appointments?**`, (r) => r.fulfill({ json: [...APPTS, { id: 'a-g', starts_at: laISO(LA_TODAY, 1140), minutes: 120,
     staff_id: null, guest_instructor: 'Ana Guest', service: 'Reformer Workshop', capacity: 10, series_id: null, series_changed: false, status: 'BOOKED',
     appointment_clients: [] }] }));
+  await context.route(`${SUPABASE}/rest/v1/schedule_settings?**`, (r) => r.fulfill({ json: [{ change_text_minutes: 15, other_color: '#2E9AA6' }] }));
   await page.reload();
   const dlg = page.locator('dialog[open]');
   const offered = () => dlg.getByLabel('Service').evaluate((el) => [...el.options].map((o) => o.value));
   const ev = page.getByRole('button', { name: /Reformer Workshop with Ana Guest/ });
   await ev.waitFor();
   check(true, 'others: a guest event reads "Reformer Workshop with Ana Guest" on the calendar');
+  check(await ev.evaluate((el) => getComputedStyle(el).backgroundColor) === 'rgb(46, 154, 166)', 'others: a guest event takes the Other color from Settings');
   await ev.hover();
   check(await page.getByText('Other: Ana Guest', { exact: true }).isVisible(), 'others: the hover card says Other: Ana Guest');
   await ev.click();

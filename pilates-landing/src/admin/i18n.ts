@@ -589,7 +589,7 @@ const en = {
   calUndo: 'Undo',
   // schedule settings
   ssInstructors: 'Instructors',
-  ssInstructorsHint: "Instructors are staff accounts in Users. Each has one color; a color someone else uses can't be picked.",
+  ssInstructorsHint: "Instructors are staff accounts in Users. Each has one color; a color someone else uses can't be picked. Other is for guest instructors and events.",
   ssNoInstructors: 'No instructors yet. Give a user the Instructor role in Users.',
   ssServices: 'Services',
   ssServicesHint: 'The list to pick from for a new appointment. A Schedulista import takes the service named like Schedulista\'s ("Private with Sunnie"), else the plain one ("Private").',
@@ -1393,7 +1393,7 @@ const ko: Dict = {
   calUndo: '되돌리기',
   // schedule settings
   ssInstructors: '강사',
-  ssInstructorsHint: '강사는 Users에 등록된 직원 계정이에요. 색은 강사마다 하나씩, 다른 강사가 쓰는 색은 고를 수 없어요.',
+  ssInstructorsHint: '강사는 Users에 등록된 직원 계정이에요. 색은 강사마다 하나씩, 다른 강사가 쓰는 색은 고를 수 없어요. Other는 초대 강사와 이벤트 색이에요.',
   ssNoInstructors: '아직 강사가 없어요. Users에서 직원에게 강사 역할을 주세요.',
   ssServices: '서비스',
   ssServicesHint: '새 예약을 만들 때 고르는 목록이에요. Schedulista에서 가져올 때는 같은 이름의 서비스("Private with Sunnie")를 먼저 찾고, 없으면 기본 서비스("Private")로 넣어요.',

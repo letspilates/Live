@@ -1,12 +1,12 @@
 // Settings › Schedule (Owner/Admin): the services offered for new appointments in their categories
-// (laid out like Schedulista's settings), instructor colors, the change-text delay and the Schedulista
+// (laid out like Schedulista's settings), instructor and Other colors, the change-text delay and the Schedulista
 // CSV import. Every save goes through an owner-only database function.
 import { useEffect, useId, useRef, useState, type DragEvent } from 'react';
 import { GripVertical, MessageSquare, Pencil, Plus, Sparkles, Trash2, Upload, Users } from 'lucide-react';
 import { useT } from '../i18n';
 import Layout from '../Layout';
 import MinutesInput from '../MinutesInput';
-import { loadInstructors, loadServices, PALETTE, type Category, type Instructor, type Service } from '../schedule';
+import { EVENT_COLOR, loadInstructors, loadServices, PALETTE, type Category, type Instructor, type Service } from '../schedule';
 import { scheduleFromCsv, type ImportProblem, type ScheduleImportRow } from '../scheduleImport';
 import { supabase } from '../supabase';
 import { Button, Card, CardTitle, Chip, Dialog, Notice, Skeleton, Stat, Switch, TextArea, TextField, inputCls } from '../ui';
@@ -22,13 +22,14 @@ async function loadAll() {
   const [instructors, lists, settings] = await Promise.all([
     loadInstructors(),
     loadServices(true),
-    supabase!.from('schedule_settings').select('change_text_minutes').maybeSingle(),
+    supabase!.from('schedule_settings').select('change_text_minutes, other_color').maybeSingle(),
   ]);
   if (settings.error) throw settings.error;
   return {
     instructors,
     ...lists,
     textMinutes: (settings.data?.change_text_minutes ?? null) as number | null,
+    otherColor: (settings.data?.other_color as string | null) ?? EVENT_COLOR,
   };
 }
 
@@ -75,6 +76,34 @@ export default function ScheduleSettings() {
     });
   };
 
+  const setOther = async (color: string) => {
+    if (!data || color === data.otherColor) return;
+    const { error } = await supabase!.rpc('set_other_color', { p_color: color });
+    if (error) return setNote({ card: 'colors', tone: 'error', text: t('saveFailed', { reason: error.message }) });
+    setNote(null);
+    setData({ ...data, otherColor: color });
+  };
+
+  // A row of color dots; a color someone else uses is greyed out.
+  const swatches = (label: string, current: string, colors: string[], taken: (c: string) => boolean, pick: (c: string) => void) => (
+    <span role="group" aria-label={label} className="flex flex-wrap gap-2">
+      {colors.map((c) => (
+        <button
+          key={c}
+          type="button"
+          aria-label={c}
+          aria-pressed={current === c}
+          disabled={taken(c)}
+          onClick={() => pick(c)}
+          style={{ background: c }}
+          className={`h-[1.6rem] w-[1.6rem] rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/50 disabled:cursor-not-allowed disabled:opacity-[.35] ${
+            current === c ? 'ring-2 ring-ink/60 ring-offset-2 ring-offset-paper' : ''
+          }`}
+        />
+      ))}
+    </span>
+  );
+
   const setTextDelay = async (value: string) => {
     if (!data) return;
     const minutes = value === '' ? null : Number(value);
@@ -109,36 +138,40 @@ export default function ScheduleSettings() {
           {show('colors')}
           {!data ? (
             <Skeleton className="h-40 w-full" />
-          ) : !data.instructors.length ? (
-            <p className="text-sm text-mute">{t('ssNoInstructors')}</p>
           ) : (
-            <ul className="divide-y divide-ink/[0.06]">
-              {data.instructors.map((p) => (
-                <li key={p.user_id} className="flex flex-wrap items-center gap-3 py-3">
-                  <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-[3px]" style={{ background: p.color }} />
-                  <span className="w-28 truncate text-sm font-medium" title={p.full_name}>
-                    {p.full_name}
-                  </span>
-                  <span role="group" aria-label={p.full_name} className="flex flex-wrap gap-2">
-                    {PALETTE.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        aria-label={c}
-                        aria-pressed={p.color === c}
-                        disabled={data.instructors.some((o) => o.user_id !== p.user_id && o.color === c)}
-                        onClick={() => void setColor(p, c)}
-                        style={{ background: c }}
-                        className={`h-[1.6rem] w-[1.6rem] rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/50 disabled:cursor-not-allowed disabled:opacity-[.35] ${
-                          p.color === c ? 'ring-2 ring-ink/60 ring-offset-2 ring-offset-paper' : ''
-                        }`}
-                      />
-                    ))}
-                  </span>
-                  {!p.active && <Chip>{t('INACTIVE')}</Chip>}
+            <>
+              {!data.instructors.length && <p className="text-sm text-mute">{t('ssNoInstructors')}</p>}
+              <ul className="divide-y divide-ink/[0.06]">
+                {data.instructors.map((p) => (
+                  <li key={p.user_id} className="flex flex-wrap items-center gap-3 py-3">
+                    <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-[3px]" style={{ background: p.color }} />
+                    <span className="w-28 truncate text-sm font-medium" title={p.full_name}>
+                      {p.full_name}
+                    </span>
+                    {swatches(
+                      p.full_name,
+                      p.color,
+                      PALETTE,
+                      (c) => c === data.otherColor || data.instructors.some((o) => o.user_id !== p.user_id && o.color === c),
+                      (c) => void setColor(p, c),
+                    )}
+                    {!p.active && <Chip>{t('INACTIVE')}</Chip>}
+                  </li>
+                ))}
+                {/* Other: guest instructors and events without an instructor. */}
+                <li className="flex flex-wrap items-center gap-3 py-3">
+                  <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-[3px]" style={{ background: data.otherColor }} />
+                  <span className="w-28 truncate text-sm font-medium">{t('calStudioEvent')}</span>
+                  {swatches(
+                    t('calStudioEvent'),
+                    data.otherColor,
+                    [EVENT_COLOR, ...PALETTE],
+                    (c) => data.instructors.some((o) => o.color === c),
+                    (c) => void setOther(c),
+                  )}
                 </li>
-              ))}
-            </ul>
+              </ul>
+            </>
           )}
           <p className="mt-3 text-xs text-mute">{t('ssInstructorsHint')}</p>
         </Card>

@@ -314,6 +314,9 @@ select t.login('00000000-0000-0000-0000-0000000000a2');
 select public.move_appointment(current_setting('t.dst1')::uuid, '2026-03-08 11:00');
 select public.set_calendar_color('00000000-0000-0000-0000-0000000000b3', '#D63A43');
 select public.set_change_text_minutes(15);
+select public.set_other_color(' #2e9aa6 ');
+select t.check('admin sets the Other color', (select other_color = '#2E9AA6' from public.schedule_settings));
+select t.expect_error('Other color must be #RRGGBB', '23514', $$select public.set_other_color('teal')$$);
 select t.check('admin reads, moves, sets colors', t.la(current_setting('t.dst1')::uuid) = '2026-03-08 11:00'
   and (select calendar_color = '#D63A43' from public.schedule_instructors() where full_name = 'Jo ann LEE'));
 reset role;
@@ -335,6 +338,7 @@ select t.expect_error('staff: no categories', '42501', $$select public.save_sche
 select t.expect_error('staff: no reorder', '42501', $$select public.set_schedule_order(null, null)$$);
 select t.expect_error('staff: no service delete', '42501', $$select public.delete_schedule_service(gen_random_uuid())$$);
 select t.expect_error('staff: no text delay', '42501', $$select public.set_change_text_minutes(5)$$);
+select t.expect_error('staff: no Other color', '42501', $$select public.set_other_color('#3C78C8')$$);
 select t.expect_error('staff: no import', '42501', $$select public.import_schedule('[]', false)$$);
 select t.check('staff: client search by name and phone', (select phone_last4 = '0101' from public.schedule_search_clients('mina'))
   and (select count(*) = 1 from public.schedule_search_clients('555-0199')) and (select count(*) = 0 from public.schedule_search_clients('m')));
