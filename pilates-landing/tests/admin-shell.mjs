@@ -1419,7 +1419,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const { page, context, errors } = await open('OWNER', 1280, 'backup/');
   check((await page.locator('h1').innerText()) === 'Backup', 'backup: page opens');
   await page.getByRole('button', { name: 'Prepare backup' }).click();
-  await page.getByText(`Ready: ${MEMBERS.length} clients, ${PAYMENTS.length} payments.`).waitFor();
+  await page.getByText(`Ready: ${MEMBERS.length} clients, ${PAYMENTS.length} payments, ${APPTS.length} appointments.`).waitFor();
   check(true, 'backup: counts what it read');
   const fs = await import('node:fs');
   const day = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
@@ -1438,7 +1438,17 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const json = JSON.parse(full);
   check(fullName === `backup-${day}.json` && json.students.length === MEMBERS.length && json.payment_transactions.length === PAYMENTS.length
     && json.payment_methods.length === METHODS.length && Array.isArray(json.accounting_periods) && json.exported_at,
-    'backup: JSON holds all four tables');
+    'backup: JSON holds clients and payments');
+  check(json.appointments.length === APPTS.length && json.schedule_services.length === SERVICES.length
+    && json.schedule_categories.length === SERVICE_CATEGORIES.length && json.schedule_settings.length === 1
+    && json.schedule_instructors.length === INSTRUCTORS.length && json.staff.length === Object.keys(PEOPLE).length,
+    'backup: JSON holds the schedule, services, categories, settings and staff');
+  // Every table the migrations create is in the file (or deliberately left out).
+  const dir = new URL('../../supabase/migrations/', import.meta.url);
+  const made = [...new Set(fs.readdirSync(dir)
+    .flatMap((f) => [...fs.readFileSync(new URL(f, dir), 'utf8').matchAll(/create table public\.(\w+)/g)].map((m) => m[1])))];
+  const missing = made.filter((t) => !['audit_logs', 'staff_profiles'].includes(t) && !Array.isArray(json[t]));
+  check(made.length > 15 && !missing.length, `backup: every table is in the JSON (missing: ${missing.join(', ') || 'none'})`);
   check(await page.getByText(/client names and phone numbers/).isVisible(), 'backup: warns the files are private');
   await shot(page, 'desktop-backup');
   await page.setViewportSize({ width: 393, height: 852 });

@@ -495,9 +495,9 @@ const en = {
   navBackup: 'Backup',
   backupTitle: 'Download a backup',
   backupBody:
-    'Saves every client and every payment (edited and voided ones too) to this computer. Open the CSV files in Excel. Keep the JSON file: it is what moves the data to the live site later.',
+    'Saves every client and every payment (edited and voided ones too) to this computer as CSV files for Excel. The JSON file holds everything in the portal: clients, payments, schedule and services, expenses, trainings and the Knowledge list. Keep it: it is what moves the data to the live site later.',
   backupPrepare: 'Prepare backup',
-  backupReady: 'Ready: {clients} clients, {payments} payments.',
+  backupReady: 'Ready: {clients} clients, {payments} payments, {appointments} appointments.',
   backupClients: 'Clients (CSV)',
   backupPayments: 'Payments (CSV)',
   backupFull: 'Everything (JSON)',
@@ -1289,9 +1289,9 @@ const ko: Dict = {
   navBackup: '백업',
   backupTitle: '백업 내려받기',
   backupBody:
-    '모든 클라이언트와 모든 결제(수정·무효 기록 포함)를 이 컴퓨터에 저장합니다. CSV 파일은 엑셀에서 열립니다. JSON 파일은 나중에 라이브 사이트로 데이터를 옮길 때 쓰니 꼭 보관하세요.',
+    '모든 클라이언트와 모든 결제(수정·무효 기록 포함)를 엑셀용 CSV 파일로 이 컴퓨터에 저장합니다. JSON 파일에는 포털의 모든 데이터가 들어 있습니다: 클라이언트, 결제, 스케줄과 서비스, 지출, 트레이닝, Knowledge 목록. 나중에 라이브 사이트로 데이터를 옮길 때 쓰니 꼭 보관하세요.',
   backupPrepare: '백업 준비',
-  backupReady: '준비 완료: 클라이언트 {clients}명, 결제 {payments}건.',
+  backupReady: '준비 완료: 클라이언트 {clients}명, 결제 {payments}건, 예약 {appointments}건.',
   backupClients: '클라이언트 (CSV)',
   backupPayments: '결제 (CSV)',
   backupFull: '전체 (JSON)',

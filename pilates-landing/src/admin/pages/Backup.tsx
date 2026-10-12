@@ -1,7 +1,7 @@
 // Backup (owner): download every client and every payment (voided and edited
-// rows included) as CSV for Excel, plus one JSON file with the raw rows for
-// moving the data to another Supabase project. Reads with the owner's own
-// login; RLS decides what comes back.
+// rows included) as CSV for Excel, plus one JSON file with the raw rows of
+// every studio table for moving the data to another Supabase project. Reads
+// with the owner's own login; RLS decides what comes back.
 import { useState } from 'react';
 import { DatabaseBackup, Download } from 'lucide-react';
 import { useT } from '../i18n';
@@ -11,18 +11,36 @@ import { toCsv } from '../expenses';
 import { Button, Card, CardTitle, Notice } from '../ui';
 
 type Row = Record<string, unknown>;
-type Data = {
-  students: Row[];
-  payment_transactions: Row[];
-  payment_methods: Row[];
-  accounting_periods: Row[];
-  appointments: Row[];
-  appointment_clients: Row[];
-};
+
+// Every table in supabase/migrations except audit_logs (change history) and
+// staff_profiles (read through list_staff and schedule_instructors below,
+// since some of its columns are not readable directly). A new table goes here;
+// tests/admin-shell.mjs fails until it does. Sort ends in a unique column.
+const TABLES = {
+  students: ['full_name', 'id'],
+  payment_transactions: ['business_date', 'recorded_at', 'id'],
+  payment_methods: ['sort_order', 'code'],
+  accounting_periods: ['month'],
+  appointments: ['starts_at', 'id'],
+  appointment_clients: ['id'],
+  schedule_services: ['sort', 'id'],
+  schedule_categories: ['sort', 'id'],
+  schedule_settings: ['id'],
+  expenses: ['id'],
+  expense_categories: ['code'],
+  recurring_expense_rules: ['id'],
+  training_courses: ['id'],
+  training_registrations: ['submitted_at', 'id'],
+  knowledge_items: ['id'],
+  knowledge_item_viewers: ['item_id', 'user_id'],
+  role_menu_access: ['role', 'menu'],
+} as const;
+type Table = keyof typeof TABLES;
+type Data = Record<Table | 'staff' | 'schedule_instructors', Row[]>;
 
 // Pages of 1000 (the API's cap), ordered down to a unique column so no row is
 // skipped or read twice between pages.
-async function readAll(table: keyof Data, order: string[]): Promise<Row[]> {
+async function readAll(table: Table, order: readonly string[]): Promise<Row[]> {
   const rows: Row[] = [];
   for (let from = 0; ; from += 1000) {
     let query = supabase!.from(table).select('*');
@@ -61,14 +79,15 @@ export default function Backup() {
     setBusy(true);
     setFailed(false);
     try {
-      setData({
-        students: await readAll('students', ['full_name', 'id']),
-        payment_transactions: await readAll('payment_transactions', ['business_date', 'recorded_at', 'id']),
-        payment_methods: await readAll('payment_methods', ['sort_order', 'code']),
-        accounting_periods: await readAll('accounting_periods', ['month']),
-        appointments: await readAll('appointments', ['id']),
-        appointment_clients: await readAll('appointment_clients', ['id']),
-      });
+      const out = {} as Data;
+      for (const [table, order] of Object.entries(TABLES)) out[table as Table] = await readAll(table as Table, order);
+      // Staff names, roles and calendar colors, so staff ids can be matched in a new project.
+      for (const fn of ['list_staff', 'schedule_instructors'] as const) {
+        const { data, error } = await supabase!.rpc(fn);
+        if (error) throw error;
+        out[fn === 'list_staff' ? 'staff' : fn] = data;
+      }
+      setData(out);
     } catch {
       setFailed(true);
     }
@@ -89,7 +108,11 @@ export default function Backup() {
           ) : (
             <div className="flex flex-col gap-3">
               <p className="text-sm">
-                {t('backupReady', { clients: String(data.students.length), payments: String(data.payment_transactions.length) })}
+                {t('backupReady', {
+                  clients: String(data.students.length),
+                  payments: String(data.payment_transactions.length),
+                  appointments: String(data.appointments.length),
+                })}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" onClick={() => save(`clients-${day}.csv`, tableCsv(data.students), 'text/csv')}>
