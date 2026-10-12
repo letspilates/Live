@@ -2,7 +2,7 @@
 // (laid out like Schedulista's settings), instructor colors, the change-text delay and the Schedulista
 // CSV import. Every save goes through an owner-only database function.
 import { useEffect, useId, useRef, useState, type DragEvent } from 'react';
-import { GripVertical, MessageSquare, Plus, Sparkles, Upload, Users } from 'lucide-react';
+import { GripVertical, MessageSquare, Pencil, Plus, Sparkles, Trash2, Upload, Users } from 'lucide-react';
 import { useT } from '../i18n';
 import Layout from '../Layout';
 import MinutesInput from '../MinutesInput';
@@ -184,9 +184,14 @@ export default function ScheduleSettings() {
 }
 
 const NONE = ''; // category_id null: the "No category" row and option
-// Text links in sage, like Schedulista's green "+ Add" and "Edit".
+// Text links in sage, like Schedulista's green "+ Add".
 const LINK =
   'inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-medium text-sage transition-colors hover:text-sage-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40';
+// Pencil (edit) and trash (delete) at the end of a row.
+const ROW_ICON =
+  'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40';
+const EDIT_ICON = `${ROW_ICON} text-sage hover:bg-sage/10 hover:text-sage-deep`;
+const DELETE_ICON = `${ROW_ICON} text-mute hover:bg-red-700/10 hover:text-red-700`;
 const HANDLE =
   'inline-flex h-10 w-8 shrink-0 cursor-grab items-center justify-center rounded-lg text-mute/60 hover:text-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40';
 const PICK =
@@ -220,6 +225,7 @@ function ServicesCard({
   const [drag, setDrag] = useState<{ list: List; index: number } | null>(null);
   const [editCategory, setEditCategory] = useState<Category | 'new' | null>(null);
   const [editService, setEditService] = useState<Service | 'new' | null>(null);
+  const [deleting, setDeleting] = useState<Service | null>(null);
 
   if (!data) {
     return (
@@ -299,10 +305,11 @@ function ServicesCard({
     </button>
   );
 
-  const done = (pick?: string) => {
+  const done = (pick?: string, text = t('ssSaved')) => {
     setEditCategory(null);
     setEditService(null);
-    setNote({ tone: 'success', text: t('ssSaved') });
+    setDeleting(null);
+    setNote({ tone: 'success', text });
     if (pick !== undefined) setPicked(pick);
     reload();
   };
@@ -328,8 +335,8 @@ function ServicesCard({
                 <button type="button" aria-pressed={c.id === current} onClick={() => setPicked(c.id)} className={PICK}>
                   {c.name} ({inCategory(c.id).length})
                 </button>
-                <button type="button" aria-label={t('ssEditNamed', { name: c.name })} onClick={() => setEditCategory(c)} className={LINK}>
-                  {t('edit')}
+                <button type="button" aria-label={t('ssEditNamed', { name: c.name })} onClick={() => setEditCategory(c)} className={EDIT_ICON}>
+                  <Pencil {...ICON} />
                 </button>
               </li>
             ))}
@@ -384,8 +391,11 @@ function ServicesCard({
                         )}
                       </span>
                     </div>
-                    <button type="button" aria-label={t('ssEditNamed', { name: s.name })} onClick={() => setEditService(s)} className={LINK}>
-                      {t('edit')}
+                    <button type="button" aria-label={t('ssEditNamed', { name: s.name })} onClick={() => setEditService(s)} className={EDIT_ICON}>
+                      <Pencil {...ICON} />
+                    </button>
+                    <button type="button" aria-label={t('ssDeleteNamed', { name: s.name })} onClick={() => setDeleting(s)} className={DELETE_ICON}>
+                      <Trash2 {...ICON} />
                     </button>
                   </li>
                 );
@@ -415,8 +425,11 @@ function ServicesCard({
           category={current}
           onClose={() => setEditService(null)}
           onDone={done}
+          onDelete={editService === 'new' ? undefined : () => setDeleting(editService)}
         />
       )}
+      {/* After the edit dialog, so it opens on top of it; Cancel goes back to it. */}
+      {deleting && <DeleteServiceDialog service={deleting} onClose={() => setDeleting(null)} onDone={() => done(undefined, t('ssDeleted'))} />}
     </Card>
   );
 }
@@ -491,12 +504,14 @@ function ServiceDialog({
   category,
   onClose,
   onDone,
+  onDelete,
 }: {
   service: Service | null;
   data: Data;
   category: string;
   onClose: () => void;
   onDone: (pick?: string) => void;
+  onDelete?: () => void;
 }) {
   const { t } = useT();
   const id = useId();
@@ -666,12 +681,72 @@ function ServiceDialog({
         </div>
 
         {errors.form && <Notice tone="error">{errors.form}</Notice>}
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {onDelete && (
+            <Button variant="danger" className="mr-auto" disabled={busy} onClick={onDelete}>
+              {t('ssDeleteService')}
+            </Button>
+          )}
           <Button type="submit" disabled={busy}>
             {busy ? t('saving') : t('save')}
           </Button>
         </div>
       </form>
+    </Dialog>
+  );
+}
+
+/** Asks first and says how many appointments use the service. They keep its name, so the calendar doesn't change. */
+function DeleteServiceDialog({ service, onClose, onDone }: { service: Service; onClose: () => void; onDone: () => void }) {
+  const { t } = useT();
+  // undefined while counting, null when the count failed.
+  const [count, setCount] = useState<number | null>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let stale = false;
+    void supabase!
+      .from('appointments')
+      .select('id', { count: 'exact', head: true })
+      .eq('service', service.name)
+      .eq('status', 'BOOKED')
+      .then(({ count, error }) => !stale && setCount(error ? null : (count ?? 0)));
+    return () => {
+      stale = true;
+    };
+  }, [service.name]);
+
+  const remove = async () => {
+    setBusy(true);
+    const { error } = await supabase!.rpc('delete_schedule_service', { p_id: service.id });
+    setBusy(false);
+    if (error) return setError(t('deleteFailed', { reason: error.message }));
+    onDone();
+  };
+
+  return (
+    <Dialog open onClose={onClose} title={t('ssDeleteService')}>
+      <div className="grid gap-3 text-[15px]">
+        {count !== null && (
+          <p aria-live="polite">
+            {count === undefined
+              ? t('ssCounting')
+              : t(count === 0 ? 'ssDeleteCountNone' : count === 1 ? 'ssDeleteCountOne' : 'ssDeleteCount', { n: count.toLocaleString() })}
+          </p>
+        )}
+        <p className="font-medium">{t('ssDeleteSure', { name: service.name })}</p>
+        {Boolean(count) && <p className="text-sm text-mute">{t('ssDeleteKeeps')}</p>}
+        {error && <Notice tone="error">{error}</Notice>}
+      </div>
+      <div className="mt-6 flex flex-wrap justify-end gap-3">
+        <Button variant="secondary" onClick={onClose}>
+          {t('cancel')}
+        </Button>
+        <Button variant="danger" disabled={busy} onClick={() => void remove()}>
+          {t('delete')}
+        </Button>
+      </div>
     </Dialog>
   );
 }

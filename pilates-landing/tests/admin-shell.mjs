@@ -344,7 +344,14 @@ async function open(who, width, path = '', options = {}) {
       return r.fulfill({ json: name === 'save_knowledge_item' ? 'k-new' : 'f1/manual.pdf' });
     });
   }
-  await context.route(`${SUPABASE}/rest/v1/appointments?**`, (r) => r.fulfill({ json: APPTS }));
+  await context.route(`${SUPABASE}/rest/v1/appointments?**`, (r) => {
+    if (r.request().method() !== 'HEAD') return r.fulfill({ json: APPTS });
+    // Settings › Schedule counts a service's booked appointments before deleting it.
+    const q = new URL(r.request().url()).searchParams;
+    sched.push(['count appointments', q.get('service'), q.get('status')]);
+    return r.fulfill({ headers: { 'access-control-allow-origin': '*', 'access-control-expose-headers': 'content-range',
+      'content-range': `*/${{ 'eq.Private': 312, 'eq.Gyrotonic': 1 }[q.get('service')] ?? 0}` } });
+  });
   await context.route(`${SUPABASE}/rest/v1/appointment_clients?**`, (r) => r.fulfill({ json: APPTS.flatMap((a) => a.appointment_clients) }));
   await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) => r.fulfill({ json: SERVICES }));
   await context.route(`${SUPABASE}/rest/v1/schedule_categories?**`, (r) => r.fulfill({ json: SERVICE_CATEGORIES }));
@@ -355,7 +362,7 @@ async function open(who, width, path = '', options = {}) {
     return r.fulfill({ json: [{ id: 's-leo', full_name: 'Leo Park', phone_last4: '0199' }] });
   });
   for (const name of ['save_appointment', 'move_appointment', 'cancel_appointment', 'set_calendar_color', 'save_schedule_service', 'set_change_text_minutes', 'import_schedule',
-    'save_schedule_category', 'delete_schedule_category', 'set_schedule_order']) {
+    'save_schedule_category', 'delete_schedule_category', 'set_schedule_order', 'delete_schedule_service']) {
     await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
       const body = r.request().postDataJSON();
       sched.push([name, body]);
@@ -1807,6 +1814,36 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
   await page.waitForTimeout(300);
   const byDrag = saved('set_schedule_order')[1];
   check(byDrag?.p_services?.join() === 'v-2,v-1,v-3,v-4' && byDrag.p_categories === null, 'order: dragging a service saves every service in the new order');
+
+  // Delete: pencil and trash icons on each row, a Delete button in the dialog, then a confirm with the appointment count.
+  await page.reload();
+  await btn('Individual Classes (2)').click();
+  check(await btn('Delete Private').isVisible() && await btn('Edit Private').isVisible() && !(await page.getByText('Edit', { exact: true }).count()),
+    'delete: each service row has an edit (pencil) and a delete (trash) icon, no Edit text');
+  await btn('Delete Private').click();
+  const confirm = page.locator('dialog[open]').last();
+  await confirm.getByText('This service has 312 appointments on the calendar.').waitFor();
+  check(await confirm.getByRole('heading', { name: 'Delete service' }).isVisible() && await confirm.getByText('Are you sure you want to delete Private?').isVisible()
+    && await confirm.getByRole('button', { name: 'Cancel', exact: true }).isVisible() && await confirm.getByRole('button', { name: 'Delete', exact: true }).isVisible(),
+    'delete: the confirm says how many appointments use it and asks, with Delete and Cancel at the bottom');
+  check(sched.some(([n, svc, status]) => n === 'count appointments' && svc === 'eq.Private' && status === 'eq.BOOKED'), 'delete: counts only booked appointments of that service');
+  await shot(page, 'services-delete-confirm');
+  await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('heading', { name: 'Delete service' }).waitFor({ state: 'detached' });
+  check(!saved('delete_schedule_service').length, 'delete: Cancel deletes nothing');
+
+  await btn('Edit Gyrotonic').click();
+  await page.getByRole('heading', { name: 'Edit service' }).waitFor();
+  await dialog.getByRole('button', { name: 'Delete service' }).click();
+  await confirm.getByText('This service has 1 appointment on the calendar.').waitFor();
+  await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
+  check(await page.getByRole('heading', { name: 'Edit service' }).isVisible() && !(await page.getByRole('heading', { name: 'Delete service' }).count()),
+    'delete: Cancel on the confirm goes back to the edit dialog');
+  await dialog.getByRole('button', { name: 'Delete service' }).click();
+  await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByText('Deleted.', { exact: true }).waitFor();
+  check(saved('delete_schedule_service')[0]?.p_id === 'v-2' && !(await page.locator('dialog[open]').count()),
+    'delete: Delete in the edit dialog, then confirm, deletes that service and closes both dialogs');
   check(errors.length === 0, `services: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
@@ -1819,6 +1856,10 @@ for (const colorScheme of ['light', 'dark']) {
   await page.getByRole('heading', { name: 'Edit service' }).waitFor();
   check(await noOverflow(page), `services phone ${colorScheme}: dialog fits`);
   await shot(page, `services-phone-dialog-${colorScheme}`);
+  await page.locator('dialog[open]').getByRole('button', { name: 'Delete service' }).click();
+  await page.getByText('Are you sure you want to delete Private?').waitFor();
+  check(await noOverflow(page), `services phone ${colorScheme}: delete confirm fits`);
+  await shot(page, `services-phone-delete-${colorScheme}`);
   check(errors.length === 0, `services phone ${colorScheme}: no page errors ${errors.join(' | ')}`);
   await context.close();
 }

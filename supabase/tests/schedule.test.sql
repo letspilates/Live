@@ -265,6 +265,13 @@ select public.delete_schedule_category(current_setting('t.cat')::uuid);
 select t.check('empty category deleted, service kept without one', not exists (select 1 from public.schedule_categories
   where id = current_setting('t.cat')::uuid) and (select category_id is null and staff_ids is null from public.schedule_services
   where id = current_setting('t.svc')::uuid));
+select set_config('t.trio', public.save_schedule_service('{"name":"Trio","minutes":50,"capacity":3}')::text, true);
+select set_config('t.ta', public.save_appointment('{"start":"2026-11-03 10:00","minutes":50,"staff_id":null,
+  "service":"Trio","capacity":3,"clients":[]}')::text, true);
+select public.delete_schedule_service(current_setting('t.trio')::uuid);
+select t.check('service deleted, its appointments keep the name', not exists (select 1 from public.schedule_services
+  where id = current_setting('t.trio')::uuid) and (select service = 'Trio' and capacity = 3 from public.appointments
+  where id = current_setting('t.ta')::uuid));
 reset role;
 
 -- Admin: same as owner ---------------------------------------------------------------------
@@ -291,6 +298,7 @@ select t.expect_error('staff: no colors', '42501', $$select public.set_calendar_
 select t.expect_error('staff: no services', '42501', $$select public.save_schedule_service('{"name":"X","minutes":50,"capacity":1}')$$);
 select t.expect_error('staff: no categories', '42501', $$select public.save_schedule_category('{"name":"X"}')$$);
 select t.expect_error('staff: no reorder', '42501', $$select public.set_schedule_order(null, null)$$);
+select t.expect_error('staff: no service delete', '42501', $$select public.delete_schedule_service(gen_random_uuid())$$);
 select t.expect_error('staff: no text delay', '42501', $$select public.set_change_text_minutes(5)$$);
 select t.expect_error('staff: no import', '42501', $$select public.import_schedule('[]', false)$$);
 select t.check('staff: client search by name and phone', (select phone_last4 = '0101' from public.schedule_search_clients('mina'))
