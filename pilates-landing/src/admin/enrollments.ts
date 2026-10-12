@@ -24,6 +24,8 @@ export interface Course {
   desc_kr: string;
   /** Last day (YYYY-MM-DD) saved with the course; after it the site hides the course. */
   ends_on: string;
+  /** Seats held by hand (verbal yes); count as taken. */
+  held_seats: number;
 }
 
 /** public.training_courses row */
@@ -45,6 +47,7 @@ export interface CourseRow {
   desc_kr: string;
   active: boolean;
   ends_on: string | null;
+  held_seats: number | null;
 }
 
 /** public.training_registrations row */
@@ -64,7 +67,7 @@ export interface Registration {
   prereq: string;
   availability: string;
   anything_else: string;
-  source: 'form' | 'import';
+  source: 'form' | 'import' | 'manual';
 }
 
 export const CONDUCTORS = ["Master Trainer Rich O'Connor", 'Pre-Trainer Sunnie Lee'];
@@ -191,6 +194,48 @@ export const firstDateOf = (text: string, today = studioToday()): string => date
 /** Last date in the schedule text (the course's last day), or ''. */
 export const lastDateOf = (text: string, today = studioToday()): string => datesIn(text, today).at(-1) ?? '';
 
+/** One run of class days, YYYY-MM-DD (end may be '' for a single day). */
+export type DateRange = { start: string; end: string };
+
+/** Schedule text → date ranges, one per comma-separated part ("8/7 - 8/9, 8/13 - 8/16").
+ *  `anchor` picks the year for dates written without one (use the saved last day). */
+export function rangesOf(text: string, anchor = studioToday()): DateRange[] {
+  const all = datesIn(text, anchor);
+  const out: DateRange[] = [];
+  let i = 0;
+  for (const part of String(text || '').split(/\s*[,;\n]\s*/)) {
+    const n = datesIn(part, anchor).length;
+    if (!n) continue;
+    const ds = all.slice(i, i + n);
+    i += n;
+    if (ds.length) out.push({ start: ds[0], end: ds[ds.length - 1] });
+  }
+  return out;
+}
+
+const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+const endOf = (r: DateRange) => (r.end && r.end > r.start ? r.end : r.start);
+
+/** Ranges → the text the site shows: "10/29 - 11/1", "8/22", joined with ", ". */
+export function rangesText(rs: DateRange[]): string {
+  return rs
+    .filter((r) => r.start)
+    .map((r) => (endOf(r) === r.start ? md(r.start) : `${md(r.start)} - ${md(endOf(r))}`))
+    .join(', ');
+}
+
+/** Class days across all ranges. */
+export function rangesDays(rs: DateRange[]): number {
+  return rs
+    .filter((r) => r.start)
+    .reduce((n, r) => n + Math.round((Date.parse(endOf(r)) - Date.parse(r.start)) / 864e5) + 1, 0);
+}
+
+/** Last class day, or ''. */
+export function rangesEnd(rs: DateRange[]): string {
+  return rs.filter((r) => r.start).map(endOf).sort().at(-1) ?? '';
+}
+
 /** 0 → A … 25 → Z, 26 → AA */
 export function letterOf(i: number): string {
   let n = i + 1;
@@ -274,6 +319,7 @@ export function fromRow(r: CourseRow, regs: Registration[]): Course {
     desc_en: r.desc_en,
     desc_kr: r.desc_kr,
     ends_on: r.ends_on ?? '',
+    held_seats: r.held_seats ?? 0,
   };
 }
 
@@ -373,6 +419,7 @@ export function coursesFromCsv(text: string): Course[] {
         desc_en: get('desc_en'),
         desc_kr: get('desc_kr'),
         ends_on: '',
+        held_seats: 0,
       };
     })
     .filter((c) => c.name_en || c.name_kr || c.dates);

@@ -47,6 +47,7 @@ const REGS = [
 let saved = null;
 let imported = null;
 let deletedReg = null;
+let addedReg = null;
 let submitted = null;
 let browserCalledSheet = false;
 let loadMode = 'ok'; // 'ok' | 'fail'
@@ -195,6 +196,10 @@ async function open(who, width, path = '') {
   await context.route(`${SUPABASE}/rest/v1/rpc/import_training_registrations`, (r) => {
     imported = r.request().postDataJSON().p_rows;
     return r.fulfill({ json: imported.length });
+  });
+  await context.route(`${SUPABASE}/rest/v1/rpc/add_training_registration`, (r) => {
+    addedReg = r.request().postDataJSON().p;
+    return r.fulfill({ json: 'r-new' });
   });
   await context.route(`${SUPABASE}/rest/v1/rpc/delete_training_registration`, (r) => {
     deletedReg = r.request().postDataJSON().p_id;
@@ -347,13 +352,19 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   }
   await page.waitForURL(/\/admin\/trainings\/$/);
   check((await page.locator('h1').innerText()) === 'Trainings', `${device}: trainings page title`);
-  await page.getByLabel('Course name (English)').first().waitFor();
+  await page.getByRole('button', { name: /^Edit course:/ }).first().waitFor();
   check(!(await page.locator('iframe, input[type="password"]').count()), `${device}: no page-in-page, no second password`);
-  const names = await page.getByLabel('Course name (English)').evaluateAll((els) => els.map((e) => e.value));
-  check(names.join('|') === 'Jumping Stretching Board|Gyrotoner® Part 1|Old Course', `${device}: courses in schedule order, hidden last`);
+  const names = await page.getByRole('button', { name: /^Edit course:/ }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  check(names.join('|') === 'Edit course: Jumping Stretching Board|Edit course: Gyrotoner® Part 1|Edit course: Old Course', `${device}: courses in schedule order, hidden last`);
   check(await page.getByText('IDs were re-lettered').isVisible(), `${device}: tells the owner the letters changed`);
-  check(await page.getByText('Sign-ups 1/1').isVisible() && await page.getByText('Full', { exact: true }).isVisible(), `${device}: seat chips`);
-  check(await page.getByText('Early bird on').isVisible(), `${device}: early-bird status`);
+  check(await page.locator('text=1/1 · Full >> visible=true').first().isVisible(), `${device}: seats shown`);
+  check(await page.getByRole('region', { name: 'Hidden' }).isVisible(), `${device}: hidden courses grouped`);
+  await page.getByRole('button', { name: 'Edit course: Gyrotoner® Part 1' }).click();
+  const panel = page.locator('dialog[open]');
+  check(await panel.getByLabel('Early-bird fee', { exact: true }).isVisible(), `${device}: edit panel opens with the early bird`);
+  const pbox = await panel.boundingBox();
+  check(pbox && pbox.x >= 0 && pbox.x + pbox.width <= width + 1, `${device}: edit panel inside the screen`);
+  await page.keyboard.press('Escape');
   await page.getByRole('tab', { name: /Registrants/ }).click();
   await page.getByText('Mina Cho').waitFor();
   check(await page.getByRole('link', { name: 'mina@example.com' }).isVisible(), `${device}: registrant contact links`);
@@ -434,31 +445,73 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
 // 5. Saving courses: what goes to save_training_courses
 {
   saved = null;
-  const { page, context } = await open('OWNER', 1280, 'trainings/');
-  await page.getByLabel('Course name (English)').first().waitFor();
-  const jump = page.locator('section').filter({ has: page.locator('input[value="Jumping Stretching Board"]') });
-  await jump.getByLabel('Length (days)').fill('1');
-  check(await page.getByText('Unsaved changes').isVisible() || await page.getByText('IDs were re-lettered').isVisible(), 'edit marks the page as changed');
-  const gyro = page.locator('section').filter({ has: page.locator('input[value="Gyrotoner® Part 1"]') });
-  await gyro.getByLabel('Use an early-bird fee').uncheck();
-  await page.getByRole('button', { name: 'Add course' }).click();
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await page.getByText('Saved. The site shows the change now.').waitFor();
-  const byName = Object.fromEntries((saved ?? []).map((c) => [c.name_en, c]));
-  check(saved?.length === 3, 'empty new course is not saved');
+  const { page, context, errors } = await open('OWNER', 1280, 'trainings/');
+  await page.getByRole('button', { name: /^Edit course:/ }).first().waitFor();
+  // Switch saves right away.
+  await page.getByRole('switch', { name: 'Show on the site: Old Course' }).check({ force: true });
+  await page.getByText('Shown on the site.').waitFor();
+  let byName = Object.fromEntries((saved ?? []).map((c) => [c.name_en, c]));
+  check(saved?.length === 3 && byName['Old Course']?.active === true, 'switch shows a hidden course right away');
   check(saved?.map((c) => c.code).join() === 'A,B,C', 'saved IDs follow schedule order');
   check(byName['Jumping Stretching Board']?.id === 'c-b' && byName['Old Course']?.id === 'c-c', 'existing courses keep their database id');
-  check(byName['Jumping Stretching Board']?.length_days === '1', 'day count saved as length');
-  check(byName['Gyrotoner® Part 1']?.fee_early === '' && byName['Gyrotoner® Part 1']?.early_until === '', 'early bird switched off is saved empty');
-  check(byName['Gyrotoner® Part 1']?.desc_kr === '한글 설명', 'Korean description is kept');
-  check(byName['Old Course']?.active === false, 'hidden course stays hidden');
   check(!('taken' in (saved?.[0] ?? {})) && !('key' in (saved?.[0] ?? {})) && !('tag_en' in (saved?.[0] ?? {})), 'no screen-only fields sent');
 
+  // Edit panel: early bird off, new instructor, held seat.
+  saved = null;
+  await page.getByRole('button', { name: 'Edit course: Gyrotoner® Part 1' }).click();
+  const panel = page.locator('dialog[open]');
+  await panel.getByRole('switch', { name: 'Use an early-bird fee' }).uncheck({ force: true });
+  await panel.getByLabel('Conducted by').selectOption({ label: '+ Add instructor' });
+  await panel.getByLabel('New instructor name').fill('Pre-Trainer Test');
+  await panel.getByRole('button', { name: 'One more' }).nth(1).click();
+  await panel.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByText('Saved. The site shows the change now.').waitFor();
+  byName = Object.fromEntries((saved ?? []).map((c) => [c.name_en, c]));
+  const g = byName['Gyrotoner® Part 1'];
+  check(g?.fee_early === '' && g?.early_until === '', 'early bird switched off is saved empty');
+  check(g?.conducted_by === 'Pre-Trainer Test', 'new instructor saved with the course');
+  check(g?.held_seats === 1, 'held seat saved');
+  check(g?.desc_kr === '한글 설명' && g?.dates === '11/14 - 11/16' && g?.length_days === '3' && /^\d{4}-11-16$/.test(g?.ends_on), 'schedule, days, last day and Korean description kept');
+  check(!(await page.locator('dialog[open]').count()), 'panel closes after saving');
+
+  // New course from date pickers; a name is required.
+  saved = null;
+  await page.getByRole('button', { name: 'Add course' }).click();
+  await panel.getByRole('button', { name: 'Save', exact: true }).click();
+  check(await panel.getByText('Enter the English course name.').isVisible() && saved === null, 'new course needs a name');
+  await panel.getByLabel('English', { exact: true }).fill('New Course');
+  await panel.getByLabel('First day').fill('2099-03-01');
+  await panel.getByLabel('Last day').fill('2099-03-03');
+  check(await panel.getByText('3 days · shows as "3/1 - 3/3"').isVisible(), 'schedule summary from the dates');
+  await panel.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByText('Saved. The site shows the change now.').waitFor();
+  const n = (saved ?? []).find((c) => c.name_en === 'New Course');
+  check(n && n.id === '' && n.dates === '3/1 - 3/3' && n.length_days === '3' && n.ends_on === '2099-03-03' && n.capacity === '8', 'new course saved from the date pickers');
+
   // Delete asks first
-  await gyro.getByRole('button', { name: 'Delete course' }).click();
-  check(await page.locator('dialog[open]').getByText('Gyrotoner® Part 1').isVisible(), 'delete asks for confirmation');
-  await page.locator('dialog[open]').getByRole('button', { name: 'Delete' }).click();
-  check((await page.getByLabel('Course name (English)').count()) === 2, 'course removed from the list');
+  saved = null;
+  await page.getByRole('button', { name: 'Edit course: Gyrotoner® Part 1' }).click();
+  await panel.getByRole('button', { name: 'Delete course' }).click();
+  const confirm = page.locator('dialog[open]').filter({ hasText: 'Delete the course' });
+  check(await confirm.getByText('Gyrotoner® Part 1').isVisible(), 'delete asks for confirmation');
+  await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByText('Course deleted.').waitFor();
+  check(saved?.length === 2 && !saved.some((c) => c.id === 'c-a'), 'deleted course left out of the save');
+
+  // Registrant added by hand
+  addedReg = null;
+  await page.getByRole('tab', { name: /Registrants/ }).click();
+  await page.getByRole('button', { name: 'Add registrant' }).click();
+  const add = page.locator('dialog[open]');
+  await add.getByRole('button', { name: 'Add', exact: true }).click();
+  check(await add.getByText('Enter a name and pick at least one course.').isVisible() && addedReg === null, 'hand add needs a name and a course');
+  await add.getByLabel('Full name').fill('Jae Lee');
+  await add.getByLabel('Phone (optional)').fill('213-555-0100');
+  await add.getByRole('checkbox', { name: /Gyrotoner/ }).check();
+  await add.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByText('Registrant added.').waitFor();
+  check(addedReg?.full_name === 'Jae Lee' && addedReg.course_ids.join() === 'c-a' && addedReg.email === '', 'hand add sends name, phone and course');
+  check(errors.length === 0, `courses: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 
@@ -470,7 +523,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   check(await noOverflow(page), 'error message fits the phone');
   loadMode = 'ok';
   await page.getByRole('button', { name: 'Try again' }).click();
-  await page.getByLabel('Course name (English)').first().waitFor();
+  await page.getByRole('button', { name: /^Edit course:/ }).first().waitFor();
   check(true, 'try again loads the courses');
   await context.close();
 }
@@ -480,16 +533,14 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   saved = null;
   imported = null;
   const { page, context, errors } = await open('OWNER', 1280, 'trainings/');
-  await page.getByLabel('Course name (English)').first().waitFor();
+  await page.getByRole('button', { name: /^Edit course:/ }).first().waitFor();
   const coursesCsv =
     'id,name_en,name_kr,dates,tag_en,tag_kr,active,capacity,time,price,desc_en,desc_kr,fee,conducted_by,fee_early,early_until\n' +
     'A,"Level 1, Foundation",기초,12/1 - 12/12,12 days,12일,TRUE,8,,,,,$400,,,\n' +
     'B,Jumping Stretching Board,점핑 보드,,2 days,2일,TRUE,,,,,,,,,\n';
   await page.locator('input[type="file"]').setInputFiles({ name: 'Courses.csv', mimeType: 'text/csv', buffer: Buffer.from(coursesCsv) });
-  await page.getByText('Courses added from the file: 1.').waitFor({ timeout: 5000 }).catch(() => {});
-  check(await page.getByText('Courses added from the file: 1.').isVisible(), 'course CSV adds only the new course');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await page.getByText('Saved. The site shows the change now.').waitFor();
+  await page.getByText('Courses added from the file and saved: 1.').waitFor({ timeout: 5000 }).catch(() => {});
+  check(await page.getByText('Courses added from the file and saved: 1.').isVisible(), 'course CSV adds only the new course, saved right away');
   const lvl = (saved ?? []).find((c) => c.name_en === 'Level 1, Foundation');
   check(lvl && lvl.id === '' && lvl.length_days === '12' && lvl.capacity === '8' && lvl.fee === '$400', 'imported course saved as a new row');
 

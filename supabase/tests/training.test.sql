@@ -146,6 +146,37 @@ select t.check('owner: 3 registrations', (select count(*) = 3 from public.traini
 select t.expect_error('owner: no direct delete', '42501', $$delete from public.training_registrations$$);
 reset role;
 
+-- Seats held by hand and registrants added by hand -------------------------------------
+update public.training_courses set held_seats = 1 where code = 'A';  -- capacity 2, 1 sign-up
+select t.as_anon();
+select t.check('held seats count as taken', (select (c ->> 'taken')::int = 2
+  from jsonb_array_elements(public.public_training_courses()) c where c ->> 'id' = 'A'));
+select t.expect_error('held seats make the course full', '22023', format(
+  $$select public.submit_training_registration('{"course_ids":["%s"],"full_name":"X","email":"x@y.z","phone":"1","certification":"c"}')$$,
+  current_setting('t.course_a')));
+select t.expect_error('anon: cannot add by hand', '42501',
+  $$select public.add_training_registration('{"full_name":"X"}')$$);
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b1');
+select t.expect_error('instructor: cannot add by hand', '42501',
+  $$select public.add_training_registration('{"full_name":"X"}')$$);
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select set_config('t.manual', public.add_training_registration(jsonb_build_object(
+  'course_ids', jsonb_build_array(current_setting('t.course_a')), 'full_name', ' Jae Lee ',
+  'phone', '213-555-0100', 'note', 'said yes on the phone'))::text, true);
+select t.check('owner: adds a registrant by hand, no email', (select r.source = 'manual' and r.email = ''
+  and r.full_name = 'Jae Lee' and r.phone = '213-555-0100' and r.courses_text like 'A - %'
+  and r.questions = 'said yes on the phone'
+  from public.training_registrations r where r.id = current_setting('t.manual')::uuid));
+select t.expect_error('owner: hand add needs a name', '23514', format(
+  $$select public.add_training_registration('{"course_ids":["%s"],"full_name":" "}')$$, current_setting('t.course_a')));
+select t.expect_error('owner: hand add needs a course', '22023',
+  $$select public.add_training_registration('{"full_name":"X"}')$$);
+select t.expect_error('owner: hand add checks email', '23514', format(
+  $$select public.add_training_registration('{"course_ids":["%s"],"full_name":"X","email":"nope"}')$$, current_setting('t.course_a')));
+reset role;
+
 select app.check_api_exposure();
 
 rollback;
