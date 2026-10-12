@@ -229,6 +229,42 @@ select t.check('text delay saved', (select change_text_minutes = 30 from public.
 select public.set_change_text_minutes(null);
 select t.check('text delay off', (select change_text_minutes is null from public.schedule_settings));
 select public.save_schedule_service('{"name":"Private","minutes":50,"capacity":1,"active":true}');
+
+-- Categories and service details (Settings › Schedule)
+select t.check('categories seeded with their services', (select count(*) = 3 from public.schedule_categories)
+  and (select c.name = 'Pilates Classes' from public.schedule_services s join public.schedule_categories c on c.id = s.category_id
+        where s.name = 'Pilates Group'));
+select set_config('t.cat', public.save_schedule_category('{"name":"Workshops"}')::text, true);
+select t.expect_error('category name unique', '23505', $$select public.save_schedule_category('{"name":" workshops "}')$$);
+select set_config('t.svc', public.save_schedule_service(jsonb_build_object('name', 'Mat Workshop', 'minutes', 90, 'capacity', 8,
+  'category_id', current_setting('t.cat'), 'price_cents', 4500, 'cleanup_minutes', 10, 'description', 'Bring socks',
+  'staff_ids', json_build_array('00000000-0000-0000-0000-0000000000b2')))::text, true);
+select t.check('service saved with category, price, cleanup, description, instructors', exists (select 1 from public.schedule_services
+  where id = current_setting('t.svc')::uuid and category_id = current_setting('t.cat')::uuid and price_cents = 4500
+    and cleanup_minutes = 10 and description = 'Bring socks' and staff_ids = array['00000000-0000-0000-0000-0000000000b2'::uuid]
+    and sort = 6));
+select set_config('t.mw', public.save_appointment('{"start":"2026-11-02 10:00","minutes":90,"staff_id":null,
+  "service":"Mat Workshop","capacity":8,"clients":[]}')::text, true);
+select public.save_schedule_service(jsonb_build_object('id', current_setting('t.svc'), 'name', 'Mat Class', 'minutes', 90, 'capacity', 8));
+select t.check('rename keeps the other details and renames its appointments',
+  (select service = 'Mat Class' from public.appointments where id = current_setting('t.mw')::uuid)
+  and exists (select 1 from public.schedule_services where id = current_setting('t.svc')::uuid and name = 'Mat Class'
+               and price_cents = 4500 and category_id = current_setting('t.cat')::uuid and staff_ids is not null));
+select t.expect_error('rename onto another service', '23505', $$select public.save_schedule_service(
+  jsonb_build_object('id', current_setting('t.svc'), 'name', 'private', 'minutes', 90, 'capacity', 8))$$);
+select t.expect_error('at least one instructor', '22023',
+  $$select public.save_schedule_service('{"name":"Y","minutes":50,"capacity":1,"staff_ids":[]}')$$);
+select t.expect_error('category with services stays', '23503',
+  $$select public.delete_schedule_category(current_setting('t.cat')::uuid)$$);
+select public.set_schedule_order(array[current_setting('t.cat')::uuid], array[current_setting('t.svc')::uuid]);
+select t.check('drag order saved', (select sort = 1 from public.schedule_categories where id = current_setting('t.cat')::uuid)
+  and (select sort = 1 from public.schedule_services where id = current_setting('t.svc')::uuid));
+select public.save_schedule_service(jsonb_build_object('id', current_setting('t.svc'), 'name', 'Mat Class', 'minutes', 90,
+  'capacity', 8, 'category_id', null, 'staff_ids', null));
+select public.delete_schedule_category(current_setting('t.cat')::uuid);
+select t.check('empty category deleted, service kept without one', not exists (select 1 from public.schedule_categories
+  where id = current_setting('t.cat')::uuid) and (select category_id is null and staff_ids is null from public.schedule_services
+  where id = current_setting('t.svc')::uuid));
 reset role;
 
 -- Admin: same as owner ---------------------------------------------------------------------
@@ -243,8 +279,8 @@ reset role;
 -- Staff with Schedule access (default): calendar yes, settings no ---------------------------
 select t.login('00000000-0000-0000-0000-0000000000b1');
 select t.check('staff reads the calendar', (select count(*) > 0 from public.appointments)
-  and (select count(*) > 0 from public.appointment_clients) and (select count(*) = 5 from public.schedule_services)
-  and (select count(*) = 1 from public.schedule_settings));
+  and (select count(*) > 0 from public.appointment_clients) and (select count(*) = 6 from public.schedule_services)
+  and (select count(*) = 3 from public.schedule_categories) and (select count(*) = 1 from public.schedule_settings));
 select set_config('t.st', public.save_appointment('{"start":"2026-10-30 12:00","minutes":50,"staff_id":null,
   "service":"Workshop","capacity":8,"clients":[{"student_id":"00000000-0000-0000-0000-0000000000c2"}]}')::text, true);
 select public.move_appointment(current_setting('t.st')::uuid, '2026-10-30 13:00');
@@ -253,6 +289,8 @@ select t.check('staff saves, moves, cancels', (select status = 'CANCELLED' and c
   from public.appointments where id = current_setting('t.st')::uuid) and t.la(current_setting('t.st')::uuid) = '2026-10-30 13:00');
 select t.expect_error('staff: no colors', '42501', $$select public.set_calendar_color('00000000-0000-0000-0000-0000000000b2', '#3C78C8')$$);
 select t.expect_error('staff: no services', '42501', $$select public.save_schedule_service('{"name":"X","minutes":50,"capacity":1}')$$);
+select t.expect_error('staff: no categories', '42501', $$select public.save_schedule_category('{"name":"X"}')$$);
+select t.expect_error('staff: no reorder', '42501', $$select public.set_schedule_order(null, null)$$);
 select t.expect_error('staff: no text delay', '42501', $$select public.set_change_text_minutes(5)$$);
 select t.expect_error('staff: no import', '42501', $$select public.import_schedule('[]', false)$$);
 select t.check('staff: client search by name and phone', (select phone_last4 = '0101' from public.schedule_search_clients('mina'))
@@ -262,7 +300,8 @@ reset role;
 -- Instructor without Schedule access: nothing ------------------------------------------------
 select t.login('00000000-0000-0000-0000-0000000000b2');
 select t.check('instructor reads 0 rows', (select count(*) = 0 from public.appointments)
-  and (select count(*) = 0 from public.appointment_clients) and (select count(*) = 0 from public.schedule_services));
+  and (select count(*) = 0 from public.appointment_clients) and (select count(*) = 0 from public.schedule_services)
+  and (select count(*) = 0 from public.schedule_categories));
 select t.expect_error('instructor cannot save', '42501',
   $$select public.save_appointment('{"start":"2026-10-30 12:00","minutes":50,"service":"Private","capacity":1,"clients":[]}')$$);
 select t.expect_error('instructor cannot move', '42501',

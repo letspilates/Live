@@ -140,7 +140,7 @@ export default function Schedule() {
   useEffect(() => {
     let stale = false;
     Promise.all([loadInstructors(), loadServices()])
-      .then(([instructors, services]) => !stale && setSetup({ instructors, services }))
+      .then(([instructors, { services }]) => !stale && setSetup({ instructors, services }))
       .catch(() => !stale && setFailed(true));
     return () => {
       stale = true;

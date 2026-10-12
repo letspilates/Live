@@ -46,10 +46,25 @@ export interface Instructor {
   color: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  sort: number;
+}
+
 export interface Service {
+  id: string;
   name: string;
   minutes: number;
   capacity: number;
+  active: boolean;
+  sort: number;
+  category_id: string | null;
+  price_cents: number | null;
+  cleanup_minutes: number;
+  description: string;
+  /** Instructors who teach it; null = every instructor. */
+  staff_ids: string[] | null;
 }
 
 // Schedulista's block colors, the fallback when an instructor has no color yet.
@@ -114,16 +129,19 @@ export async function loadInstructors(): Promise<Instructor[]> {
   return (data as Omit<Instructor, 'color'>[]).map((r, i) => ({ ...r, color: r.calendar_color ?? PALETTE[i % PALETTE.length] }));
 }
 
-/** Services for the picker (Settings › Schedule), in their set order. */
-export async function loadServices(): Promise<Service[]> {
-  const { data, error } = await supabase!
+/** Categories and services in their set order (Settings › Schedule); only active services unless all. */
+export async function loadServices(all = false): Promise<{ categories: Category[]; services: Service[] }> {
+  let services = supabase!
     .from('schedule_services')
-    .select('name, minutes, capacity')
-    .eq('active', true)
-    .order('sort')
-    .order('name');
-  if (error) throw error;
-  return data as Service[];
+    .select('id, name, minutes, capacity, active, sort, category_id, price_cents, cleanup_minutes, description, staff_ids');
+  if (!all) services = services.eq('active', true);
+  const [c, s] = await Promise.all([
+    supabase!.from('schedule_categories').select('id, name, sort').order('sort').order('name'),
+    services.order('sort').order('name'),
+  ]);
+  if (c.error) throw c.error;
+  if (s.error) throw s.error;
+  return { categories: c.data as Category[], services: s.data as Service[] };
 }
 
 /* ───────────── Studio time ───────────── */
