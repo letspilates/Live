@@ -161,6 +161,8 @@ select t.login('00000000-0000-0000-0000-0000000000b1');
 select t.check('A: corrects own payment today', (select amount_cents = 12000 and method = 'DEBIT'
   from public.correct_payment(current_setting('t.a1')::uuid, 12000, 'DEBIT', 'fixed', 'typo')));
 select t.check('A: audit log hidden from staff', (select count(*) = 0 from public.audit_logs));
+select t.expect_error('A: cannot move a payment to another day', '42501',
+  format($$select public.correct_payment('%s', 12000, 'DEBIT', p_business_date => current_date - 1)$$, current_setting('t.a1')));
 reset role;
 select t.check('A: correction audited with reason', (select count(*) = 1 from public.audit_logs
   where entity_type = 'payment_transactions' and action = 'update' and reason = 'typo'
@@ -183,6 +185,11 @@ reset role;
 select t.login('00000000-0000-0000-0000-0000000000a1');
 select t.check('owner: corrects any open-month payment', (select amount_cents = 5000
   from public.correct_payment(current_setting('t.a3')::uuid, 5000, 'VENMO')));
+select t.check('owner: edit moves the date', (select business_date = current_date - 2
+  from public.correct_payment(current_setting('t.a3')::uuid, 5000, 'VENMO', p_business_date => current_date - 2)));
+select t.expect_error('owner: edit cannot move to the future', '22023',
+  format($$select public.correct_payment('%s', 5000, 'VENMO', p_business_date => current_date + 3)$$, current_setting('t.a3')));
+select public.correct_payment(current_setting('t.a3')::uuid, 5000, 'VENMO', p_business_date => current_date - 1);
 reset role;
 
 -- Refunds (owner only) -------------------------------------------------------------------

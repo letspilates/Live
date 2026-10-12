@@ -662,7 +662,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   await day.getByRole('button', { name: /Mina Cho/ }).click();
   const dialog = page.locator('dialog[open]');
   await shot(page, 'phone-dialog');
-  check(await dialog.getByRole('button', { name: 'Correct' }).isVisible() && !(await dialog.getByRole('button', { name: 'Refund' }).count()), 'history: correct today, no refund for staff');
+  check(await dialog.getByRole('button', { name: 'Edit' }).isVisible() && !(await dialog.getByRole('button', { name: 'Refund' }).count()), 'history: correct today, no refund for staff');
   calls.length = 0;
   await dialog.getByRole('button', { name: 'Void' }).click();
   await dialog.getByRole('button', { name: 'Void' }).click();
@@ -704,6 +704,16 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     check(calls.find(([n]) => n === 'record_payment')?.[1].p_business_date === LA_YESTERDAY, 'desktop owner: back-dated payment sends the date');
     await page.getByRole('button', { name: 'Record another' }).click();
     check(await page.getByLabel('Payment date').inputValue() === LA_TODAY, 'desktop owner: date resets to today');
+    // Edit an existing payment: the owner can move it to another day
+    calls.length = 0;
+    await day.getByRole('button', { name: /Leo Park/ }).click();
+    const dlg = page.locator('dialog[open]');
+    await dlg.getByRole('button', { name: 'Edit' }).click();
+    check(await dlg.getByText('Edit payment').isVisible() && await dlg.getByLabel('Payment date').inputValue() === LA_TODAY, 'desktop owner: edit shows the payment date');
+    await dlg.getByLabel('Payment date').fill(LA_YESTERDAY);
+    await dlg.getByRole('button', { name: 'Save' }).click();
+    await page.getByText('Payment updated.').waitFor();
+    check(calls.find(([n]) => n === 'correct_payment')?.[1].p_business_date === LA_YESTERDAY, 'desktop owner: edit sends the new date');
   }
   await shot(page, `${device}-owner-record`);
   await day.getByRole('button', { name: 'All transactions' }).click();

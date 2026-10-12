@@ -87,7 +87,7 @@ reset role;
 -- 4. Refunds never add up to more than the payment ---------------------------------------
 select t.check('correct_payment locks the refunded payment', (
   select prosrc ~ 'related_transaction_id\s+for update' from pg_proc
-   where oid = 'public.correct_payment(uuid,bigint,text,text,text,uuid,text)'::regprocedure));
+   where oid = 'public.correct_payment(uuid,bigint,text,text,text,uuid,text,date)'::regprocedure));
 select t.login('00000000-0000-0000-0000-0000000000a1');
 select set_config('t.pay', (public.record_payment(gen_random_uuid(), 10000, 'CASH', null, 'Walk-in A',
   p_collected_by => '00000000-0000-0000-0000-0000000000b1')).id::text, true);

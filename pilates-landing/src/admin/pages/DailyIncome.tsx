@@ -1014,6 +1014,7 @@ function PaymentDialog({
   const [methodOther, setMethodOther] = useState(p.method_other);
   const [collector, setCollector] = useState(p.collected_by);
   const [notes, setNotes] = useState(p.notes);
+  const [day, setDay] = useState(p.business_date);
   const [reason, setReason] = useState('');
   const [refunded, setRefunded] = useState<number | null>(null);
   const [requestId] = useState(() => crypto.randomUUID());
@@ -1069,6 +1070,7 @@ function PaymentDialog({
             p_notes: notes.trim(),
             p_reason: reason.trim(),
             p_collected_by: collector,
+            ...(owner && day !== p.business_date ? { p_business_date: day } : {}),
           })
         : mode === 'void'
           ? supabase!.rpc('void_payment', { p_id: p.id, p_reason: reason.trim() })
@@ -1183,6 +1185,15 @@ function PaymentDialog({
                 otherError={tried && otherMissing ? t('enterMethodOther') : undefined}
               />
             </>
+          )}
+          {mode === 'correct' && owner && (
+            <TextField
+              label={t('paymentDate')}
+              type="date"
+              max={laToday()}
+              value={day}
+              onChange={(e) => e.target.value && setDay(e.target.value)}
+            />
           )}
           {mode === 'correct' && <CollectorSelect collectors={collectors} value={collector} onChange={setCollector} />}
           {mode === 'correct' && (
