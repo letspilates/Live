@@ -166,6 +166,9 @@ const APPTS = [
   // Starts while the 9:00 blocks are still running: drawn on top, pushed in by half.
   { id: 'a-5', starts_at: laISO(LA_TODAY, 570), minutes: 30, staff_id: 'i-sun', service: 'Gyrotonic', capacity: 1, series_id: null, series_changed: false,
     status: 'BOOKED', appointment_clients: [booking({ id: 'b-6', client_name: 'Noa Han' })] },
+  // The client didn't come: striped like a late cancel.
+  { id: 'a-6', starts_at: laISO(LA_TODAY, 1020), minutes: 50, staff_id: 'i-suk', service: 'Private', capacity: 1, series_id: null, series_changed: false,
+    status: 'BOOKED', appointment_clients: [booking({ id: 'b-7', client_name: 'Rio Song', status: 'NO_SHOW' })] },
 ];
 const INSTRUCTORS = [{ user_id: 'i-suk', full_name: 'Su kyung YI', calendar_color: '#EEBC43', active: true },
   { user_id: 'i-sun', full_name: 'Sunnie Lee', calendar_color: null, active: true }];
@@ -1438,7 +1441,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await context.close();
 }
 
-// 22. Schedule: studio time whatever the browser's zone, edit, drag to move + Undo, cancel; who may open it
+// 22. Schedule: studio time whatever the browser's zone, edit, drag to move + Undo, cancel / no-show; who may open it
 {
   sched.length = 0;
   const { page, context, errors } = await open('OWNER', 1280, 'schedule/', { timezoneId: 'Asia/Seoul' });
@@ -1462,14 +1465,53 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   check(p?.id === 'a-1' && p.start === `${LA_TODAY} 09:00` && p.minutes === 50 && p.staff_id === 'i-sun' && p.scope === 'one'
     && p.clients.length === 1 && p.clients[0].id === 'b-1' && p.clients[0].student_id === 's-mina', 'schedule: edit saves 09:00 studio time, booking kept');
 
-  // Drag the 2-hour workshop down one hour: confirm, then Undo.
+  // Close X instead of a Cancel button; Cancel Appointment stands out (danger). Duration steps by 5 with − / +.
+  sched.length = 0;
+  await mina.click();
+  const dlg = page.locator('dialog[open]');
+  await dlg.getByRole('heading', { name: 'Edit Appointment' }).waitFor();
+  check(await dlg.getByRole('button', { name: 'Close' }).isVisible() && !(await dlg.getByRole('button', { name: 'Cancel', exact: true }).count()),
+    'schedule: edit dialog has a Close X and no Cancel button');
+  check((await dlg.getByRole('button', { name: 'Cancel Appointment' }).getAttribute('class')).includes('bg-red-700'), 'schedule: Cancel Appointment is a danger button');
+  await dlg.getByRole('button', { name: '5 minutes longer' }).click();
+  check(await dlg.getByText('to 9:55 am').isVisible(), 'schedule: + makes it 55 minutes, the end time follows');
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  await dlg.waitFor({ state: 'detached' });
+  check(sched.find(([n]) => n === 'save_appointment')?.[1]?.p?.minutes === 55, 'schedule: + then Save sends 55 minutes');
+  sched.length = 0;
+  await mina.click();
+  await dlg.getByLabel('Duration').fill('80');
+  check(await dlg.getByText('(1 hr 20 min)').isVisible() && await dlg.getByText('to 10:20 am').isVisible(), 'schedule: typing 80 shows (1 hr 20 min) and the end time');
+
+  // Services grouped by category; only what the chosen instructor teaches.
+  const offered = () => dlg.getByLabel('Service').evaluate((el) => [...el.options].map((o) => o.value));
+  check((await offered()).includes('Private') && !(await offered()).includes('Gyrotonic Group'), 'schedule: Sunnie Lee is not offered Gyrotonic Group');
+  await dlg.getByLabel('Instructor').selectOption({ label: 'Su kyung YI' });
+  check((await offered()).includes('Gyrotonic Group'), 'schedule: Su kyung YI is offered Gyrotonic Group');
+  const groups = await dlg.getByLabel('Service').evaluate((el) => [...el.querySelectorAll('optgroup')].map((g) => `${g.label}: ${[...g.children].map((o) => o.value).join(', ')}`));
+  check(groups.join(' | ') === 'Individual Classes: Private, Gyrotonic | Pilates Classes: Pilates Group | Gyrotonic Classes: Gyrotonic Group',
+    `schedule: services grouped by category in order ${groups.join(' | ')}`);
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  check(!sched.some(([n]) => n === 'save_appointment'), 'schedule: the Close X closes without saving');
+
+  // Drag the 2-hour workshop down one hour: the Close X puts it back; drag again, confirm, then Undo.
   const w = await workshop.boundingBox();
-  await page.mouse.move(w.x + w.width / 2, w.y + 20);
-  await page.mouse.down();
-  await page.mouse.move(w.x + w.width / 2, w.y + 20 + w.height / 4, { steps: 6 });
-  await page.mouse.move(w.x + w.width / 2, w.y + 20 + w.height / 2, { steps: 6 });
-  await page.mouse.up();
-  await page.getByRole('heading', { name: 'Move Event' }).waitFor();
+  const dragDown = async () => {
+    await page.mouse.move(w.x + w.width / 2, w.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(w.x + w.width / 2, w.y + 20 + w.height / 4, { steps: 6 });
+    await page.mouse.move(w.x + w.width / 2, w.y + 20 + w.height / 2, { steps: 6 });
+    await page.mouse.up();
+    await page.getByRole('heading', { name: 'Move Event' }).waitFor();
+  };
+  await dragDown();
+  check(!(await dlg.getByRole('button', { name: 'Cancel', exact: true }).count()), 'schedule: move dialog has no Cancel button');
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  check(!(await page.locator('[data-grid] button[aria-hidden="true"]').count()) && (await workshop.evaluate((el) => getComputedStyle(el).opacity)) === '1'
+    && !sched.some(([n]) => n === 'move_appointment'), 'schedule: Close X on the move dialog brings the block back, nothing sent');
+  await dragDown();
   await page.getByRole('button', { name: 'Move', exact: true }).click();
   await page.getByRole('button', { name: 'Undo' }).waitFor();
   const mv = sched.filter(([n]) => n === 'move_appointment').map(([, b]) => b);
@@ -1492,17 +1534,35 @@ for (const [device, width] of Object.entries(WIDTHS)) {
 
   // Late cancel: striped block, the hover details say so; the cancel step can mark it instead of removing it.
   const late = page.getByRole('button', { name: /Kai Moon - Private/ });
-  check((await late.evaluate((el) => getComputedStyle(el).backgroundImage)).includes('repeating-linear-gradient')
-    && !(await mina.evaluate((el) => getComputedStyle(el).backgroundImage)).includes('gradient'), 'schedule: late cancel is striped, others are not');
+  const noShow = page.getByRole('button', { name: /Rio Song - Private/ });
+  const stripes = (el) => getComputedStyle(el).backgroundImage.includes('repeating-linear-gradient');
+  check(await late.evaluate(stripes) && await noShow.evaluate(stripes) && !(await mina.evaluate((el) => getComputedStyle(el).backgroundImage)).includes('gradient'),
+    'schedule: late cancel and no-show are striped, others are not');
   await late.hover();
   await page.getByText('Late cancel', { exact: true }).waitFor();
   await shot(page, 'schedule-week-late-cancel');
   check(true, 'schedule: hover details say Late cancel');
+  await noShow.hover();
+  await page.getByText('No-show', { exact: true }).waitFor();
+  check(!(await page.getByText('Late cancel', { exact: true }).count()), 'schedule: hover details say No-show for a no-show');
   await page.mouse.move(5, 5);
+
+  // No-show from the cancel step: every booking marked, the class stays on the calendar.
+  sched.length = 0;
+  await group.click();
+  await dlg.getByRole('button', { name: 'Cancel Class' }).click();
+  await dlg.getByText(/Late cancel and No-show keep it on the calendar/).waitFor();
+  const steps = await dlg.locator('div', { has: page.getByText('Take it off the calendar?') }).last().getByRole('button').allInnerTexts();
+  check(steps.join(' · ') === 'Keep it · No-show · Late cancel · Cancel Class', `schedule: cancel step buttons in order (${steps.join(' · ')})`);
+  await dlg.getByRole('button', { name: 'No-show', exact: true }).click();
+  await dlg.waitFor({ state: 'detached' });
+  const ns = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
+  check(ns?.id === 'a-2' && ns.clients.length === 2 && ns.clients.every((x) => x.status === 'NO_SHOW') && !sched.some(([n]) => n === 'cancel_appointment'),
+    'schedule: No-show keeps the class and marks every booking');
   sched.length = 0;
   await mina.click();
   await page.getByRole('button', { name: 'Cancel Appointment' }).click();
-  await page.getByText(/Late cancel keeps it on the calendar/).waitFor();
+  await page.getByText(/Late cancel and No-show keep it on the calendar/).waitFor();
   await page.getByRole('button', { name: 'Late cancel', exact: true }).click();
   await page.getByRole('heading', { name: 'Edit Appointment' }).waitFor({ state: 'detached' });
   const lc = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;

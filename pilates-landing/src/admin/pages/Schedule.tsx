@@ -18,6 +18,7 @@ import { Check, ChevronLeft, ChevronRight, FileText, Plus, RotateCw, Search, Set
 import { isAdmin, useStaff } from '../auth';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
+import MinutesInput from '../MinutesInput';
 import { addDays, formatDay, laToday, type StudentHit } from '../payments';
 import { navigate } from '../router';
 import {
@@ -45,6 +46,7 @@ import {
   type Appointment,
   type Booking,
   type BookingStatus,
+  type Category,
   type Instructor,
   type Service,
 } from '../schedule';
@@ -75,16 +77,15 @@ type Spot = { a: Appointment; day: string; min: number; minutes?: number };
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 const MINI = { size: 12, strokeWidth: 2.5, 'aria-hidden': true } as const;
-const DURATIONS = [30, 40, 45, 50, 55, 60, 80, 90, 110, 120, 180, 360];
 const SNAP = 15;
 const GUTTER = 16; // px kept free on the right of each day, to click for a new appointment at that time
 const LINE = 'rgb(var(--c-ink) / 0.08)';
 const SHADOW = '[text-shadow:0_1px_1px_rgb(0_0_0/0.28)]';
 const STRIPES = 'repeating-linear-gradient(135deg, rgb(255 255 255 / 0.5) 0 5px, transparent 5px 10px)';
-/** Everyone booked cancelled the same day: the block stays on the calendar, striped (like Schedulista). */
-const lateCancelled = (a: Appointment) => a.clients.length > 0 && a.clients.every((b) => b.status === 'LATE_CANCEL');
-const paint = (a: Appointment, color: string) => (lateCancelled(a) ? `${STRIPES}, ${color}` : color);
-const shade = (a: Appointment, color: string) => (isLight(color) || lateCancelled(a) ? SHADOW : '');
+/** Everyone booked cancelled the same day or didn't come: the block stays on the calendar, striped (like Schedulista). */
+const striped = (a: Appointment) => a.clients.length > 0 && a.clients.every((b) => b.status === 'LATE_CANCEL' || b.status === 'NO_SHOW');
+const paint = (a: Appointment, color: string) => (striped(a) ? `${STRIPES}, ${color}` : color);
+const shade = (a: Appointment, color: string) => (isLight(color) || striped(a) ? SHADOW : '');
 const ROUND =
   'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-paper shadow-[0_1px_2px_rgb(var(--c-shadow)/0.06)] ring-1 ring-ink/[0.12] transition-colors hover:bg-sand/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40';
 // Dialog rows: label column + field column, stacked on phones.
@@ -99,7 +100,7 @@ export default function Schedule() {
   const [view, setView] = useState<View>(() => (window.matchMedia('(min-width: 768px)').matches ? 'week' : 'day'));
   const [day, setDay] = useState(laToday);
   const [now, setNow] = useState(() => laWall());
-  const [setup, setSetup] = useState<{ instructors: Instructor[]; services: Service[] } | null>(null);
+  const [setup, setSetup] = useState<{ instructors: Instructor[]; categories: Category[]; services: Service[] } | null>(null);
   const [appts, setAppts] = useState<Appointment[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [version, setVersion] = useState(0);
@@ -140,7 +141,7 @@ export default function Schedule() {
   useEffect(() => {
     let stale = false;
     Promise.all([loadInstructors(), loadServices()])
-      .then(([instructors, { services }]) => !stale && setSetup({ instructors, services }))
+      .then(([instructors, { categories, services }]) => !stale && setSetup({ instructors, categories, services }))
       .catch(() => !stale && setFailed(true));
     return () => {
       stale = true;
@@ -199,14 +200,15 @@ export default function Schedule() {
         : t('calHours', { n: String(a.minutes / 60) }),
       !a.staff_id ? a.service : a.capacity > 1 ? t('calBookedOf', count(a)) : a.clients[0]?.name,
       a.staff_id ? full(a) : t('calStudioEvent'),
-      lateLine(a),
+      statusLine(a, 'LATE_CANCEL'),
+      statusLine(a, 'NO_SHOW'),
       a.series_id && a.series_changed ? t('calChanged') : '',
     ].filter(Boolean);
-  /** "Late cancel" (one client) or "Late cancel: Ava, Ben" (a class). */
-  const lateLine = (a: Appointment) => {
-    const late = a.clients.filter((b) => b.status === 'LATE_CANCEL');
-    if (!late.length) return '';
-    return a.capacity > 1 ? `${t('calLATE_CANCEL')}: ${late.map((b) => b.name).join(', ')}` : t('calLATE_CANCEL');
+  /** "Late cancel" (one client) or "Late cancel: Ava, Ben" (a class); the same for No-show. */
+  const statusLine = (a: Appointment, status: 'LATE_CANCEL' | 'NO_SHOW') => {
+    const marked = a.clients.filter((b) => b.status === status);
+    if (!marked.length) return '';
+    return a.capacity > 1 ? `${t(`cal${status}`)}: ${marked.map((b) => b.name).join(', ')}` : t(`cal${status}`);
   };
 
   const placeTip = (e: PointerEvent) => {
@@ -626,6 +628,7 @@ export default function Schedule() {
           day={edit.day}
           min={edit.min}
           instructors={setup.instructors}
+          categories={setup.categories}
           services={setup.services}
           defaultStaff={mine?.user_id ?? ''}
           onClose={() => setEdit(null)}
@@ -994,6 +997,7 @@ function MiniMonth({
 
 /** Native <dialog> like ui.tsx's Dialog, sized and titled like the calendar dialogs in the approved design. */
 function Modal({ title, width, onClose, children }: { title: string; width: string; onClose: () => void; children: ReactNode }) {
+  const { t } = useT();
   const ref = useRef<HTMLDialogElement>(null);
   const downOnBackdrop = useRef(false);
   useEffect(() => {
@@ -1008,8 +1012,16 @@ function Modal({ title, width, onClose, children }: { title: string; width: stri
       onClick={(e) => downOnBackdrop.current && e.target === ref.current && onClose()}
       className={`max-h-[calc(100dvh-2rem)] ${width} overflow-y-auto rounded-[20px] bg-paper p-0 text-ink shadow-pop backdrop:bg-ink/30`}
     >
+      <button
+        type="button"
+        aria-label={t('close')}
+        onClick={onClose}
+        className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full text-mute hover:bg-ink/[0.05] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/40"
+      >
+        <X {...ICON} />
+      </button>
       <div className="p-6 md:p-8">
-        <h2 className="text-center font-display text-2xl font-semibold tracking-tight">{title}</h2>
+        <h2 className="px-10 text-center font-display text-2xl font-semibold tracking-tight">{title}</h2>
         {children}
       </div>
     </dialog>
@@ -1096,9 +1108,6 @@ function MoveDialog({
         {error && <Notice tone="error">{error}</Notice>}
       </div>
       <div className="mt-7 flex flex-wrap items-center justify-end gap-3 border-t border-ink/10 pt-6">
-        <Button variant="secondary" className="!px-7" onClick={onClose}>
-          {t('cancel')}
-        </Button>
         <Button className="!px-8" disabled={busy} onClick={() => void run()}>
           {busy ? t('saving') : action}
         </Button>
@@ -1113,6 +1122,7 @@ function AppointmentDialog({
   day,
   min,
   instructors,
+  categories,
   services,
   defaultStaff,
   onClose,
@@ -1122,6 +1132,7 @@ function AppointmentDialog({
   day: string;
   min: number;
   instructors: Instructor[];
+  categories: Category[];
   services: Service[];
   defaultStaff: string;
   onClose: () => void;
@@ -1129,7 +1140,9 @@ function AppointmentDialog({
 }) {
   const { t, lang } = useT();
   const id = useId();
-  const first = services[0];
+  // What an instructor teaches (staff_ids null = everyone); a studio event (no instructor) can be any service.
+  const teaches = (s: Service, staff: string) => !staff || !s.staff_ids || s.staff_ids.includes(staff);
+  const first = services.find((s) => teaches(s, defaultStaff));
   const [f, setF] = useState(() => ({
     staff: a ? (a.staff_id ?? '') : defaultStaff,
     service: a?.service ?? first?.name ?? '',
@@ -1153,13 +1166,18 @@ function AppointmentDialog({
   const [error, setError] = useState('');
 
   const svc = services.find((s) => s.name === f.service);
+  const offered = services.filter((s) => teaches(s, f.staff));
+  const option = (s: Service) => (
+    <option key={s.name} value={s.name}>
+      {s.name}
+    </option>
+  );
   const showCapacity = (svc?.capacity ?? 1) > 1 || (a?.capacity ?? 1) > 1;
   const group = f.capacity > 1 || f.clients.length > 1;
   const client = f.clients[0];
   const title = !a ? t('calNew') : !a.staff_id ? t('calEditEvent') : a.capacity > 1 ? t('calEditClass') : t('calEditAppt');
   const cancelLabel = a && t(!a.staff_id ? 'calCancelEvent' : a.capacity > 1 ? 'calCancelClass' : 'calCancelAppt');
   const dot = f.staff ? (instructors.find((i) => i.user_id === f.staff)?.color ?? PALETTE[8]) : EVENT_COLOR;
-  const durations = [...new Set([...DURATIONS, f.minutes])].sort((x, y) => x - y);
   const valid = Boolean(f.service && f.date && f.time) && (!f.repeat || (f.days.length > 0 && (f.ends !== 'until' || f.until)));
   const statusOptions = BOOKING_STATUSES.map((s) => (
     <option key={s} value={s}>
@@ -1175,7 +1193,7 @@ function AppointmentDialog({
     if (e) setError(e.message);
     else onSaved();
   };
-  /** status: give every booking this status (Late cancel from the cancel step). */
+  /** status: give every booking this status (No-show or Late cancel from the cancel step). */
   const save = (status?: BookingStatus) =>
     run('save_appointment', {
       p: {
@@ -1250,12 +1268,19 @@ function AppointmentDialog({
             }}
             className={`${inputCls} font-medium`}
           >
-            {!svc && <option value={f.service}>{f.service}</option>}
-            {services.map((s) => (
-              <option key={s.name} value={s.name}>
-                {s.name}
-              </option>
-            ))}
+            {!offered.some((s) => s.name === f.service) && <option value={f.service}>{f.service}</option>}
+            {/* Grouped by category in their set order; services without one last. */}
+            {categories.map((c) => {
+              const list = offered.filter((s) => s.category_id === c.id);
+              return (
+                list.length > 0 && (
+                  <optgroup key={c.id} label={c.name}>
+                    {list.map(option)}
+                  </optgroup>
+                )
+              );
+            })}
+            {offered.filter((s) => !categories.some((c) => c.id === s.category_id)).map(option)}
           </select>
         </div>
         <div className={ROW}>
@@ -1294,18 +1319,7 @@ function AppointmentDialog({
           <label htmlFor={`${id}-dur`} className={LABEL}>
             {t('calDuration')}
           </label>
-          <select
-            id={`${id}-dur`}
-            value={f.minutes}
-            onChange={(e) => set({ minutes: Number(e.target.value) })}
-            className={`${inputCls} font-medium`}
-          >
-            {durations.map((m) => (
-              <option key={m} value={m}>
-                {t('calMinutes', { n: String(m) })}
-              </option>
-            ))}
-          </select>
+          <MinutesInput id={`${id}-dur`} value={f.minutes} onChange={(minutes) => set({ minutes })} />
         </div>
         {showCapacity && (
           <div className={ROW}>
@@ -1542,9 +1556,14 @@ function AppointmentDialog({
               {t('calKeep')}
             </Button>
             {f.clients.length > 0 && (
-              <Button variant="secondary" disabled={busy} onClick={() => void save('LATE_CANCEL')}>
-                {t('calLATE_CANCEL')}
-              </Button>
+              <>
+                <Button variant="secondary" disabled={busy} onClick={() => void save('NO_SHOW')}>
+                  {t('calNO_SHOW')}
+                </Button>
+                <Button variant="secondary" disabled={busy} onClick={() => void save('LATE_CANCEL')}>
+                  {t('calLATE_CANCEL')}
+                </Button>
+              </>
             )}
             <Button variant="danger" disabled={busy} onClick={() => void run('cancel_appointment', { p_id: a!.id, p_scope: f.scope })}>
               {busy ? t('saving') : cancelLabel}
@@ -1554,20 +1573,15 @@ function AppointmentDialog({
       ) : (
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 pt-6">
           {a ? (
-            <button type="button" onClick={() => setConfirming(true)} className="text-[15px] font-medium text-sage-deep hover:underline">
+            <Button variant="danger" onClick={() => setConfirming(true)}>
               {cancelLabel}
-            </button>
+            </Button>
           ) : (
             <span />
           )}
-          <div className="flex gap-3">
-            <Button variant="secondary" className="!px-7" onClick={onClose}>
-              {t('cancel')}
-            </Button>
-            <Button className="!px-8" disabled={busy || !valid} onClick={() => void save()}>
-              {busy ? t('saving') : t('save')}
-            </Button>
-          </div>
+          <Button className="!px-8" disabled={busy || !valid} onClick={() => void save()}>
+            {busy ? t('saving') : t('save')}
+          </Button>
         </div>
       )}
     </Modal>
