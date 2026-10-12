@@ -4,6 +4,12 @@
 \set ON_ERROR_STOP 1
 begin;
 
+-- Start from no courses (the seed migration adds the studio's real ones).
+set local session_replication_role = replica; -- skip triggers (audit log is append-only)
+delete from public.training_courses;
+delete from public.audit_logs where entity_type = 'training_courses';
+set local session_replication_role = origin;
+
 create schema t;
 grant usage on schema t to anon, authenticated;
 
