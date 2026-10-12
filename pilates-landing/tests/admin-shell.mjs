@@ -169,7 +169,12 @@ const APPTS = [
 ];
 const INSTRUCTORS = [{ user_id: 'i-suk', full_name: 'Su kyung YI', calendar_color: '#EEBC43', active: true },
   { user_id: 'i-sun', full_name: 'Sunnie Lee', calendar_color: null, active: true }];
-const SERVICES = [['Private', 1], ['Gyrotonic', 1], ['Pilates Group', 5], ['Gyrotonic Group', 3]].map(([name, capacity]) => ({ name, minutes: 50, capacity, active: true }));
+const SERVICE_CATEGORIES = [{ id: 'c-ind', name: 'Individual Classes', sort: 1 }, { id: 'c-pil', name: 'Pilates Classes', sort: 2 },
+  { id: 'c-gyr', name: 'Gyrotonic Classes', sort: 3 }];
+// Gyrotonic Group: only Su kyung teaches it (null = every instructor).
+const SERVICES = [['Private', 1, 'c-ind', null], ['Gyrotonic', 1, 'c-ind', null], ['Pilates Group', 5, 'c-pil', null], ['Gyrotonic Group', 3, 'c-gyr', ['i-suk']]]
+  .map(([name, capacity, category_id, staff_ids], i) => ({ id: `v-${i + 1}`, name, minutes: 50, capacity, active: true, sort: i + 1, category_id,
+    price_cents: null, cleanup_minutes: 0, description: '', staff_ids }));
 const sched = []; // [rpc, body]
 
 /** A page signed in as `who` (or signed out when null) at the given width. */
@@ -339,17 +344,20 @@ async function open(who, width, path = '', options = {}) {
   await context.route(`${SUPABASE}/rest/v1/appointments?**`, (r) => r.fulfill({ json: APPTS }));
   await context.route(`${SUPABASE}/rest/v1/appointment_clients?**`, (r) => r.fulfill({ json: APPTS.flatMap((a) => a.appointment_clients) }));
   await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) => r.fulfill({ json: SERVICES }));
+  await context.route(`${SUPABASE}/rest/v1/schedule_categories?**`, (r) => r.fulfill({ json: SERVICE_CATEGORIES }));
   await context.route(`${SUPABASE}/rest/v1/schedule_settings?**`, (r) => r.fulfill({ json: [{ change_text_minutes: 15 }] }));
   await context.route(`${SUPABASE}/rest/v1/rpc/schedule_instructors`, (r) => r.fulfill({ json: INSTRUCTORS }));
   await context.route(`${SUPABASE}/rest/v1/rpc/schedule_search_clients`, (r) => {
     sched.push(['schedule_search_clients', r.request().postDataJSON()]);
     return r.fulfill({ json: [{ id: 's-leo', full_name: 'Leo Park', phone_last4: '0199' }] });
   });
-  for (const name of ['save_appointment', 'move_appointment', 'cancel_appointment', 'set_calendar_color', 'save_schedule_service', 'set_change_text_minutes', 'import_schedule']) {
+  for (const name of ['save_appointment', 'move_appointment', 'cancel_appointment', 'set_calendar_color', 'save_schedule_service', 'set_change_text_minutes', 'import_schedule',
+    'save_schedule_category', 'delete_schedule_category', 'set_schedule_order']) {
     await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
       const body = r.request().postDataJSON();
       sched.push([name, body]);
       if (name === 'save_appointment') return r.fulfill({ json: 'a-new' });
+      if (name === 'save_schedule_service' || name === 'save_schedule_category') return r.fulfill({ json: body.p.id ?? `${name}-new` });
       if (name !== 'import_schedule') return r.fulfill({ status: 204 });
       // Rows for instructor "Nobody" fail like an unknown instructor does in the database.
       const bad = body.p_rows.filter((x) => x.instructor === 'Nobody');
