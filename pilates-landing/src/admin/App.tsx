@@ -22,6 +22,7 @@ import Backup from './pages/Backup';
 import Schedule from './pages/Schedule';
 import ScheduleSettings from './pages/ScheduleSettings';
 import StaffPage from './pages/Staff';
+import Trash from './pages/Trash';
 
 const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType> = {
   '': Dashboard,
@@ -37,6 +38,7 @@ const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType>
   notifications: Notifications,
   'schedule-settings': ScheduleSettings,
   backup: Backup,
+  trash: Trash,
   account: Account,
 };
 

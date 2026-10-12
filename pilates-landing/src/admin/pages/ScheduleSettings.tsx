@@ -237,6 +237,7 @@ function ServicesCard({
   }
 
   const { categories, services, instructors } = data;
+  const guestCats = new Set(categories.filter((c) => c.guest).map((c) => c.id));
   const inCategory = (id: string) => services.filter((s) => (s.category_id ?? NONE) === id);
   const loose = inCategory(NONE).length;
   // The picked row, or the first one while nothing (or a deleted category) is picked.
@@ -335,6 +336,7 @@ function ServicesCard({
                 <button type="button" aria-pressed={c.id === current} onClick={() => setPicked(c.id)} className={PICK}>
                   {c.name} ({inCategory(c.id).length})
                 </button>
+                {c.guest && <Chip>{t('ssOthers')}</Chip>}
                 <button type="button" aria-label={t('ssEditNamed', { name: c.name })} onClick={() => setEditCategory(c)} className={EDIT_ICON}>
                   <Pencil {...ICON} />
                 </button>
@@ -374,7 +376,9 @@ function ServicesCard({
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 px-1 py-2.5">
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="truncate text-[15px] font-medium">{s.name}</span>
-                        {teachers.length > 0 && (
+                        {guestCats.has(s.category_id ?? NONE) ? (
+                          <span className="truncate text-sm text-mute">{s.guest_instructor || t('ssOthers')}</span>
+                        ) : teachers.length > 0 && (
                           <span role="img" aria-label={teachers.map((p) => p.full_name).join(', ')} className="flex shrink-0 items-center gap-1">
                             {teachers.slice(0, 5).map((p) => (
                               <span key={p.user_id} className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} />
@@ -444,17 +448,18 @@ function CategoryDialog({
   category: Category | null;
   count: number;
   onClose: () => void;
-  onDone: (pick?: string) => void;
+  onDone: (pick?: string, text?: string) => void;
 }) {
   const { t } = useT();
   const [name, setName] = useState(category?.name ?? '');
+  const [guest, setGuest] = useState(category?.guest ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const save = async () => {
     if (!name.trim()) return setError(t('enterName'));
     setBusy(true);
-    const { data, error } = await supabase!.rpc('save_schedule_category', { p: { id: category?.id, name: name.trim() } });
+    const { data, error } = await supabase!.rpc('save_schedule_category', { p: { id: category?.id, name: name.trim(), guest } });
     setBusy(false);
     if (error) return setError(t('saveFailed', { reason: error.message }));
     onDone(data as string);
@@ -465,7 +470,7 @@ function CategoryDialog({
     const { error } = await supabase!.rpc('delete_schedule_category', { p_id: category!.id });
     setBusy(false);
     if (error) return setError(t('deleteFailed', { reason: error.message }));
-    onDone();
+    onDone(undefined, t('ssDeleted'));
   };
 
   return (
@@ -478,6 +483,16 @@ function CategoryDialog({
         }}
       >
         <TextField label={t('ssCategoryName')} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
+        <fieldset>
+          <legend className="mb-1 text-sm font-medium text-ink">{t('ssInstructorsKind')}</legend>
+          {([false, true] as const).map((g) => (
+            <label key={String(g)} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+              <input type="radio" name="guest" className="h-5 w-5 accent-sage" checked={guest === g} onChange={() => setGuest(g)} />
+              {t(g ? 'ssGuestInstructors' : 'ssOurInstructors')}
+            </label>
+          ))}
+          {guest && <p className="mt-1 text-xs text-mute">{t('ssGuestKindHint')}</p>}
+        </fieldset>
         {error && <Notice tone="error">{error}</Notice>}
         <div className="flex flex-wrap items-center justify-end gap-3">
           {category && (
@@ -531,9 +546,12 @@ function ServiceDialog({
       isClass: (svc?.capacity ?? 1) > 1,
       capacity: String(svc && svc.capacity > 1 ? svc.capacity : 5),
       staff: svc?.staff_ids ?? active.map((p) => p.user_id),
+      guest: svc?.guest_instructor ?? '',
       active: svc?.active ?? true,
     };
   });
+  // A service in an Others category names its guest instructor instead of picking staff.
+  const guestCat = data.categories.some((c) => c.id === f.category && c.guest);
   const set = <K extends keyof typeof f>(key: K, value: (typeof f)[K]) => setF((v) => ({ ...v, [key]: value }));
   const [errors, setErrors] = useState<{ name?: string; price?: string; capacity?: string; form?: string }>({});
   const [busy, setBusy] = useState(false);
@@ -564,7 +582,9 @@ function ServiceDialog({
         description: f.description.trim(),
         // Every instructor = null, so someone who joins later teaches it too. An inactive one only counts when the
         // service had no list: an edit that leaves the boxes as they were never widens a saved list.
-        staff_ids: data.instructors.every((p) => f.staff.includes(p.user_id) || (!p.active && !svc?.staff_ids)) ? null : f.staff,
+        staff_ids:
+          guestCat || data.instructors.every((p) => f.staff.includes(p.user_id) || (!p.active && !svc?.staff_ids)) ? null : f.staff,
+        guest_instructor: guestCat ? f.guest.trim() : '',
       },
     });
     setBusy(false);
@@ -648,6 +668,15 @@ function ServiceDialog({
         )}
 
         <hr className="border-ink/[0.08]" />
+        {guestCat ? (
+          <TextField
+            label={t('ssGuestName')}
+            maxLength={80}
+            value={f.guest}
+            hint={t('ssGuestNameHint')}
+            onChange={(e) => set('guest', e.target.value)}
+          />
+        ) : (
         <fieldset>
           <legend className="mb-1 text-sm font-medium text-ink">{t('ssTaughtBy')}</legend>
           {!listed.length ? (
@@ -673,6 +702,7 @@ function ServiceDialog({
             })
           )}
         </fieldset>
+        )}
 
         <hr className="border-ink/[0.08]" />
         <div className={TOGGLE}>
@@ -736,7 +766,7 @@ function DeleteServiceDialog({ service, onClose, onDone }: { service: Service; o
           </p>
         )}
         <p className="font-medium">{t('ssDeleteSure', { name: service.name })}</p>
-        {Boolean(count) && <p className="text-sm text-mute">{t('ssDeleteKeeps')}</p>}
+        <p className="text-sm text-mute">{count ? `${t('ssDeleteKeeps')} ${t('ssDeleteTrash')}` : t('ssDeleteTrash')}</p>
         {error && <Notice tone="error">{error}</Notice>}
       </div>
       <div className="mt-6 flex flex-wrap justify-end gap-3">

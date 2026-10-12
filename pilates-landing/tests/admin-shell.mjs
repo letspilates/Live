@@ -420,7 +420,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Trainings' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup', `${device}: owner menu`);
+    check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup,Trash', `${device}: owner menu`);
     if (device === 'desktop') check(await page.locator('aside').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
@@ -505,7 +505,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
   }
-  for (const path of ['trainings/', 'users/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/']) {
+  for (const path of ['trainings/', 'users/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/', 'trash/']) {
     const { page, context } = await open(who, 1280, path);
     await page.waitForURL(/\/admin\/$/);
     check(!(await page.getByRole('tab').count()), `${who}: /${path} redirects to dashboard`);
@@ -1216,7 +1216,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 {
   const { page, context, errors } = await open('ADMIN', 1280, 'users/');
   await page.getByText('Ana Park').waitFor();
-  check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup', 'admin: full menu');
+  check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup,Trash', 'admin: full menu');
   check(!(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).count()), 'admin: cannot edit the owner');
   check(await page.getByRole('button', { name: 'Edit user: Ana Park' }).isVisible(), 'admin: can edit others');
   await page.getByRole('button', { name: 'Add user' }).click();
@@ -1503,13 +1503,13 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   // Services grouped by category; only what the chosen instructor teaches.
   const offered = () => dlg.getByLabel('Service').evaluate((el) => [...el.options].map((o) => o.value));
   check((await offered()).includes('Private') && !(await offered()).includes('Gyrotonic Group'), 'schedule: Sunnie Lee is not offered Gyrotonic Group');
-  await dlg.getByLabel('Instructor').selectOption({ label: 'Su kyung YI' });
+  await dlg.getByLabel('Instructor', { exact: true }).selectOption({ label: 'Su kyung YI' });
   check((await offered()).includes('Gyrotonic Group'), 'schedule: Su kyung YI is offered Gyrotonic Group');
   const groups = await dlg.getByLabel('Service').evaluate((el) => [...el.querySelectorAll('optgroup')].map((g) => `${g.label}: ${[...g.children].map((o) => o.value).join(', ')}`));
   check(groups.join(' | ') === 'Individual Classes: Private, Gyrotonic | Pilates Classes: Pilates Group | Gyrotonic Classes: Gyrotonic Group',
     `schedule: services grouped by category in order ${groups.join(' | ')}`);
   await dlg.getByLabel('Service').selectOption('Gyrotonic Group');
-  await dlg.getByLabel('Instructor').selectOption({ label: 'Sunnie Lee' });
+  await dlg.getByLabel('Instructor', { exact: true }).selectOption({ label: 'Sunnie Lee' });
   check(await dlg.getByLabel('Service').inputValue() === 'Private', 'schedule: switching to an instructor who does not teach the service picks one they do');
   await dlg.getByRole('button', { name: 'Close' }).click();
   await dlg.waitFor({ state: 'detached' });
@@ -1833,6 +1833,7 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
   await btn('Delete Private').click();
   const confirm = page.locator('dialog[open]').last();
   await confirm.getByText('This service has 312 appointments on the calendar.').waitFor();
+  check(await confirm.getByText('It goes to Trash in Settings, where you can restore it.', { exact: false }).isVisible(), 'delete: the confirm says it goes to Trash');
   check(await confirm.getByRole('heading', { name: 'Delete service' }).isVisible() && await confirm.getByText('Are you sure you want to delete Private?').isVisible()
     && await confirm.getByRole('button', { name: 'Cancel', exact: true }).isVisible() && await confirm.getByRole('button', { name: 'Delete', exact: true }).isVisible(),
     'delete: the confirm says how many appointments use it and asks, with Delete and Cancel at the bottom');
@@ -1851,7 +1852,7 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
     'delete: Cancel on the confirm goes back to the edit dialog');
   await dialog.getByRole('button', { name: 'Delete service' }).click();
   await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
-  await page.getByText('Deleted.', { exact: true }).waitFor();
+  await page.getByText('Moved to Trash.', { exact: true }).waitFor();
   check(saved('delete_schedule_service')[0]?.p_id === 'v-2' && !(await page.locator('dialog[open]').count()),
     'delete: Delete in the edit dialog, then confirm, deletes that service and closes both dialogs');
   check(errors.length === 0, `services: no page errors ${errors.join(' | ')}`);
@@ -1893,6 +1894,173 @@ for (const colorScheme of ['light', 'dark']) {
   const p = sched.find(([n]) => n === 'save_schedule_service')?.[1]?.p;
   check(p?.staff_ids?.join() === 'i-suk,i-sun' && p.minutes === 52, 'service dialog: saving keeps a list that leaves out an inactive instructor; 52 minutes saves');
   check(errors.length === 0, `services inactive: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 25. Others (guest instructors): an Others category, its services name the guest, the calendar shows Other.
+const GUEST_CATS = [...SERVICE_CATEGORIES, { id: 'c-evt', name: 'Events', sort: 4, guest: true }];
+const GUEST_SERVICES = [...SERVICES, { id: 'v-9', name: 'Reformer Workshop', minutes: 120, capacity: 10, active: true, sort: 9, category_id: 'c-evt',
+  price_cents: null, cleanup_minutes: 0, description: '', staff_ids: null, guest_instructor: 'Ana Guest' }];
+const withGuests = async (context) => {
+  await context.route(`${SUPABASE}/rest/v1/schedule_categories?**`, (r) => r.fulfill({ json: GUEST_CATS }));
+  await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) => r.fulfill({ json: GUEST_SERVICES }));
+};
+{
+  sched.length = 0;
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule-settings/');
+  await withGuests(context);
+  await page.reload();
+  const btn = (name) => page.getByRole('button', { name, exact: true });
+  const dialog = page.locator('dialog[open]');
+  const saved = (rpc) => sched.filter(([n]) => n === rpc).map(([, b]) => b.p);
+  await btn('Events (1)').click();
+  check(await page.getByText('Others', { exact: true }).isVisible() && await page.getByText('Ana Guest', { exact: true }).isVisible(),
+    'others: an Others category is marked, its service shows the guest instead of instructor dots');
+  await shot(page, 'others-settings');
+  await btn('Edit Reformer Workshop').click();
+  await page.getByRole('heading', { name: 'Edit service' }).waitFor();
+  check(await dialog.getByLabel('Guest instructor').inputValue() === 'Ana Guest' && !(await dialog.getByRole('checkbox').count()),
+    'others: the service dialog asks for the guest instructor, no staff checkboxes');
+  await dialog.getByLabel('Guest instructor').fill('Bo Guest');
+  await shot(page, 'others-service');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('heading', { name: 'Edit service' }).waitFor({ state: 'detached' });
+  const svc = saved('save_schedule_service')[0];
+  check(svc?.id === 'v-9' && svc.guest_instructor === 'Bo Guest' && svc.staff_ids === null && svc.category_id === 'c-evt',
+    'others: saving sends the guest instructor and no staff list');
+
+  await btn('Add category').click();
+  await page.getByRole('heading', { name: 'Add category' }).waitFor();
+  await dialog.getByLabel('Category name').fill('Trainings');
+  check(await dialog.getByRole('radio', { name: 'Our instructors' }).isChecked(), 'others: a new category is for our instructors by default');
+  await dialog.getByRole('radio', { name: 'Others (guest instructors)' }).check();
+  check(await dialog.getByText(/not in Users/).isVisible(), 'others: choosing Others explains it');
+  await shot(page, 'others-category');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await page.getByText('Saved.', { exact: true }).waitFor();
+  const cat = saved('save_schedule_category')[0];
+  check(cat?.name === 'Trainings' && cat.guest === true, 'others: Add category sends guest: true');
+  await btn('Edit Events').click();
+  await page.getByRole('heading', { name: 'Edit category' }).waitFor();
+  check(await dialog.getByRole('radio', { name: 'Others (guest instructors)' }).isChecked(), 'others: editing an Others category shows it checked');
+  await page.keyboard.press('Escape');
+  await page.getByRole('heading', { name: 'Edit category' }).waitFor({ state: 'detached' });
+
+  await btn('Individual Classes (2)').click();
+  await btn('Edit Private').click();
+  await page.getByRole('heading', { name: 'Edit service' }).waitFor();
+  check(await dialog.getByRole('checkbox', { name: 'Sunnie Lee' }).isVisible(), 'others: a service of our instructors lists them');
+  await dialog.getByRole('combobox', { name: /^Category/ }).selectOption('c-evt');
+  check(await dialog.getByLabel('Guest instructor').isVisible() && !(await dialog.getByRole('checkbox').count()),
+    'others: moving a service to an Others category swaps the instructor list for the guest name');
+  await page.keyboard.press('Escape');
+  check(errors.length === 0, `others settings: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+{
+  sched.length = 0;
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule/');
+  await withGuests(context);
+  await context.route(`${SUPABASE}/rest/v1/appointments?**`, (r) => r.fulfill({ json: [...APPTS, { id: 'a-g', starts_at: laISO(LA_TODAY, 1140), minutes: 120,
+    staff_id: null, guest_instructor: 'Ana Guest', service: 'Reformer Workshop', capacity: 10, series_id: null, series_changed: false, status: 'BOOKED',
+    appointment_clients: [] }] }));
+  await page.reload();
+  const dlg = page.locator('dialog[open]');
+  const offered = () => dlg.getByLabel('Service').evaluate((el) => [...el.options].map((o) => o.value));
+  const ev = page.getByRole('button', { name: /Reformer Workshop with Ana Guest/ });
+  await ev.waitFor();
+  check(true, 'others: a guest event reads "Reformer Workshop with Ana Guest" on the calendar');
+  await ev.hover();
+  check(await page.getByText('Other: Ana Guest', { exact: true }).isVisible(), 'others: the hover card says Other: Ana Guest');
+  await ev.click();
+  await dlg.getByRole('heading', { name: 'Edit Event' }).waitFor();
+  check(await dlg.getByLabel('Instructor', { exact: true }).inputValue() === 'other' && await dlg.getByLabel('Guest instructor').inputValue() === 'Ana Guest',
+    'others: the dialog shows Other with the guest');
+  check((await offered()).join() === 'Reformer Workshop', 'others: Other is offered only guest-led services');
+  await shot(page, 'others-appointment');
+  await dlg.getByLabel('Guest instructor').fill('Bo Guest');
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  await dlg.waitFor({ state: 'detached' });
+  const edited = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
+  check(edited?.id === 'a-g' && edited.staff_id === null && edited.guest_instructor === 'Bo Guest' && edited.service === 'Reformer Workshop',
+    'others: saving sends no staff and the typed guest');
+
+  sched.length = 0;
+  await page.getByRole('button', { name: 'New Appointment' }).click();
+  await dlg.getByRole('heading', { name: 'New Appointment' }).waitFor();
+  await dlg.getByLabel('Instructor', { exact: true }).selectOption({ label: 'Sunnie Lee' });
+  check(!(await offered()).includes('Reformer Workshop') && !(await dlg.getByLabel('Guest instructor').count()),
+    'others: our instructors are not offered a guest-led service');
+  await dlg.getByLabel('Instructor', { exact: true }).selectOption('other');
+  check(await dlg.getByLabel('Service').inputValue() === 'Reformer Workshop' && await dlg.getByLabel('Guest instructor').inputValue() === 'Ana Guest',
+    'others: choosing Other picks a guest-led service and fills its guest');
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  await dlg.waitFor({ state: 'detached' });
+  const added = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
+  check(added && !added.id && added.staff_id === null && added.guest_instructor === 'Ana Guest' && added.minutes === 120,
+    'others: a new guest event saves no staff, the guest and the service length');
+
+  await page.getByRole('button', { name: 'New Appointment' }).click();
+  await dlg.getByRole('heading', { name: 'New Appointment' }).waitFor();
+  await dlg.getByLabel('Instructor', { exact: true }).selectOption({ label: 'No instructor (studio event)' });
+  await dlg.getByLabel('Service').selectOption('Reformer Workshop');
+  check(await dlg.getByLabel('Instructor', { exact: true }).inputValue() === 'other' && await dlg.getByLabel('Guest instructor').inputValue() === 'Ana Guest',
+    'others: a studio event that picks a guest-led service becomes Other with its guest');
+  await dlg.getByLabel('Instructor', { exact: true }).selectOption({ label: 'Sunnie Lee' });
+  check(await dlg.getByLabel('Service').inputValue() !== 'Reformer Workshop', 'others: switching from Other to our instructor picks one of their services');
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  check(errors.length === 0, `others schedule: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 26. Settings › Trash: restore, a taken name says so, delete forever asks first
+for (const width of [1280, 393]) {
+  sched.length = 0;
+  const { page, context, errors } = await open('OWNER', width, 'trash/');
+  let trash = [
+    { id: 't-1', kind: 'schedule_service', label: 'Private with Ivy', deleted_at: '2026-10-12T20:15:00Z', staff_profiles: { full_name: 'Olive Owner' } },
+    { id: 't-2', kind: 'schedule_category', label: 'Workshops', deleted_at: '2026-10-11T18:00:00Z', staff_profiles: null },
+  ];
+  await context.route(`${SUPABASE}/rest/v1/trash?**`, (r) => r.fulfill({ json: trash }));
+  for (const name of ['restore_trash', 'purge_trash']) {
+    await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
+      const body = r.request().postDataJSON();
+      sched.push([name, body]);
+      if (name === 'restore_trash' && body.p_id === 't-2')
+        return r.fulfill({ status: 409, json: { code: '23505', message: 'A category named "Workshops" already exists. Rename it first.', details: null, hint: null } });
+      trash = trash.filter((x) => x.id !== body.p_id);
+      return r.fulfill({ status: 204 });
+    });
+  }
+  await page.reload();
+  const btn = (name) => page.getByRole('button', { name, exact: true });
+  await btn('Restore Private with Ivy').waitFor();
+  check((await page.locator('h1').innerText()) === 'Trash', `trash ${width}: page opens`);
+  check(await page.getByText(/Deleted Oct 12, 2026, 1:15\sPM by Olive Owner/).isVisible() && await page.getByText('Service', { exact: true }).isVisible()
+    && await page.getByText(/^Deleted Oct 11, 2026/).isVisible() && await page.getByText('Category', { exact: true }).isVisible(),
+    `trash ${width}: each item with its kind, when (studio time) and who deleted it`);
+  check(await noOverflow(page), `trash ${width}: no sideways scroll`);
+  await shot(page, `trash-${width}`);
+  await btn('Restore Private with Ivy').click();
+  await page.getByText('Restored "Private with Ivy".').waitFor();
+  await btn('Restore Private with Ivy').waitFor({ state: 'detached' });
+  check(sched[0]?.[0] === 'restore_trash' && sched[0][1].p_id === 't-1', `trash ${width}: Restore sends that item and it leaves the list`);
+  await btn('Restore Workshops').click();
+  await page.getByText('Another service or category is already named "Workshops". Rename that one first, then restore.').waitFor();
+  check(await btn('Restore Workshops').isVisible(), `trash ${width}: a taken name says so and the item stays`);
+  await btn('Delete Workshops forever').click();
+  const dlg = page.locator('dialog[open]');
+  await dlg.getByText('"Workshops" will be deleted for good. This can\'t be undone.').waitFor();
+  check(await noOverflow(page), `trash ${width}: confirm fits`);
+  await shot(page, `trash-confirm-${width}`);
+  await dlg.getByRole('button', { name: 'Cancel', exact: true }).click();
+  check(!sched.some(([n]) => n === 'purge_trash'), `trash ${width}: Cancel deletes nothing`);
+  await btn('Delete Workshops forever').click();
+  await dlg.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await page.getByText('Trash is empty.').waitFor();
+  check(sched.find(([n]) => n === 'purge_trash')?.[1]?.p_id === 't-2' && await page.getByText('Deleted "Workshops" forever.').isVisible(),
+    `trash ${width}: Delete forever after the confirm, then the list is empty`);
+  check(errors.length === 0, `trash ${width}: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 

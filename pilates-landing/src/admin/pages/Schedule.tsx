@@ -77,6 +77,8 @@ type Spot = { a: Appointment; day: string; min: number; minutes?: number };
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 const MINI = { size: 12, strokeWidth: 2.5, 'aria-hidden': true } as const;
+/** Instructor picker value for a guest instructor (saved as no staff + guest_instructor). */
+const OTHER = 'other';
 const SNAP = 15;
 const GUTTER = 16; // px kept free on the right of each day, to click for a new appointment at that time
 const LINE = 'rgb(var(--c-ink) / 0.08)';
@@ -186,9 +188,13 @@ export default function Schedule() {
   /** "Ava Moon" or "4/5"; null for a studio event or nobody booked. */
   const who = (a: Appointment) =>
     !a.staff_id ? null : a.capacity > 1 ? `${a.clients.length}/${a.capacity}` : (a.clients[0]?.name ?? null);
-  const label = (a: Appointment) => (who(a) ? `${who(a)} - ${a.service}` : a.service);
-  /** "Private with Sunnie" */
-  const full = (a: Appointment) => (a.staff_id ? t('calWith', { service: a.service, name: firstName(a) }) : a.service);
+  const label = (a: Appointment) => (who(a) ? `${who(a)} - ${a.service}` : a.staff_id ? a.service : full(a));
+  /** "Pilates Group with Sunnie", "Workshop with Ana Guest" (Other); a service already named after them stays as it is. */
+  const full = (a: Appointment) => {
+    const name = a.staff_id ? firstName(a) : a.guest_instructor;
+    const bare = (x: string) => x.toLowerCase().replace(/[^\p{L}]/gu, '');
+    return name && !bare(a.service).includes(bare(name)) ? t('calWith', { service: a.service, name }) : a.service;
+  };
   const when = (d: string, start: number, minutes: number) =>
     `${formatDay(d, lang)} · ${hm(start)} - ${ampm(start + minutes)}`;
 
@@ -199,7 +205,7 @@ export default function Schedule() {
         ? t('calMinutes', { n: String(a.minutes) })
         : t('calHours', { n: String(a.minutes / 60) }),
       !a.staff_id ? a.service : a.capacity > 1 ? t('calBookedOf', count(a)) : a.clients[0]?.name,
-      a.staff_id ? full(a) : t('calStudioEvent'),
+      a.staff_id ? full(a) : a.guest_instructor ? t('calGuestBy', { name: a.guest_instructor }) : t('calStudioEvent'),
       statusLine(a, 'LATE_CANCEL'),
       statusLine(a, 'NO_SHOW'),
       a.series_id && a.series_changed ? t('calChanged') : '',
@@ -567,7 +573,7 @@ export default function Schedule() {
                       appts={shown}
                       today={today}
                       color={color}
-                      pill={(a) => (!a.staff_id ? a.service : a.capacity > 1 ? `${who(a)} ${a.service}` : (who(a) ?? a.service))}
+                      pill={(a) => (!a.staff_id ? full(a) : a.capacity > 1 ? `${who(a)} ${a.service}` : (who(a) ?? a.service))}
                       onOpen={(a) => setEdit({ a, day: a.day, min: a.start })}
                       onDay={showDay}
                     />
@@ -1140,11 +1146,16 @@ function AppointmentDialog({
 }) {
   const { t, lang } = useT();
   const id = useId();
+  // Services of an Others category are led by a guest (Other), never by staff.
+  const guestCats = new Set(categories.filter((c) => c.guest).map((c) => c.id));
+  const isGuest = (s: Service) => guestCats.has(s.category_id ?? '');
   // What an instructor teaches (staff_ids null = everyone); a studio event (no instructor) can be any service.
-  const teaches = (s: Service, staff: string) => !staff || !s.staff_ids || s.staff_ids.includes(staff);
+  const teaches = (s: Service, staff: string) =>
+    staff === OTHER ? isGuest(s) : !staff || (!isGuest(s) && (!s.staff_ids || s.staff_ids.includes(staff)));
   const first = services.find((s) => teaches(s, defaultStaff));
   const [f, setF] = useState(() => ({
-    staff: a ? (a.staff_id ?? '') : defaultStaff,
+    staff: a ? (a.staff_id ?? (a.guest_instructor ? OTHER : '')) : defaultStaff,
+    guest: a?.guest_instructor ?? '',
     service: a?.service ?? first?.name ?? '',
     date: a?.day ?? day,
     time: hhmm(a?.start ?? min),
@@ -1177,7 +1188,7 @@ function AppointmentDialog({
   const client = f.clients[0];
   const title = !a ? t('calNew') : !a.staff_id ? t('calEditEvent') : a.capacity > 1 ? t('calEditClass') : t('calEditAppt');
   const cancelLabel = a && t(!a.staff_id ? 'calCancelEvent' : a.capacity > 1 ? 'calCancelClass' : 'calCancelAppt');
-  const dot = f.staff ? (instructors.find((i) => i.user_id === f.staff)?.color ?? PALETTE[8]) : EVENT_COLOR;
+  const dot = f.staff && f.staff !== OTHER ? (instructors.find((i) => i.user_id === f.staff)?.color ?? PALETTE[8]) : EVENT_COLOR;
   const valid = Boolean(f.service && f.date && f.time) && (!f.repeat || (f.days.length > 0 && (f.ends !== 'until' || f.until)));
   const statusOptions = BOOKING_STATUSES.map((s) => (
     <option key={s} value={s}>
@@ -1200,7 +1211,8 @@ function AppointmentDialog({
         id: a?.id,
         start: wallText(f.date, toMin(f.time)),
         minutes: f.minutes,
-        staff_id: f.staff || null,
+        staff_id: f.staff && f.staff !== OTHER ? f.staff : null,
+        guest_instructor: f.staff === OTHER ? f.guest.trim() : '',
         service: f.service,
         capacity: f.capacity,
         ...(a?.series_id ? { scope: f.scope } : {}),
@@ -1241,9 +1253,15 @@ function AppointmentDialog({
               id={`${id}-staff`}
               value={f.staff}
               onChange={(e) => {
+                const v = e.target.value;
                 // A service the new instructor doesn't teach switches to the first one they do (an old name stays).
-                const next = svc && !teaches(svc, e.target.value) ? services.find((x) => teaches(x, e.target.value)) : undefined;
-                set({ staff: e.target.value, ...(next ? { service: next.name, minutes: next.minutes, capacity: next.capacity } : {}) });
+                const next = svc && !teaches(svc, v) ? services.find((x) => teaches(x, v)) : undefined;
+                set({
+                  staff: v,
+                  ...(next ? { service: next.name, minutes: next.minutes, capacity: next.capacity } : {}),
+                  // Other: the service's guest instructor, unless a name is typed already.
+                  ...(v === OTHER && !f.guest.trim() ? { guest: (next ?? svc)?.guest_instructor ?? '' } : {}),
+                });
               }}
               className={`${inputCls} font-medium`}
             >
@@ -1254,11 +1272,26 @@ function AppointmentDialog({
                     {i.full_name}
                   </option>
                 ))}
+              <option value={OTHER}>{t('calOther')}</option>
               <option value="">{t('calNoInstructor')}</option>
             </select>
             <span className="h-6 w-6 shrink-0 rounded-full" style={{ background: dot }} />
           </div>
         </div>
+        {f.staff === OTHER && (
+          <div className={ROW}>
+            <label htmlFor={`${id}-guest`} className={LABEL}>
+              {t('calGuestName')}
+            </label>
+            <input
+              id={`${id}-guest`}
+              maxLength={80}
+              value={f.guest}
+              onChange={(e) => set({ guest: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+        )}
         <div className={ROW}>
           <label htmlFor={`${id}-svc`} className={LABEL}>
             {t('calService')}
@@ -1268,7 +1301,12 @@ function AppointmentDialog({
             value={f.service}
             onChange={(e) => {
               const s = services.find((x) => x.name === e.target.value);
-              set({ service: e.target.value, ...(s ? { minutes: s.minutes, capacity: s.capacity } : {}) });
+              set({
+                service: e.target.value,
+                ...(s ? { minutes: s.minutes, capacity: s.capacity } : {}),
+                // A guest-led service (Others category) makes the instructor Other with its guest's name.
+                ...(s && isGuest(s) ? { staff: OTHER, guest: s.guest_instructor || f.guest } : {}),
+              });
             }}
             className={`${inputCls} font-medium`}
           >

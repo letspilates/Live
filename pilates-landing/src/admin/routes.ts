@@ -19,6 +19,7 @@ export const ADMIN_ROUTES = {
   notifications: 'owner',
   'schedule-settings': 'owner',
   backup: 'owner',
+  trash: 'owner',
   account: 'staff',
 } as const;
 

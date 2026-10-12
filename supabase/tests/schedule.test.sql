@@ -282,6 +282,55 @@ select public.delete_schedule_service(current_setting('t.trio')::uuid);
 select t.check('service deleted, its appointments keep the name', not exists (select 1 from public.schedule_services
   where id = current_setting('t.trio')::uuid) and (select service = 'Trio' and capacity = 3 from public.appointments
   where id = current_setting('t.ta')::uuid));
+-- Trash: a deleted service or category waits there; restore puts it back as it was, delete forever drops it.
+select t.check('deleted service is in Trash', exists (select 1 from public.trash where kind = 'schedule_service' and label = 'Trio'
+  and (data ->> 'id')::uuid = current_setting('t.trio')::uuid and data ->> 'capacity' = '3'));
+select public.restore_trash((select id from public.trash where label = 'Trio'));
+select t.check('restored service is back as it was', exists (select 1 from public.schedule_services
+  where id = current_setting('t.trio')::uuid and name = 'Trio' and capacity = 3 and minutes = 50)
+  and not exists (select 1 from public.trash where label = 'Trio'));
+select public.delete_schedule_service(current_setting('t.trio')::uuid);
+select public.save_schedule_service('{"name":"trio","minutes":45,"capacity":3}');
+select t.expect_error('restore onto a taken name', '23505', $$select public.restore_trash((select id from public.trash where label = 'Trio'))$$);
+select t.check('a failed restore stays in Trash', exists (select 1 from public.trash where label = 'Trio'));
+select public.purge_trash((select id from public.trash where label = 'Trio'));
+select t.check('delete forever', not exists (select 1 from public.trash where label = 'Trio'));
+select t.expect_error('restore what is not in Trash', 'P0002', $$select public.restore_trash(gen_random_uuid())$$);
+-- Others: a guest category; its service names the guest instead of staff.
+select set_config('t.ev', public.save_schedule_category('{"name":"Events","guest":true}')::text, true);
+select set_config('t.ws', public.save_schedule_service(jsonb_build_object('name', 'Reformer Workshop', 'minutes', 120, 'capacity', 10,
+  'category_id', current_setting('t.ev'), 'guest_instructor', ' Ana Guest '))::text, true);
+select public.save_schedule_category(jsonb_build_object('id', current_setting('t.ev'), 'name', 'Events'));
+select t.check('guest category and its service', (select guest from public.schedule_categories where id = current_setting('t.ev')::uuid)
+  and (select guest_instructor = 'Ana Guest' from public.schedule_services where id = current_setting('t.ws')::uuid));
+select public.save_schedule_service(jsonb_build_object('id', current_setting('t.ws'), 'name', 'Reformer Workshop', 'minutes', 120,
+  'capacity', 10));
+select t.check('a save without guest_instructor keeps it', (select guest_instructor = 'Ana Guest' from public.schedule_services
+  where id = current_setting('t.ws')::uuid));
+select set_config('t.ga', public.save_appointment('{"start":"2026-11-07 10:00","minutes":120,"staff_id":null,
+  "guest_instructor":" Ana Guest ","service":"Reformer Workshop","capacity":10,"clients":[]}')::text, true);
+select set_config('t.gb', public.save_appointment('{"start":"2026-11-07 14:00","minutes":50,
+  "staff_id":"00000000-0000-0000-0000-0000000000b2","guest_instructor":"Ana Guest","service":"Private","capacity":1,"clients":[]}')::text, true);
+select t.check('appointment names its guest only without staff',
+  (select guest_instructor = 'Ana Guest' and staff_id is null from public.appointments where id = current_setting('t.ga')::uuid)
+  and (select guest_instructor = '' from public.appointments where id = current_setting('t.gb')::uuid));
+select public.save_appointment(jsonb_build_object('id', current_setting('t.ga'), 'start', '2026-11-07 10:00', 'minutes', 120,
+  'staff_id', null, 'guest_instructor', 'Bo Guest', 'service', 'Reformer Workshop', 'capacity', 10, 'clients', '[]'::jsonb));
+select t.check('edit changes the guest', (select guest_instructor = 'Bo Guest' from public.appointments where id = current_setting('t.ga')::uuid));
+select t.expect_error('guest name up to 80', '22023', $$select public.save_appointment(jsonb_build_object('start', '2026-11-08 10:00',
+  'minutes', 50, 'staff_id', null, 'guest_instructor', repeat('x', 81), 'service', 'Reformer Workshop', 'capacity', 1, 'clients', '[]'::jsonb))$$);
+-- A category goes to Trash with its guest setting; a service restored after its category is gone has none.
+select public.delete_schedule_service(current_setting('t.ws')::uuid);
+select public.delete_schedule_category(current_setting('t.ev')::uuid);
+select public.restore_trash((select id from public.trash where label = 'Reformer Workshop'));
+select t.check('service restored without its deleted category', (select category_id is null and guest_instructor = 'Ana Guest'
+  from public.schedule_services where id = current_setting('t.ws')::uuid));
+select public.restore_trash((select id from public.trash where label = 'Events'));
+select t.check('category restored with its guest setting', (select guest and name = 'Events' from public.schedule_categories
+  where id = current_setting('t.ev')::uuid));
+select public.delete_schedule_service(current_setting('t.ws')::uuid);
+select public.delete_schedule_service((select id from public.schedule_services where name = 'trio'));
+select public.delete_schedule_category(current_setting('t.ev')::uuid);
 reset role;
 
 -- Admin: same as owner ---------------------------------------------------------------------
@@ -309,6 +358,12 @@ select t.expect_error('staff: no services', '42501', $$select public.save_schedu
 select t.expect_error('staff: no categories', '42501', $$select public.save_schedule_category('{"name":"X"}')$$);
 select t.expect_error('staff: no reorder', '42501', $$select public.set_schedule_order(null, null)$$);
 select t.expect_error('staff: no service delete', '42501', $$select public.delete_schedule_service(gen_random_uuid())$$);
+select t.expect_error('staff: no restore', '42501', $$select public.restore_trash(gen_random_uuid())$$);
+select t.expect_error('staff: no delete forever', '42501', $$select public.purge_trash(gen_random_uuid())$$);
+select t.check('staff: Trash is hidden', (select count(*) = 0 from public.trash));
+reset role;
+select t.check('Trash has rows the staff could not see', (select count(*) >= 3 from public.trash));
+select t.login('00000000-0000-0000-0000-0000000000b1');
 select t.expect_error('staff: no text delay', '42501', $$select public.set_change_text_minutes(5)$$);
 select t.expect_error('staff: no import', '42501', $$select public.import_schedule('[]', false)$$);
 select t.check('staff: client search by name and phone', (select phone_last4 = '0101' from public.schedule_search_clients('mina'))

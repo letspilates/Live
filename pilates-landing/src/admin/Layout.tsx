@@ -20,6 +20,7 @@ import {
   Receipt,
   ShieldCheck,
   Sun,
+  Trash2,
   UserRound,
   Users,
   Wallet,
@@ -66,6 +67,7 @@ export const NAV: { group: TextKey; items: NavItem[] }[] = [
       { to: 'access', label: 'navAccess', Icon: ShieldCheck },
       { to: 'schedule-settings', label: 'navScheduleSettings', Icon: CalendarCog },
       { to: 'backup', label: 'navBackup', Icon: DatabaseBackup },
+      { to: 'trash', label: 'navTrash', Icon: Trash2 },
     ],
   },
 ];

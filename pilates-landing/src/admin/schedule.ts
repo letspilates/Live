@@ -26,6 +26,8 @@ export interface Appointment {
   minutes: number;
   /** null = studio event (no instructor). */
   staff_id: string | null;
+  /** A guest who leads it (Other); only without staff_id. '' = none. */
+  guest_instructor: string;
   service: string;
   capacity: number;
   series_id: string | null;
@@ -50,6 +52,8 @@ export interface Category {
   id: string;
   name: string;
   sort: number;
+  /** Others: its services are led by guest instructors, not staff. */
+  guest: boolean;
 }
 
 export interface Service {
@@ -65,6 +69,8 @@ export interface Service {
   description: string;
   /** Instructors who teach it; null = every instructor. */
   staff_ids: string[] | null;
+  /** Who leads it, for a service in an Others category. */
+  guest_instructor: string;
 }
 
 // Schedulista's block colors, the fallback when an instructor has no color yet.
@@ -95,7 +101,7 @@ export async function loadAppointments(from: string, to: string): Promise<Appoin
   const { data, error } = await supabase!
     .from('appointments')
     .select(
-      'id, starts_at, minutes, staff_id, service, capacity, series_id, series_changed, status, appointment_clients(id, student_id, client_name, client_phone, status, notes, students(full_name))',
+      'id, starts_at, minutes, staff_id, guest_instructor, service, capacity, series_id, series_changed, status, appointment_clients(id, student_id, client_name, client_phone, status, notes, students(full_name))',
     )
     .eq('status', 'BOOKED')
     .gte('starts_at', laInstant(from))
@@ -133,10 +139,10 @@ export async function loadInstructors(): Promise<Instructor[]> {
 export async function loadServices(all = false): Promise<{ categories: Category[]; services: Service[] }> {
   let services = supabase!
     .from('schedule_services')
-    .select('id, name, minutes, capacity, active, sort, category_id, price_cents, cleanup_minutes, description, staff_ids');
+    .select('id, name, minutes, capacity, active, sort, category_id, price_cents, cleanup_minutes, description, staff_ids, guest_instructor');
   if (!all) services = services.eq('active', true);
   const [c, s] = await Promise.all([
-    supabase!.from('schedule_categories').select('id, name, sort').order('sort').order('name'),
+    supabase!.from('schedule_categories').select('id, name, sort, guest').order('sort').order('name'),
     services.order('sort').order('name'),
   ]);
   if (c.error) throw c.error;
