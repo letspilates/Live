@@ -467,19 +467,12 @@ function ClientHistory({ clientId, methods }: { clientId: string; methods: Metho
   );
 }
 
-/** Search the client list (new clients are added on the Clients screen). */
+/** Search the client list. New clients are added on the Clients screen, never here. */
 function ClientPicker({ onPick }: { onPick: (hit: StudentHit) => void }) {
   const { t } = useT();
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<StudentHit[] | null>(null);
   const [failed, setFailed] = useState(false);
-  // Adding a new client: anyone recording payments can, with a name and phone.
-  const [adding, setAdding] = useState(false);
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [tried, setTried] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [addFailed, setAddFailed] = useState(false);
   const q = query.trim();
   const searching = q.length >= 2;
 
@@ -498,59 +491,6 @@ function ClientPicker({ onPick }: { onPick: (hit: StudentHit) => void }) {
       window.clearTimeout(timer);
     };
   }, [q, searching]);
-
-  const addClient = async () => {
-    setTried(true);
-    if (!name.trim() || !phone.trim() || busy) return;
-    setBusy(true);
-    setAddFailed(false);
-    // add_student returns the existing client when the same name and phone are already saved.
-    const { data, error } = await supabase!.rpc('add_student', { p_full_name: name.trim(), p_phone: phone.trim() });
-    setBusy(false);
-    if (error) return setAddFailed(true);
-    onPick({
-      id: data as string,
-      full_name: name.trim(),
-      phone_last4: phone.replace(/\D/g, '').slice(-4),
-      last_paid_on: null,
-      last_amount_cents: null,
-      last_method: null,
-    });
-  };
-
-  if (adding) {
-    return (
-      <div className="grid gap-4">
-        <p className="text-sm text-mute">{t('newClientNote')}</p>
-        <TextField
-          label={t('fullName')}
-          autoComplete="off"
-          maxLength={120}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          error={tried && !name.trim() ? t('enterName') : undefined}
-        />
-        <TextField
-          label={t('phone')}
-          type="tel"
-          autoComplete="off"
-          maxLength={30}
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          error={tried && !phone.trim() ? t('enterPhone') : undefined}
-        />
-        {addFailed && <Notice tone="error">{t('somethingWrong')}</Notice>}
-        <div className="flex flex-wrap gap-3">
-          <Button disabled={busy} onClick={() => void addClient()}>
-            {t('addStudent')}
-          </Button>
-          <Button variant="secondary" onClick={() => setAdding(false)}>
-            {t('back')}
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="grid gap-3">
@@ -599,23 +539,6 @@ function ClientPicker({ onPick }: { onPick: (hit: StudentHit) => void }) {
           ))}
         </ul>
       )}
-      <div className="flex flex-wrap gap-2 border-t border-ink/10 pt-3">
-        <Button
-          variant="secondary"
-          className="min-h-10 px-4"
-          onClick={() => {
-            const isPhone = /\d{3}/.test(q);
-            setName(isPhone ? '' : q);
-            setPhone(isPhone ? q : '');
-            setTried(false);
-            setAddFailed(false);
-            setAdding(true);
-          }}
-        >
-          <Plus {...ICON} size={16} />
-          {t('addStudent')}
-        </Button>
-      </div>
     </div>
   );
 }
