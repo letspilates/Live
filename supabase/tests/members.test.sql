@@ -192,6 +192,19 @@ select t.check('merge: one Yuhee', (select count(*) = 1 from public.students whe
 select t.check('merge: same name, different phone still apart', (select count(*) = 2 from public.students
   where merged_into is null and app.client_name_key(full_name) = 'ian moon'));
 
+-- Merge by hand (different spellings)
+insert into public.students (full_name, phone) values ('설유희', ''), ('Yu Hee Seol', '2135550960');
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select public.merge_clients((select id from public.students where full_name = 'Yu Hee Seol'),
+  (select id from public.students where full_name = '설유희'), 'Yuhee Seol');
+select t.check('merge by hand: one client, renamed', (select count(*) = 1 from public.students where full_name = 'Yuhee Seol' and merged_into is null)
+  and (select merged_into is not null from public.students where full_name = '설유희'));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b1');
+select t.expect_error('merge by hand: instructor refused', '42501',
+  $$select public.merge_clients(gen_random_uuid(), gen_random_uuid())$$);
+reset role;
+
 select app.check_api_exposure();
 
 rollback;
