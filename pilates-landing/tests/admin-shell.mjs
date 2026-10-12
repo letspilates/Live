@@ -1096,7 +1096,17 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   // Clients is view-only for instructors
   const cl = await open('INSTRUCTOR', 1280, 'clients/');
   await cl.page.getByText('Mina Cho').first().waitFor();
-  check(!(await cl.page.getByRole('button', { name: /Add client|Import/ }).count()), 'clients: no add or import for instructors');
+  check(!(await cl.page.getByRole('button', { name: /Import/ }).count()), 'clients: no import for instructors');
+  // Clients access (Settings › Admin access) lets instructors add a client: name and phone only
+  calls.length = 0;
+  await cl.page.getByRole('button', { name: 'Add client' }).click();
+  const addDlg = cl.page.locator('dialog[open]');
+  check(await addDlg.getByLabel('Full name').isVisible() && !(await addDlg.getByLabel('Email').count()), 'clients: instructor adds with name and phone only');
+  await addDlg.getByLabel('Full name').fill('Zoe Han');
+  await addDlg.getByLabel('Phone').fill('310-555-0123');
+  await addDlg.getByRole('button', { name: 'Add client' }).click();
+  await addDlg.waitFor({ state: 'detached' });
+  check(calls.some(([n, b]) => n === 'add_student' && b.p_full_name === 'Zoe Han') && !calls.some(([n]) => n === 'update_member'), 'clients: instructor add saves the client only');
   await cl.context.close();
 }
 

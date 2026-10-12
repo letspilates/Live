@@ -152,12 +152,11 @@ export default function Members() {
             <span className="sr-only sm:not-sr-only">{t('refresh')}</span>
           </Button>
           {admin && <CsvPicker onText={pickFile} />}
-          {admin && (
-            <Button onClick={() => setOpen({ member: null })}>
-              <Plus {...ICON} size={16} />
-              {t('addStudent')}
-            </Button>
-          )}
+          {/* Anyone with Clients access (Settings › Admin access) can add a client. */}
+          <Button onClick={() => setOpen({ member: null })}>
+            <Plus {...ICON} size={16} />
+            {t('addStudent')}
+          </Button>
         </>
       }
     >
@@ -366,6 +365,8 @@ function MemberDialog({
 }) {
   const { t, lang } = useT();
   const admin = isAdmin(useStaff());
+  // A new client can be added by anyone on this screen; existing clients are edited by owners/admins.
+  const editable = admin || !m;
   const [form, setForm] = useState({
     full_name: m?.full_name ?? '',
     phone: m?.phone ?? '',
@@ -400,6 +401,11 @@ function MemberDialog({
     if (created?.error) {
       setBusy(false);
       return setError(t('somethingWrong'));
+    }
+    // Staff and instructors add a name and phone only; the other details are owner/admin edits.
+    if (!admin) {
+      setBusy(false);
+      return onSaved();
     }
     const { error: dbError } = await supabase!.rpc('update_member', {
       p_id: m ? m.id : (created!.data as string),
@@ -483,26 +489,30 @@ function MemberDialog({
           void save();
         }}
       >
-        <fieldset disabled={!admin} className="contents">
+        <fieldset disabled={!editable} className="contents">
           <TextField label={t('fullName')} maxLength={120} value={form.full_name} onChange={set('full_name')} />
           <TextField label={t('phone')} type="tel" maxLength={30} value={form.phone} onChange={set('phone')} />
-          <TextField label={t('email')} type="email" maxLength={254} value={form.email} onChange={set('email')} />
-          <TextField label={t('address')} maxLength={300} value={form.address} onChange={set('address')} />
-          <TextField label={t('memberNotes')} maxLength={2000} value={form.notes} onChange={set('notes')} />
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-ink">{t('status')}</span>
-            <select value={form.status} onChange={set('status')} className={inputCls}>
-              <option value="ACTIVE">{t('ACTIVE')}</option>
-              <option value="INACTIVE">{t('INACTIVE')}</option>
-            </select>
-          </label>
+          {(admin || m) && (
+            <>
+              <TextField label={t('email')} type="email" maxLength={254} value={form.email} onChange={set('email')} />
+              <TextField label={t('address')} maxLength={300} value={form.address} onChange={set('address')} />
+              <TextField label={t('memberNotes')} maxLength={2000} value={form.notes} onChange={set('notes')} />
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-ink">{t('status')}</span>
+                <select value={form.status} onChange={set('status')} className={inputCls}>
+                  <option value="ACTIVE">{t('ACTIVE')}</option>
+                  <option value="INACTIVE">{t('INACTIVE')}</option>
+                </select>
+              </label>
+            </>
+          )}
         </fieldset>
         {error && <Notice tone="error">{error}</Notice>}
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>
-            {t(admin ? 'cancel' : 'close')}
+            {t(editable ? 'cancel' : 'close')}
           </Button>
-          {admin && (
+          {editable && (
             <Button type="submit" disabled={busy}>
               {busy ? t('saving') : m ? t('save') : t('addStudent')}
             </Button>

@@ -56,7 +56,7 @@ select t.check('every privileged function checks the caller', not exists (
    where n.nspname = 'public' and p.prosecdef
      and p.proname not in ('public_training_courses', 'submit_training_registration',
                            'current_staff', 'update_my_name', 'update_my_profile')
-     and p.prosrc !~ 'app\.(me|require_owner|editable_payment)\(|public\.add_staff_user\('));
+     and p.prosrc !~ 'app\.(me|can|require_owner|editable_payment)\(|public\.add_staff_user\('));
 select app.check_api_exposure();
 select t.check('no table grants DELETE to the API', not exists (
   select 1 from information_schema.role_table_grants
@@ -181,14 +181,15 @@ select t.check('payments off: instructor sees no payments', t.rows('payment_tran
 select t.expect_error('payments off: record', '42501', format('select public.record_payment(gen_random_uuid(), 100, %L, %L)', 'CASH', current_setting('t.client')));
 select t.expect_error('payments off: correct own', '42501', format('select public.correct_payment(%L, 9000, %L)', current_setting('t.p_inst'), 'CASH'));
 select t.expect_error('payments off: void own', '42501', format('select public.void_payment(%L, %L)', current_setting('t.p_inst'), 'x'));
-select t.expect_error('payments off: add client', '42501', $$select public.add_student('New Person', '310-555-0000')$$);
+select t.check('payments off: instructor can still add a client (Clients is on)', public.add_student('New Person', '310-555-0000') is not null);
 select t.expect_error('payments off: search clients', '42501', $$select public.search_students('mina')$$);
 select t.expect_error('payments off: client history', '42501', format('select public.client_payments(%L)', current_setting('t.client')));
 select t.expect_error('payments off: staff names', '42501', 'select public.list_collectors()');
-select t.check('payments off: clients still readable', t.rows('students') = 1);
+select t.check('payments off: clients still readable (incl. the one just added)', t.rows('students') = 2);
 reset role;
 select t.login('00000000-0000-0000-0000-0000000000b1');
 select t.check('clients off: staff reads no clients', t.rows('students') = 0);
+select t.expect_error('clients off: staff cannot add a client', '42501', $$select public.add_student('Other Person', '310-555-0001')$$);
 select t.check('clients off: staff still records payments', (select amount_cents = 100
   from public.record_payment(gen_random_uuid(), 100, 'CREDIT', current_setting('t.client')::uuid)));
 select public.void_payment(id, 'test') from public.payment_transactions where amount_cents = 100;
