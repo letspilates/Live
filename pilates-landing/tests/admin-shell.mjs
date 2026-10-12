@@ -139,9 +139,36 @@ const KNOWLEDGE = [
 ];
 const knowledgeCalls = [];
 
+// Schedule: three blocks today in studio time. The browser runs in Seoul in the
+// schedule checks, so a time that followed the browser's zone would show wrong.
+const laISO = (day, min) => {
+  const wall = Date.parse(`${day}T00:00:00Z`) + min * 6e4;
+  const f = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  let t = wall;
+  for (let i = 0; i < 2; i++) {
+    const p = Object.fromEntries(f.formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+    t += wall - (Date.parse(`${p.year}-${p.month}-${p.day}T00:00:00Z`) + (Number(p.hour) * 60 + Number(p.minute)) * 6e4);
+  }
+  return new Date(t).toISOString();
+};
+const booking = (b) => ({ student_id: null, client_phone: '', status: 'BOOKED', notes: '', students: null, ...b });
+const APPTS = [
+  { id: 'a-1', starts_at: laISO(LA_TODAY, 540), minutes: 50, staff_id: 'i-sun', service: 'Private', capacity: 1, series_id: 'ser-1', series_changed: false,
+    status: 'BOOKED', appointment_clients: [booking({ id: 'b-1', student_id: 's-mina', client_name: 'Mina C', students: { full_name: 'Mina Cho' } })] },
+  { id: 'a-2', starts_at: laISO(LA_TODAY, 540), minutes: 50, staff_id: 'i-suk', service: 'Pilates Group', capacity: 5, series_id: 'ser-2', series_changed: true,
+    status: 'BOOKED', appointment_clients: [booking({ id: 'b-2', client_name: 'Leo Park' }), booking({ id: 'b-3', client_name: 'Sara Kim', status: 'CANCELLED' }),
+      booking({ id: 'b-4', client_name: 'Ana Lee', notes: 'Knee' })] },
+  { id: 'a-3', starts_at: laISO(LA_TODAY, 720), minutes: 120, staff_id: null, service: 'Workshop', capacity: 8, series_id: null, series_changed: false,
+    status: 'BOOKED', appointment_clients: [] },
+];
+const INSTRUCTORS = [{ user_id: 'i-suk', full_name: 'Su kyung YI', calendar_color: '#EEBC43', active: true },
+  { user_id: 'i-sun', full_name: 'Sunnie Lee', calendar_color: null, active: true }];
+const SERVICES = [['Private', 1], ['Gyrotonic', 1], ['Pilates Group', 5], ['Gyrotonic Group', 3]].map(([name, capacity]) => ({ name, minutes: 50, capacity, active: true }));
+const sched = []; // [rpc, body]
+
 /** A page signed in as `who` (or signed out when null) at the given width. */
-async function open(who, width, path = '') {
-  const context = await browser.newContext({ viewport: { width, height: width < 768 ? 852 : 900 } });
+async function open(who, width, path = '', options = {}) {
+  const context = await browser.newContext({ viewport: { width, height: width < 768 ? 852 : 900 }, ...options });
   const staff = who && PEOPLE[who];
   if (staff) {
     const user = { id: staff.user_id, email: staff.email, aud: 'authenticated', role: 'authenticated' };
@@ -303,6 +330,27 @@ async function open(who, width, path = '') {
       return r.fulfill({ json: name === 'save_knowledge_item' ? 'k-new' : 'f1/manual.pdf' });
     });
   }
+  await context.route(`${SUPABASE}/rest/v1/appointments?**`, (r) => r.fulfill({ json: APPTS }));
+  await context.route(`${SUPABASE}/rest/v1/appointment_clients?**`, (r) => r.fulfill({ json: APPTS.flatMap((a) => a.appointment_clients) }));
+  await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) => r.fulfill({ json: SERVICES }));
+  await context.route(`${SUPABASE}/rest/v1/schedule_settings?**`, (r) => r.fulfill({ json: [{ change_text_minutes: 15 }] }));
+  await context.route(`${SUPABASE}/rest/v1/rpc/schedule_instructors`, (r) => r.fulfill({ json: INSTRUCTORS }));
+  await context.route(`${SUPABASE}/rest/v1/rpc/schedule_search_clients`, (r) => {
+    sched.push(['schedule_search_clients', r.request().postDataJSON()]);
+    return r.fulfill({ json: [{ id: 's-leo', full_name: 'Leo Park', phone_last4: '0199' }] });
+  });
+  for (const name of ['save_appointment', 'move_appointment', 'cancel_appointment', 'set_calendar_color', 'save_schedule_service', 'set_change_text_minutes', 'import_schedule']) {
+    await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
+      const body = r.request().postDataJSON();
+      sched.push([name, body]);
+      if (name === 'save_appointment') return r.fulfill({ json: 'a-new' });
+      if (name !== 'import_schedule') return r.fulfill({ status: 204 });
+      // Rows for instructor "Nobody" fail like an unknown instructor does in the database.
+      const bad = body.p_rows.filter((x) => x.instructor === 'Nobody');
+      return r.fulfill({ json: { total: body.p_rows.length, importable: body.p_rows.length - bad.length, duplicates: 0, failed: bad.length,
+        appointments_new: body.p_rows.length - bad.length, errors: bad.map((x) => ({ row: x.row, reason: 'Instructor not found: Nobody' })) } });
+    });
+  }
   await context.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }));
   await context.route('https://www.youtube-nocookie.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<p>player</p>' }));
   // Staging no longer uses the Google Sheet at all.
@@ -341,7 +389,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Trainings' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Backup', `${device}: owner menu`);
+    check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup', `${device}: owner menu`);
     if (device === 'desktop') check(await page.locator('aside').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
@@ -420,7 +468,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(await page.locator('main').getByText(PEOPLE[who].email).isVisible(), `${who} ${device}: shows own email`);
     check(!(await page.getByText('Team', { exact: true }).count()), `${who} ${device}: no team card`);
     check((await page.getByText('Master').count()) === (who === 'INSTRUCTOR' ? 1 : 0), `${who} ${device}: tier only for instructors`);
-    if (device === 'desktop') check((await navLabels(page)).join() === 'Dashboard,Clients,Knowledge,Payments', `${who}: menu is Dashboard + Clients + Knowledge + Payments (Settings → Admin defaults)`);
+    if (device === 'desktop') check((await navLabels(page)).join() === (who === 'STAFF' ? 'Dashboard,Clients,Schedule,Knowledge,Payments' : 'Dashboard,Clients,Knowledge,Payments'), `${who}: menu follows Settings → Admin access defaults (staff also Schedule)`);
     check(await page.getByText('My payments today').isVisible(), `${who} ${device}: my-today card`);
     check(await noOverflow(page), `${who} ${device}: no sideways scroll`);
     check(errors.length === 0, `${who} ${device}: no page errors`);
@@ -1132,7 +1180,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 {
   const { page, context, errors } = await open('ADMIN', 1280, 'users/');
   await page.getByText('Ana Park').waitFor();
-  check((await navLabels(page)).join() === 'Dashboard,Clients,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Backup', 'admin: full menu');
+  check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup', 'admin: full menu');
   check(!(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).count()), 'admin: cannot edit the owner');
   check(await page.getByRole('button', { name: 'Edit user: Ana Park' }).isVisible(), 'admin: can edit others');
   await page.getByRole('button', { name: 'Add user' }).click();
@@ -1361,6 +1409,121 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   check(await noOverflow(page), 'backup phone: no sideways scroll');
   await shot(page, 'phone-backup');
   check(errors.length === 0, `backup: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 22. Schedule: studio time whatever the browser's zone, edit, drag to move + Undo, cancel; who may open it
+{
+  sched.length = 0;
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule/', { timezoneId: 'Asia/Seoul' });
+  check((await page.locator('h1').innerText()) === 'Schedule', 'schedule: page opens on the week');
+  const mina = page.getByRole('button', { name: /Mina Cho - Private/ });
+  await mina.waitFor();
+  check((await mina.innerText()).includes('9:00 - 9:50'), 'schedule: 9:00 studio time shows as 9:00 in a Seoul browser');
+  const group = page.getByRole('button', { name: /2\/5 - Pilates Group/ });
+  check(await group.isVisible(), 'schedule: group shows booked/capacity, cancelled booking not counted');
+  const workshop = page.getByRole('button', { name: /^12:00 - 2:00\s*Workshop/ });
+  check(await workshop.isVisible(), 'schedule: studio event without instructor');
+  const [m, g] = [await mina.boundingBox(), await group.boundingBox()];
+  check(Math.abs(m.y - g.y) < 1 && Math.abs(m.x - g.x) > 10, 'schedule: same-time blocks sit side by side');
+
+  // Edit: saving sends studio wall-clock text and keeps the booking.
+  await mina.click();
+  await page.getByRole('heading', { name: 'Edit Appointment' }).waitFor();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('heading', { name: 'Edit Appointment' }).waitFor({ state: 'detached' });
+  const p = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
+  check(p?.id === 'a-1' && p.start === `${LA_TODAY} 09:00` && p.minutes === 50 && p.staff_id === 'i-sun' && p.scope === 'one'
+    && p.clients.length === 1 && p.clients[0].id === 'b-1' && p.clients[0].student_id === 's-mina', 'schedule: edit saves 09:00 studio time, booking kept');
+
+  // Drag the 2-hour workshop down one hour: confirm, then Undo.
+  const w = await workshop.boundingBox();
+  await page.mouse.move(w.x + w.width / 2, w.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(w.x + w.width / 2, w.y + 20 + w.height / 4, { steps: 6 });
+  await page.mouse.move(w.x + w.width / 2, w.y + 20 + w.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await page.getByRole('heading', { name: 'Move Event' }).waitFor();
+  await page.getByRole('button', { name: 'Move', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo' }).waitFor();
+  const mv = sched.filter(([n]) => n === 'move_appointment').map(([, b]) => b);
+  check(mv[0]?.p_id === 'a-3' && mv[0].p_start === `${LA_TODAY} 13:00` && mv[0].p_scope === 'one', 'schedule: drag one hour down moves to 13:00 studio time');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.waitForTimeout(300);
+  const undo = sched.filter(([n]) => n === 'move_appointment').map(([, b]) => b)[1];
+  check(undo?.p_id === 'a-3' && undo.p_start === `${LA_TODAY} 12:00` && undo.p_series_changed === false, 'schedule: Undo puts it back at 12:00');
+
+  // Cancel asks first, then cancels (never deletes).
+  await workshop.click();
+  await page.getByRole('heading', { name: 'Edit Event' }).waitFor();
+  await page.getByRole('button', { name: 'Cancel Event' }).click();
+  await page.getByText('Take it off the calendar?').waitFor();
+  check(!sched.some(([n]) => n === 'cancel_appointment'), 'schedule: cancel asks before doing anything');
+  await page.getByRole('button', { name: 'Cancel Event' }).click();
+  await page.getByRole('heading', { name: 'Edit Event' }).waitFor({ state: 'detached' });
+  const c = sched.find(([n]) => n === 'cancel_appointment')?.[1];
+  check(c?.p_id === 'a-3' && c.p_scope === 'one', 'schedule: cancel sends the appointment');
+
+  // New appointment: client search uses the Schedule search (no payment data).
+  await page.getByRole('button', { name: 'New Appointment' }).click();
+  await page.getByPlaceholder(/Search/).first().fill('leo');
+  await page.getByRole('button', { name: /Leo Park/ }).click();
+  check(sched.some(([n, b]) => n === 'schedule_search_clients' && b.p_query === 'leo'), 'schedule: dialog searches clients with Schedule access');
+  check(errors.length === 0, `schedule: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+{
+  const { page, context, errors } = await open('OWNER', 393, 'schedule/', { timezoneId: 'Asia/Seoul' });
+  await page.getByRole('button', { name: /Mina Cho - Private/ }).waitFor();
+  check(await noOverflow(page), 'schedule phone: day view, no sideways scroll');
+  check(errors.length === 0, `schedule phone: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'schedule/', true], ['STAFF', 'schedule-settings/', false]]) {
+  const { page, context } = await open(who, 1280, path);
+  await page.locator('h1').waitFor();
+  const h1 = await page.locator('h1').innerText();
+  check((h1 === 'Schedule' || h1 === 'Schedule settings') === ok, `${who} ${path}: ${ok ? 'opens' : 'not allowed (Settings → Admin access / owner only)'}`);
+  await context.close();
+}
+
+// 23. Settings › Schedule: Schedulista CSV dry run → counts → import; a wrong file sends nothing
+{
+  sched.length = 0;
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule-settings/');
+  check((await page.locator('h1').innerText()) === 'Schedule settings', 'schedule settings: page opens');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const dir = fs.mkdtempSync(`${os.tmpdir()}/sched-`);
+  fs.writeFileSync(`${dir}/wrong.csv`, 'Name,Phone\nMina Cho,555\n');
+  fs.writeFileSync(`${dir}/appointments.csv`, [
+    'Appointment Time,Appointment Duration,Provider Name,Service Name,Client Name,Client Email,Client Phone,Appointment Created,Price,Appointment Notes,Location',
+    '2026-03-08 09:00:00,50,Sunnie,Private with Sunnie -,Mina Cho,,+13105550101,2026-03-01 10:00:00,$130.00,,',
+    '2026-03-08 09:00:00,50,Nobody,Private with Nobody,Leo Park,,+13105550199,,,,',
+    '2026-03-09 10:00:00,360,,Gyrotonic Workshop,Sara Kim,sara@example.com,,,,"Bring socks\nand water",',
+    'not a date,50,Sunnie,Private with Sunnie,Zed Quinn,,,,,,',
+  ].join('\n'));
+  const file = page.locator('input[type=file]');
+  await file.setInputFiles(`${dir}/wrong.csv`);
+  await page.getByText(/not a Schedulista appointments export/).waitFor();
+  check(!sched.some(([n]) => n === 'import_schedule'), 'import: wrong file is refused before anything is sent');
+
+  await file.setInputFiles(`${dir}/appointments.csv`);
+  await page.getByRole('button', { name: 'Import 2 rows' }).waitFor();
+  const dry = sched.filter(([n]) => n === 'import_schedule').map(([, b]) => b);
+  const [r1, , r3] = dry[0]?.p_rows ?? [];
+  check(dry.length === 1 && dry[0].p_commit === false && dry[0].p_rows.length === 3, 'import: dry run first with the 3 readable rows');
+  check(r1?.start === '2026-03-08 09:00' && r1.service === 'Private' && r1.instructor === 'Sunnie' && r1.price_cents === 13000
+    && r1.created === '2026-03-01 10:00:00' && r1.client_phone === '+13105550101', 'import: row read as studio time, service, instructor, price in cents');
+  check(r3?.service === 'Gyrotonic Workshop' && r3.instructor === '' && r3.minutes === 360 && r3.notes === 'Bring socks\nand water', 'import: workshop has no instructor, notes keep line breaks');
+  const stat = (label) => page.locator('dt', { hasText: label }).locator('xpath=following-sibling::dd').innerText();
+  check(await stat('Total records') === '4' && await stat('Ready to import') === '2' && await stat("Can't import") === '2', 'import: preview counts');
+  check(await page.getByText(/Instructor not found: Nobody/).isVisible() && await page.getByText(/Missing or invalid date\/time/).isVisible(), 'import: reasons with row numbers');
+  await page.getByRole('button', { name: 'Import 2 rows' }).click();
+  await page.getByText('Import finished.').waitFor();
+  const commit = sched.filter(([n]) => n === 'import_schedule').map(([, b]) => b)[1];
+  check(commit?.p_commit === true && commit.p_rows.length === 3 && await stat('Successfully imported') === '2', 'import: import sends the rows and shows the result');
+  check(errors.length === 0, `schedule settings: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 

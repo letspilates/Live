@@ -19,11 +19,14 @@ import Reports from './pages/Reports';
 import SetPassword from './pages/SetPassword';
 import Access from './pages/Access';
 import Backup from './pages/Backup';
+import Schedule from './pages/Schedule';
+import ScheduleSettings from './pages/ScheduleSettings';
 import StaffPage from './pages/Staff';
 
 const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType> = {
   '': Dashboard,
   clients: Members,
+  schedule: Schedule,
   trainings: Enrollments,
   knowledge: Knowledge,
   payments: DailyIncome,
@@ -32,6 +35,7 @@ const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType>
   users: StaffPage,
   access: Access,
   notifications: Notifications,
+  'schedule-settings': ScheduleSettings,
   backup: Backup,
   account: Account,
 };

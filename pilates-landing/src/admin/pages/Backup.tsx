@@ -11,7 +11,14 @@ import { toCsv } from '../expenses';
 import { Button, Card, CardTitle, Notice } from '../ui';
 
 type Row = Record<string, unknown>;
-type Data = { students: Row[]; payment_transactions: Row[]; payment_methods: Row[]; accounting_periods: Row[] };
+type Data = {
+  students: Row[];
+  payment_transactions: Row[];
+  payment_methods: Row[];
+  accounting_periods: Row[];
+  appointments: Row[];
+  appointment_clients: Row[];
+};
 
 // Pages of 1000 (the API's cap), ordered down to a unique column so no row is
 // skipped or read twice between pages.
@@ -59,6 +66,8 @@ export default function Backup() {
         payment_transactions: await readAll('payment_transactions', ['business_date', 'recorded_at', 'id']),
         payment_methods: await readAll('payment_methods', ['sort_order', 'code']),
         accounting_periods: await readAll('accounting_periods', ['month']),
+        appointments: await readAll('appointments', ['id']),
+        appointment_clients: await readAll('appointment_clients', ['id']),
       });
     } catch {
       setFailed(true);

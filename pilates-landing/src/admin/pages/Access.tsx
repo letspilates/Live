@@ -13,11 +13,11 @@ import { Card, Notice, Skeleton } from '../ui';
 type Grant = { role: Role; menu: Menu };
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 
-// Every menu in the sidebar, plus Schedule before it has a screen.
-const ROWS: { label: TextKey; rule: string; soon?: boolean }[] = [
-  ...NAV.flatMap((g) => g.items).map((i) => ({ label: i.label, rule: ADMIN_ROUTES[i.to] as string })),
-  { label: 'navSchedule', rule: 'schedule', soon: true },
-];
+// Every menu in the sidebar.
+const ROWS: { label: TextKey; rule: string }[] = NAV.flatMap((g) => g.items).map((i) => ({
+  label: i.label,
+  rule: ADMIN_ROUTES[i.to] as string,
+}));
 
 export default function Access() {
   const { t } = useT();
@@ -99,7 +99,6 @@ export default function Access() {
                 <div key={row.label} role="row" className="contents">
                   <span role="rowheader" className="border-t border-ink/10 px-4 py-3 font-medium sm:px-5">
                     {t(row.label)}
-                    {row.soon && <span className="block text-xs font-normal text-mute">{t('comingSoon')}</span>}
                   </span>
                   {ROLES.map((r) => (
                     <span key={r} role="cell" className="flex items-center justify-center border-t border-ink/10 py-3">
