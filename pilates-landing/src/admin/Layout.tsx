@@ -84,10 +84,13 @@ function readCollapsed() {
 export default function Layout({
   title,
   actions,
+  wide = false,
   children,
 }: {
   title: string;
   actions?: ReactNode;
+  /** Use the whole window width (the calendar). */
+  wide?: boolean;
   children: ReactNode;
 }) {
   const { t } = useT();
@@ -165,7 +168,7 @@ export default function Layout({
         <main
           id="main"
           tabIndex={-1}
-          className="mx-auto w-full max-w-6xl px-4 pb-10 pt-4 outline-none sm:px-6 lg:px-8 lg:pt-6"
+          className={`mx-auto w-full ${wide ? '' : 'max-w-6xl'} px-4 pb-10 pt-4 outline-none sm:px-6 lg:px-8 lg:pt-6`}
         >
           {actions && <div className="mb-6 flex flex-wrap justify-end gap-3">{actions}</div>}
           {children}

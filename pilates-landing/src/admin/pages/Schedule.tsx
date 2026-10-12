@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -360,7 +361,7 @@ export default function Schedule() {
         : dayText(from, lang, { month: 'long', day: 'numeric', year: 'numeric' }, addDays(to, -1));
 
   return (
-    <Layout title={t('navSchedule')}>
+    <Layout title={t('navSchedule')} wide>
       <Card pad={false} className="overflow-hidden">
         <div className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-4 md:grid-cols-[1fr_auto_1fr] md:px-5 md:py-5">
           <div role="tablist" aria-label={t('navSchedule')} className="inline-flex justify-self-start rounded-full bg-ink/[0.06] p-1">
@@ -618,7 +619,7 @@ function Block({
 /** Hour column + one column per day (week = 7, day = 1). */
 function TimeGrid({
   days,
-  ph,
+  ph: minPh,
   appts,
   ghost,
   now,
@@ -626,7 +627,7 @@ function TimeGrid({
   onSlot,
 }: {
   days: string[];
-  /** pixels per minute */
+  /** pixels per minute at least; wider screens stretch the hours to fill the window */
   ph: number;
   appts: Appointment[];
   ghost: Spot | null;
@@ -638,6 +639,20 @@ function TimeGrid({
   // 6 am – 10 pm, longer when something starts earlier or ends later.
   const g0 = Math.min(360, ...appts.map((a) => Math.floor(a.start / 60) * 60));
   const g1 = Math.min(1440, Math.max(1320, ...appts.map((a) => Math.ceil((a.start + a.minutes) / 60) * 60)));
+  // Tablets and up: the day fills the window down to the bottom (phones scroll inside the box).
+  const body = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState(0);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = body.current;
+      const wide = window.matchMedia('(min-width: 768px)').matches;
+      setRoom(el && wide ? window.innerHeight - (el.getBoundingClientRect().top + window.scrollY) - 40 : 0);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+  const ph = Math.max(minPh, room / (g1 - g0));
   const grid = { ph, g0, g1 };
   const height = (g1 - g0) * ph;
   const cols = { gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` };
@@ -662,7 +677,7 @@ function TimeGrid({
           </div>
         ))}
       </div>
-      <div className="grid" style={cols}>
+      <div ref={body} className="grid" style={cols}>
         <div className="relative" style={{ height }}>
           {hours.map((m) => (
             <span key={m} className="absolute right-2 -translate-y-1/2 text-xs text-mute" style={{ top: (m - g0) * ph }}>
