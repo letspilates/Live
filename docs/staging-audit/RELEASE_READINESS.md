@@ -2,7 +2,7 @@
 
 ## Decision: **NO-GO**
 
-> **한국어.** 지금 main 병합은 하지 않는 것이 맞습니다. 실제 데이터를 운영 DB로 옮기는 방법이 검증되지 않았고(P0), P1 5건이 남아 있으며, 운영 Supabase 프로젝트도 아직 없습니다. 아래 조건을 채우면 CONDITIONAL GO로 바뀝니다.
+> **한국어.** 지금 main 병합은 하지 않는 것이 맞습니다. 실제 데이터를 운영 DB로 옮기는 방법이 검증되지 않았고(P0), P1 4건이 남아 있으며, 운영 Supabase 프로젝트도 아직 없습니다. 아래 조건을 채우면 CONDITIONAL GO로 바뀝니다.
 
 Audited revision: `Staging` @ `af8a957` (2026-10-13). Production today serves only the homepage; its `/admin/` shows "not connected" and the training form still writes to Google Sheets, so holding the release has no customer impact.
 
@@ -12,15 +12,14 @@ Audited revision: `Staging` @ `af8a957` (2026-10-13). Production today serves on
 |---|---|---|
 | AUDIT-001 | P0 | Production would start without the Jan–Oct payment history, cleaned clients and imported schedule, or with an improvised copy that breaks staff links and closed months. |
 | AUDIT-002 | P1 | The only copy of that data is in a project with no automated backup, and fix pushes run migrations against it. |
-| AUDIT-003 | P1 | One Delete click in Users can permanently strip an instructor from their appointment history. |
+| AUDIT-003 | P1 | One Delete click in Users can permanently strip an instructor from their appointment history (one real instructor with 159 appointments is exposed today). |
 | AUDIT-004 | P1 | Silent cancellation of real client bookings when two people use the calendar. |
 | AUDIT-005 | P1 | Payments land on the wrong day/month from a screen left open overnight. |
-| AUDIT-006 | P1 | Owner's home screen overstates monthly profit. |
 
 ## Required remediation before GO
 
 1. AUDIT-002 now: Backup JSON (and a DB dump if possible) before any migration push.
-2. AUDIT-003, 004, 005, 006 fixed on Staging and verified there by Calvin.
+2. AUDIT-003, 004, 005 fixed on Staging and verified there by Calvin (AUDIT-006 is a one-line fix worth doing in the same pass).
 3. AUDIT-007 checklist rewritten; AUDIT-008 sign-ups turned off in the production plan; AUDIT-018 bot protection before the public form points at production Supabase.
 4. AUDIT-001: copy method chosen and rehearsed into a scratch project with matching reconciliation.
 5. Calvin's decisions recorded for AUDIT-010 (staff payment visibility) and AUDIT-016 (instructor schedule scope) if Instructor Schedule will be on at launch.
@@ -29,7 +28,7 @@ P2 items not listed above can ship after launch if Calvin accepts them; P3 items
 
 ## Unverified critical functions
 
-- Signed-in behaviour against the real Staging data (blocked; verified on local copies only).
+- Staff / Instructor sign-in on real Staging (no test login; verified on the local database). Owner sign-in, every menu page and Reports reconciliation were verified on real Staging read-only.
 - Data copy / restore into a real project (no project yet).
 - Real iPhone/iPad use of Record payment and the calendar.
 - Invite emails (Custom SMTP not confirmed).

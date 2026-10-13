@@ -55,7 +55,7 @@ Complexity: S = under half a day, M = about a day, L = several days or needs Cal
 - **Acceptance criteria:** With a fake clock crossing LA midnight, the save sends no back-date and the Dashboard refetches.
 - **Regression tests:** admin-shell check with a mocked clock (23:50 → 00:05 LA).
 
-### 6. AUDIT-006: Dashboard month figures must match Reports
+### 6. AUDIT-006: Dashboard month figures must match Reports (P2 after the live check; listed here because it is a one-line fix in a file Wave 2 already touches)
 - **Required change:** Dashboard uses `monthEnd(thisMonth())` as the end of the KPI range and the chart's last month.
 - **Target files:** `pilates-landing/src/admin/pages/Dashboard.tsx`.
 - **Dependencies:** none.

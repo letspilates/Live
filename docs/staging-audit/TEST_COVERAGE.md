@@ -3,7 +3,7 @@
 Audit of Staging `af8a957` on 2026-10-13. Counts are scenarios, not findings: one finding can fail several scenarios, and several scenarios can share one finding.
 
 **How to read the columns**
-- **Tested (executed)** = actually run: on a throwaway local Postgres 16 with all 38 migrations, in Playwright against a local Staging build with mocked Supabase, or as a read-only request to the real Staging site/project. Tested = Passed + Failed.
+- **Tested (executed)** = actually run: on a throwaway local Postgres 16 with all 38 migrations, in Playwright against a local Staging build with mocked Supabase, or as a read-only request to the real Staging site/project (including a signed-in Owner session from Calvin's test login, with every write request blocked in the browser). Tested = Passed + Failed.
 - **Inspected only** = established by reading code or docs. These are not counted as passed tests.
 - **Blocked** = could not be run safely. **Not tested** = out of reach (listed per section below).
 
@@ -11,26 +11,26 @@ Audit of Staging `af8a957` on 2026-10-13. Counts are scenarios, not findings: on
 
 | Section | Tested (executed) | Passed | Failed | Blocked | Inspected only | Not tested |
 |---|---:|---:|---:|---:|---:|---:|
-| A. UI / Visual | 4 | 2 | 2 | 0 | 1 | 0 |
+| A. UI / Visual | 5 | 2 | 3 | 0 | 1 | 0 |
 | B. UX / Workflows | 6 | 4 | 2 | 0 | 0 | 1 |
-| C. Mobile / Tablet / Desktop | 7 | 3 | 4 | 0 | 0 | 1 |
-| D. Routes / Navigation | 10 | 9 | 1 | 0 | 2 | 0 |
-| E. Calendar / Scheduling | 21 | 15 | 6 | 1 | 6 | 0 |
-| F. Database / Integrity | 13 | 7 | 6 | 1 | 3 | 0 |
-| G. Auth / Permissions | 29 | 25 | 4 | 1 | 3 | 0 |
+| C. Mobile / Tablet / Desktop | 8 | 3 | 5 | 0 | 0 | 1 |
+| D. Routes / Navigation | 11 | 10 | 1 | 0 | 2 | 0 |
+| E. Calendar / Scheduling | 22 | 15 | 7 | 1 | 6 | 0 |
+| F. Database / Integrity | 15 | 8 | 7 | 0 | 3 | 0 |
+| G. Auth / Permissions | 30 | 26 | 4 | 1 | 3 | 0 |
 | H. Payments | 11 | 7 | 4 | 0 | 2 | 1 |
-| I. Reports | 7 | 5 | 2 | 1 | 4 | 0 |
-| J. Backup / Recovery | 5 | 3 | 2 | 0 | 4 | 2 |
+| I. Reports | 9 | 7 | 2 | 0 | 4 | 0 |
+| J. Backup / Recovery | 6 | 4 | 2 | 0 | 4 | 2 |
 | K. Background jobs | 1 | 1 | 0 | 0 | 4 | 0 |
 | L. API / Integrations | 4 | 3 | 1 | 0 | 9 | 2 |
 | M. Security / Config | 6 | 4 | 2 | 0 | 3 | 0 |
-| N. Performance | 1 | 0 | 1 | 0 | 4 | 1 |
+| N. Performance | 2 | 1 | 1 | 0 | 4 | 1 |
 | O. Deployment / Readiness | 4 | 3 | 1 | 0 | 6 | 2 |
-| **Total** | **129** | **91** | **38** | **4** | **51** | **10** |
+| **Total** | **140** | **98** | **42** | **2** | **51** | **10** |
 
 ## Critical end-to-end scenarios
 
-The real Staging database holds production data (Jan–Oct payments, clients, the 2026 schedule), so no write was made there. Each chain below was executed on local copies: the screen half in Playwright against the built portal (mocked Supabase), the data half on local Postgres through the same RPCs the screens call.
+The real Staging database holds production data (Jan–Oct payments, clients, the 2026 schedule), so no write was made there. The write halves of each chain below were executed on local copies: the screen half in Playwright against the built portal (mocked Supabase), the data half on local Postgres through the same RPCs the screens call.
 
 | # | Chain | Where executed | Result |
 |---|---|---|---|
@@ -43,6 +43,7 @@ The real Staging database holds production data (Jan–Oct payments, clients, th
 | 7 | Backup Everything (JSON) → restore into an empty project built from the migrations | local DB | Fail (AUDIT-001) |
 | 8 | Public training form → course list → submit → admin sees applicant | local DB | Pass functionally; bot seat exhaustion (AUDIT-018) |
 | 9 | Push to Staging → Pages deploy + Supabase migrations | staging-live (read-only) | Pass for af8a957 |
+| 10 | Real Owner sign-in → every menu page at 4 widths → Reports Jan–Oct reconciled with real payment rows → Backup JSON of the real data | staging-live (read-only, writes blocked) | Pass, except 1024px layout (AUDIT-021) and no Staging marker on phones/sign-in (AUDIT-022) |
 
 No payment provider, webhook, SMS or scheduled job exists, so none was tested.
 
@@ -68,6 +69,7 @@ Method values: `local-exec`, `staging-live` and `node` are executed; `code-inspe
 | Homepage content diffs (New Student→New Client, noCourses) / index.html / public | code-inspection | pass (content only; public/admin moved to /admin/legacy/, root index.html unchanged) |
 | Clipped text / table cell spill / overlapping text on all routes | local-exec | pass, except the known Access-table label overlap (accepted 2026-10-11; at 375 "Notifications" overlaps the Owner ✓ by 17px) and calendar blocks (clipped by design) |
 | Staging indicator on phones / login | local-exec | fail (AUDIT-022) |
+| Staging marker on real portal at 375 and on sign-in | staging-live | fail: none (AUDIT-022) |
 
 ### B. UX / Workflows
 
@@ -92,6 +94,7 @@ Method values: `local-exec`, `staging-live` and `node` are executed; `code-inspe
 | Touch targets < 32px on key controls (375) | local-exec | fail, minor (AUDIT-026) |
 | Schedule header at 768/800/820/1024 | local-exec | fail at 768 only (AUDIT-024) |
 | KR language at 375/768 (overflow, clipping) | local-exec | pass |
+| Real portal at 1024px: Dashboard and Payments | staging-live | fail: money cut off, Payments 1px sideways scroll (AUDIT-021) |
 | Real iOS Safari rendering (emulated widths only) | — | not tested |
 
 ### D. Routes / Navigation
@@ -110,6 +113,7 @@ Method values: `local-exec`, `staging-live` and `node` are executed; `code-inspe
 | Production /admin/ before prod Supabase is wired shows "not connected" (legacy moved to /admin/legacy/) | code-inspection | known cutover step (docs/admin/PRODUCTION-CUTOVER-KO.md), not filed |
 | Real Staging deep links: /staging/admin/payments → 301 → /payments/; /schedule/, /backup/ 200 | staging-live | pass |
 | Real Staging unknown admin path /staging/admin/nonexistent | staging-live | fail: GitHub 404 (AUDIT-025) |
+| All 16 menu pages signed in on real Staging at 375/768/1024/1440 (64 loads, writes blocked) | staging-live | pass (no page errors, no failed requests, no error alerts) |
 
 ### E. Calendar / Scheduling
 
@@ -143,6 +147,7 @@ Method values: `local-exec`, `staging-live` and `node` are executed; `code-inspe
 | Import: Schedulista status column (cancelled rows) handling | blocked (no sample CSV) | blocked |
 | Late cancel / No-show statuses and fold into date circle | code-inspection | pass (copy AUDIT-034, capacity AUDIT-033) |
 | MinutesInput clamps 5-720, step 5 | code-inspection | pass |
+| Real same-client overlapping bookings | staging-live | fail: 35 overlapping pairs, no warning (AUDIT-014) |
 
 ### F. Database / Integrity
 
@@ -164,7 +169,8 @@ Method values: `local-exec`, `staging-live` and `node` are executed; `code-inspe
 | Multi-step RPC atomicity (record/correct/void/refund/close/merge/merge_duplicate subtransactions) | code-inspection | pass (single transaction each; merge groups in subtransactions) |
 | Expenses direct writes (created_by spoof, un-void) | local-exec | weak (AUDIT-040, P3) |
 | supabase/tests/run-local.sh: 38 migrations + all 12 SQL suites | local-exec | pass |
-| Row counts and orphan scan on real Staging | staging-live | blocked: same reason |
+| Real row counts and integrity scan: orphans, client-less payments, payments/bookings on merged clients, integer cents, dates before 2020 or in the future, refunds over original | staging-live | pass (none found) |
+| Real instructor-delete exposure (instructors with appointments and no other records) | staging-live | fail: one instructor with 159 appointments is deletable (AUDIT-003) |
 
 ### G. Auth / Permissions
 
@@ -202,7 +208,8 @@ Method values: `local-exec`, `staging-live` and `node` are executed; `code-inspe
 | Anon (publishable key) request to all 19 public tables on real Staging | staging-live | pass (401 on every table) |
 | PostgREST schema root with publishable key on real Staging | staging-live | pass (refused, secret key required) |
 | Real Staging Auth settings (GET /auth/v1/settings) | staging-live | fail: sign-ups ON, confirmation ON (AUDIT-008) |
-| Signed-in read-only role checks against real Staging data | staging-live | blocked: the session safety policy refused reads of real client tables; test Owner login lives in another thread |
+| Owner/Admin sign-in through the real login page (Calvin's test login), 4 widths | staging-live | pass |
+| Staff / Instructor sign-in and role limits on real Staging | staging-live | blocked: no Staff/Instructor test login; creating one would be a write |
 
 ### H. Payments
 
@@ -238,7 +245,8 @@ Method values: `local-exec`, `staging-live` and `node` are executed; `code-inspe
 | Payments history paging (>1000 rows) | code-inspection | risk (AUDIT-039, P3) |
 | CSV formula injection: toCsv used by Reports, Expenses, Backup (clients + payments); prefixes = + - @ TAB CR; numbers left numeric | code-inspection | pass |
 | Payment paging order unique (loadPayments, Backup readAll, Members) | code-inspection | pass (unique tiebreak), see AUDIT-039 |
-| Report totals vs real Staging payment rows (Jan–Oct) | staging-live | blocked: same reason; verified on local data instead |
+| Reports Jan–Oct 2026 vs sum of real payment rows, per month (net and payment count) | staging-live | pass (10/10 months equal; Jan–Sep also equal Calvin's sheet totals) |
+| Dashboard October expenses vs Reports on real data | staging-live | pass today (no recurring rules or later-dated expenses yet; AUDIT-006) |
 
 ### J. Backup / Recovery
 
@@ -253,6 +261,7 @@ Method values: `local-exec`, `staging-live` and `node` are executed; `code-inspe
 | Staff ids survive into prod (auth.users FK) | local-exec | fail (AUDIT-001) |
 | Automated backups of the DB holding real data | code-inspection (docs) | fail (AUDIT-002) |
 | Backup CSV formula-injection guard (`toCsv`) | code-inspection | pass |
+| Backup › Everything (JSON) on real data | staging-live | pass (4.4 MB in 6.3 s; every table count equals live count; file deleted after counting) |
 | Restore into a scratch Supabase project (no project exists; destructive on Staging) | — | not tested |
 | Supabase plan tier and backup list (dashboard only) | — | not tested |
 
@@ -309,6 +318,7 @@ Method values: `local-exec`, `staging-live` and `node` are executed; `code-inspe
 | Paging — enrollments, knowledge, expenses (per month), RPCs (limit 10) | code-inspection | pass (small or limited) |
 | N+1 request patterns | code-inspection | pass (none found; imports chunked 500) |
 | Bundle size | local-exec | P3 (AUDIT-044) |
+| Real page load times signed in | staging-live | pass (1.5–2.4 s per menu page incl. Clients 795 rows and Schedule) |
 | Load testing (not justified at ~800 clients and ~300 appointments a month) | — | not tested |
 
 ### O. Deployment / Readiness

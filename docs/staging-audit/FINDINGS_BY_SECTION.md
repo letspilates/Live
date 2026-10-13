@@ -2,7 +2,7 @@
 
 Audit of Staging `af8a957` on 2026-10-13. IDs are ranked by risk (AUDIT-001 is the highest). Status: Confirmed = reproduced by execution or certain from code; Suspected = mechanism clear, impact depends on settings or policy; Blocked = could not be checked safely.
 
-Evidence types: `local-exec` = run on a throwaway local Postgres 16 with all 38 migrations, or Playwright against a local build with mocked Supabase; `staging-live` = read-only request to the real Staging site or project; `code-inspection` = read from source. No record on real Staging was created, changed or deleted. Probe scripts stayed in the audit session's scratch area and are not committed. All names in evidence are invented test data.
+Evidence types: `local-exec` = run on a throwaway local Postgres 16 with all 38 migrations, or Playwright against a local build with mocked Supabase; `staging-live` = read-only request to the real Staging site or project, including a signed-in Owner session from Calvin's test login (every write request was blocked in the browser); `code-inspection` = read from source. No record on real Staging was created, changed or deleted. Probe scripts stayed in the audit session's scratch area and are not committed. All names in evidence are invented test data.
 
 ## A. UI / Visual Consistency
 
@@ -28,6 +28,7 @@ Findings here: AUDIT-022 (P2), AUDIT-027 (P3), AUDIT-029 (P3).
   - Content-only, no layout change: on staging builds prefix `document.title` with "STAGING ·". Also add the existing badge text to the sign-in card (or show the existing badge at all widths, which needs Calvin's OK).
   - After cutover, consider disabling Staging writes for non-test accounts.
 - Verification approach: screenshot at 375 and the Login page on the staging build, then check that the marker is visible and the title is prefixed.
+- Live check (real Staging, signed in as Owner, read-only, 2026-10-13): confirmed on the real portal: no Staging marker on any page at 375px, and none on the sign-in page at any width (page title is the same as production's).
 
 ### AUDIT-027 Clients source-chip counts ignore the Active/Inactive filter
 - Section: A UI / Visual Consistency
@@ -122,6 +123,7 @@ Findings here: AUDIT-021 (P2), AUDIT-024 (P3), AUDIT-026 (P3), AUDIT-030 (P3).
 - Root cause: the `lg` breakpoint (1024) switches to a 4-column KPI strip and a 2-column Payments layout while the 240px sidebar is also showing. That leaves about 130–150px per cell, and the amounts use `truncate`.
 - Recommended fix (design-locked, so get Calvin's OK first): the smallest change is to apply the 4-column KPI grid and the Payments 2-column layout from `xl:` instead of `lg:`. The layout above 1280 stays exactly as now. An alternative is to drop `truncate` on the amount spans only.
 - Verification approach: rerun `partA1024.mjs` (widths 1024 and 1180). Expect `truncMoney=0` and `overflow=no`.
+- Live check (real Staging, signed in as Owner, read-only, 2026-10-13): reproduced on the real portal at 1024px: the Dashboard has a cut-off money figure and Payments scrolls sideways (1025 > 1024). Fine at 375, 768 and 1440.
 
 ### AUDIT-024 Schedule settings button half cut off at 768px (iPad mini portrait)
 - Section: C Mobile / Tablet / Desktop
@@ -250,6 +252,7 @@ Findings here: AUDIT-004 (P1), AUDIT-012 (P2), AUDIT-013 (P2), AUDIT-014 (P2), A
 - Root cause: no check for a client clash on the server or in the UI.
 - Recommended fix: before saving, have the server return the clashing bookings for the chosen clients (or add a `schedule_client_clashes` RPC) and show a warning with "Book anyway", the same pattern as `calClash`. Optionally refuse an exact duplicate (same staff, start and client).
 - Verification approach: rerun p3.sql; expect a warning path (or an error for the exact duplicate) and check in a screen test that the dialog shows it.
+- Live check (real Staging, signed in as Owner, read-only, 2026-10-13): the real schedule already has 35 pairs of overlapping bookings for the same client (mostly from the Schedulista import). Some may be legitimate; nothing warned about them.
 
 ### AUDIT-017 Re-importing a newer Schedulista export duplicates rescheduled bookings (old time stays BOOKED)
 - Section: E Calendar / Booking / Scheduling
@@ -325,6 +328,7 @@ Findings here: AUDIT-003 (P1), AUDIT-011 (P2), AUDIT-032 (P3), AUDIT-035 (P3), A
 - Recommended fix: change both FKs to `on delete restrict` (no action) in a new migration, so delete_staff_user refuses and points to Deactivate. Do not use cascade.
 - Verification approach: rerun p8.sql: expect SQLSTATE LPREF and appointments unchanged; add a case to schedule.test.sql.
 - Also affected: `schedule_services.staff_ids` (uuid[] with no FK) keeps the deleted id. Found independently by the DB and Schedule passes.
+- Live check (real Staging, signed in as Owner, read-only, 2026-10-13): one instructor with 159 appointments has no payment, client, expense or other record pointing at them, so Users › Delete would succeed today and strip all 159 appointments. A second instructor (76 appointments) is protected only because other records reference them.
 
 ### AUDIT-011 Training courses are saved as a whole list: a stale tab hard-deletes courses and leaves registrants with dangling course ids
 - Section: F Database / Data Integrity
@@ -388,7 +392,7 @@ Findings here: AUDIT-003 (P1), AUDIT-011 (P2), AUDIT-032 (P3), AUDIT-035 (P3), A
 
 ## G. Authentication / Users / Permissions
 
-Anon is locked out (verified live on real Staging), owners are protected from admins, no self-escalation, deactivated users blocked. Gaps are data visibility beyond the stated rules and the open sign-up setting.
+Anon is locked out (verified live on real Staging), Owner sign-in works on the real portal, owners are protected from admins, no self-escalation, deactivated users blocked. Gaps are data visibility beyond the stated rules and the open sign-up setting.
 
 Findings here: AUDIT-008 (P2), AUDIT-010 (P2), AUDIT-015 (P2), AUDIT-016 (P2), AUDIT-041 (P3).
 
@@ -536,13 +540,13 @@ Findings here: AUDIT-005 (P1), AUDIT-009 (P2), AUDIT-036 (P3), AUDIT-038 (P3).
 
 ## I. Reports / Analytics
 
-Report totals match payment rows with LA day boundaries, including 23:30 LA on the last day. The Dashboard's month expenses/profit disagree with Reports.
+Report totals match payment rows with LA day boundaries, including 23:30 LA on the last day. On real Staging, Reports for each month Jan–Oct 2026 equal the sum of the real payment rows and Calvin's sheet totals (Jan $31,465 … Sep $38,675). The Dashboard's month expenses/profit disagree with Reports.
 
-Findings here: AUDIT-006 (P1), AUDIT-037 (P3), AUDIT-039 (P3).
+Findings here: AUDIT-006 (P2), AUDIT-037 (P3), AUDIT-039 (P3).
 
 ### AUDIT-006 Dashboard "this month" expenses and profit leave out expenses dated later in the month, so they disagree with Reports
 - Section: I Reports / Analytics
-- Severity: P1
+- Severity: P2
 - Status: Confirmed
 - Evidence type: local-exec + code-inspection
 - Module / file:line: pilates-landing/src/admin/pages/Dashboard.tsx:109 (`loadReport(thisMonth(), day)` and `loadReport(addMonths(thisMonth(), -11), day)`). Compare Reports.tsx:211 (`[month, monthEnd(month)]`), the comment at Dashboard.tsx:100-101 ("so this month's rent is already counted") and finance.ts:1-3 ("dashboard, reports, closing and CSV always agree").
@@ -553,6 +557,7 @@ Findings here: AUDIT-006 (P1), AUDIT-037 (P3), AUDIT-039 (P3).
 - Root cause: the Dashboard report range ends at today. Payments can't be future-dated, but expenses (including the recurring ones the Dashboard just generated) can.
 - Recommended fix: request `loadReport(thisMonth(), monthEnd(thisMonth()))` for the KPI strip and use `monthEnd(thisMonth())` as the chart's `to`. Revenue is unchanged because no payment has a future date.
 - Verification approach: add a DB/screen test with a recurring rule due after today, then check Dashboard expenses = Reports expenses for the current month.
+- Live check (real Staging, signed in as Owner, read-only, 2026-10-13): the real data has no recurring rules and no expense dated after today, so the Dashboard matches Reports for October right now (expenses $7,970 both ways). The defect appears as soon as a rule or a later-dated expense exists, so severity was lowered from P1 to P2.
 
 ### AUDIT-037 Report "Received by" splits one person into two rows after a name change
 - Section: I Reports / Analytics
@@ -624,6 +629,7 @@ Findings here: AUDIT-001 (P0), AUDIT-002 (P1).
 - Root cause: The prod project does not exist yet, so the staging project became the de facto production DB.
 - Recommended fix: Immediately, take a Backup JSON download (and ideally a `supabase db dump`) before every migration push, or upgrade the staging project to Pro for daily backups until cutover. Then finish the cutover (AUDIT-001/03) so real data moves to a Pro prod project and Staging goes back to test data.
 - Verification approach: Confirm the plan tier and backup list in the Supabase dashboard (Database › Backups), and confirm that a dump exists from before the next migration push.
+- Live check (real Staging, signed in as Owner, read-only, 2026-10-13): the Staging project holds 795 clients, 590 payments (Jan–Oct), 3,498 appointments, 4,185 bookings and 16,100 audit-log rows. The Backup page's Everything (JSON) export works on this data (4.4 MB, every table's row count equals the live count), but it is the only backup and it is manual.
 
 ## K. Background Jobs / Scheduled Logic
 
