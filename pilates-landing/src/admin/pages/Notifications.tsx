@@ -4,7 +4,6 @@
 // save them to the database when sending is built.
 import { useState } from 'react';
 import {
-  Bell,
   CalendarClock,
   CircleDollarSign,
   ClipboardList,
@@ -98,30 +97,16 @@ export default function Notifications() {
     });
 
   return (
-    <Layout title={t('navNotifications')}>
+    <Layout
+      title={t('navNotifications')}
+      heroNote={
+        <p className="flex items-start gap-2 rounded-xl bg-ink/[0.04] px-3 py-2.5 text-xs text-mute">
+          <Info size={14} strokeWidth={1.75} aria-hidden="true" className="mt-px shrink-0" />
+          {t('notifPreview')}
+        </p>
+      }
+    >
       <div className="flex max-w-4xl flex-col gap-4">
-        {/* Header card (reference: "Stay in the loop") */}
-        <Card className="relative overflow-hidden bg-gradient-to-br from-paper to-sage/[0.07]">
-          <div className="flex items-start gap-4 pr-0 sm:pr-28">
-            <IconTile Icon={Bell} strong />
-            <div className="min-w-0">
-              <h2 className="font-display text-lg font-semibold">{t('notifHeroTitle')}</h2>
-              <p className="mt-1 text-pretty text-sm text-mute">{t('notifHeroBody')}</p>
-            </div>
-          </div>
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute -right-4 -top-4 hidden h-32 w-32 items-center justify-center rounded-full bg-sage/10 text-sage sm:flex"
-          >
-            <Bell size={44} strokeWidth={1.5} className="-rotate-12" />
-            <span className="absolute right-9 top-9 h-3.5 w-3.5 rounded-full bg-clay ring-4 ring-paper" />
-          </span>
-          <p className="mt-4 flex items-start gap-2 rounded-xl bg-ink/[0.04] px-3 py-2.5 text-xs text-mute sm:mr-28">
-            <Info size={14} strokeWidth={1.75} aria-hidden="true" className="mt-px shrink-0" />
-            {t('notifPreview')}
-          </p>
-        </Card>
-
         {GROUPS.map((g) => (
           <Card key={g.title} pad={false} className="px-4 py-2 sm:px-6">
             <section aria-label={t(g.title)}>

@@ -71,7 +71,6 @@ export default function Access() {
   return (
     <Layout title={t('navAccess')}>
       <div className="flex max-w-3xl flex-col gap-4">
-        <p className="text-sm text-mute">{t('accessIntro')}</p>
         {loadFailed && <Notice tone="error">{t('somethingWrong')}</Notice>}
         {status && <Notice tone={status.tone}>{status.text}</Notice>}
         <Card className="p-0 sm:p-0">

@@ -33,10 +33,11 @@ import { Link, useRoute } from './router';
 import type { AdminPath } from './routes';
 import { IS_STAGING } from './supabase';
 import { toggleTheme, useTheme } from './theme';
-import { Initials } from './ui';
+import { Card, Initials } from './ui';
 
 // Who sees an item: the route's rule in routes.ts (Settings → Admin for menus).
-type NavItem = { to: AdminPath; label: TextKey; Icon: LucideIcon };
+// hero: the header card's title and line on that page (none on the Dashboard).
+type NavItem = { to: AdminPath; label: TextKey; Icon: LucideIcon; hero?: [TextKey, TextKey] };
 // Settings → Admin lists the same menus.
 // eslint-disable-next-line react-refresh/only-export-components
 export const NAV: { group: TextKey; items: NavItem[] }[] = [
@@ -44,28 +45,28 @@ export const NAV: { group: TextKey; items: NavItem[] }[] = [
     group: 'navGroupStudio',
     items: [
       { to: '', label: 'navDashboard', Icon: LayoutDashboard },
-      { to: 'clients', label: 'navClients', Icon: Contact },
-      { to: 'schedule', label: 'navSchedule', Icon: CalendarDays },
-      { to: 'trainings', label: 'navTrainings', Icon: ClipboardList },
-      { to: 'knowledge', label: 'navKnowledge', Icon: BookOpen },
+      { to: 'clients', label: 'navClients', Icon: Contact, hero: ['heroClients', 'heroClientsBody'] },
+      { to: 'schedule', label: 'navSchedule', Icon: CalendarDays, hero: ['heroSchedule', 'heroScheduleBody'] },
+      { to: 'trainings', label: 'navTrainings', Icon: ClipboardList, hero: ['heroTrainings', 'heroTrainingsBody'] },
+      { to: 'knowledge', label: 'navKnowledge', Icon: BookOpen, hero: ['heroKnowledge', 'knowledgeHint'] },
     ],
   },
   {
     group: 'navGroupAdmin',
     items: [
-      { to: 'payments', label: 'navPayments', Icon: Wallet },
-      { to: 'expenses', label: 'navExpenses', Icon: Receipt },
-      { to: 'reports', label: 'navReports', Icon: BarChart3 },
+      { to: 'payments', label: 'navPayments', Icon: Wallet, hero: ['heroPayments', 'heroPaymentsBody'] },
+      { to: 'expenses', label: 'navExpenses', Icon: Receipt, hero: ['heroExpenses', 'heroExpensesBody'] },
+      { to: 'reports', label: 'navReports', Icon: BarChart3, hero: ['heroReports', 'heroReportsBody'] },
     ],
   },
   {
     group: 'navGroupSettings',
     items: [
-      { to: 'users', label: 'navUsers', Icon: Users },
-      { to: 'notifications', label: 'navNotifications', Icon: Bell },
-      { to: 'access', label: 'navAccess', Icon: ShieldCheck },
-      { to: 'schedule-settings', label: 'navScheduleSettings', Icon: CalendarCog },
-      { to: 'backup', label: 'navBackup', Icon: DatabaseBackup },
+      { to: 'users', label: 'navUsers', Icon: Users, hero: ['heroUsers', 'heroUsersBody'] },
+      { to: 'notifications', label: 'navNotifications', Icon: Bell, hero: ['notifHeroTitle', 'notifHeroBody'] },
+      { to: 'access', label: 'navAccess', Icon: ShieldCheck, hero: ['heroAccess', 'accessIntro'] },
+      { to: 'schedule-settings', label: 'navScheduleSettings', Icon: CalendarCog, hero: ['heroScheduleSettings', 'heroScheduleSettingsBody'] },
+      { to: 'backup', label: 'navBackup', Icon: DatabaseBackup, hero: ['heroBackup', 'heroBackupBody'] },
     ],
   },
 ];
@@ -81,19 +82,50 @@ function readCollapsed() {
   }
 }
 
+/** The header card at the top of each menu page: icon, title, one line, and the icon again in a soft circle. */
+function PageHero({ Icon, hero, dot, note }: { Icon: LucideIcon; hero: [TextKey, TextKey]; dot: boolean; note?: ReactNode }) {
+  const { t } = useT();
+  return (
+    <Card className="relative mb-4 overflow-hidden bg-gradient-to-br from-paper to-sage/[0.07]">
+      <div className="flex items-start gap-4 pr-0 sm:pr-28">
+        <span aria-hidden="true" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sage/15 text-sage-deep">
+          <Icon size={18} strokeWidth={1.75} />
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-semibold">{t(hero[0])}</h2>
+          <p className="mt-1 text-pretty text-sm text-mute">{t(hero[1])}</p>
+        </div>
+      </div>
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-4 -top-4 hidden h-32 w-32 items-center justify-center rounded-full bg-sage/10 text-sage sm:flex"
+      >
+        <Icon size={44} strokeWidth={1.5} className="-rotate-12" />
+        {dot && <span className="absolute right-9 top-9 h-3.5 w-3.5 rounded-full bg-clay ring-4 ring-paper" />}
+      </span>
+      {note && <div className="mt-4 sm:mr-28">{note}</div>}
+    </Card>
+  );
+}
+
 export default function Layout({
   title,
   actions,
+  heroNote,
   wide = false,
   children,
 }: {
   title: string;
   actions?: ReactNode;
+  /** Extra line inside the header card (Notifications' preview note). */
+  heroNote?: ReactNode;
   /** Use the whole window width (the calendar). */
   wide?: boolean;
   children: ReactNode;
 }) {
   const { t } = useT();
+  const route = useRoute();
+  const item = NAV.flatMap((g) => g.items).find((i) => i.to === route);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const drawer = useRef<HTMLDialogElement>(null);
 
@@ -170,6 +202,7 @@ export default function Layout({
           tabIndex={-1}
           className={`mx-auto w-full ${wide ? '' : 'max-w-6xl'} px-4 pb-10 pt-4 outline-none sm:px-6 lg:px-8 lg:pt-6`}
         >
+          {item?.hero && <PageHero Icon={item.Icon} hero={item.hero} dot={route === 'notifications'} note={heroNote} />}
           {actions && <div className="mb-6 flex flex-wrap justify-end gap-3">{actions}</div>}
           {children}
         </main>

@@ -147,7 +147,6 @@ export default function Knowledge() {
         </>
       }
     >
-      <p className="mb-4 max-w-[70ch] text-pretty text-sm text-mute">{t('knowledgeHint')}</p>
       {message && (
         <div className="mb-4">
           <Notice tone="success">{message}</Notice>
