@@ -155,7 +155,14 @@ function RecordPayment({
   const [collector, setCollector] = useState(me.user_id);
   // Owners/admins may record a past day (the database checks it); everyone else records today.
   const canPickDate = isAdmin(me);
-  const [day, setDay] = useState(laToday);
+  // '' = today, whatever today is when the payment is saved. Only a date picked
+  // by hand is sent, so a form left open past LA midnight doesn't back-date.
+  const [day, setDay] = useState('');
+  const [today, setToday] = useState(laToday);
+  useEffect(() => {
+    const timer = window.setInterval(() => setToday(laToday()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [client, setClient] = useState<StudentHit | null>(null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState(() => readLastMethod(methods));
@@ -197,7 +204,7 @@ function RecordPayment({
       p_notes: notes.trim(),
       p_confirm_duplicate: confirmDuplicate,
       p_collected_by: collector,
-      ...(canPickDate && day !== laToday() ? { p_business_date: day } : {}),
+      ...(canPickDate && day && day !== laToday() ? { p_business_date: day } : {}),
     });
     setBusy(false);
     if (dbError) {
@@ -225,7 +232,7 @@ function RecordPayment({
     setError('');
     setSaved(null);
     setCollector(me.user_id);
-    setDay(laToday());
+    setDay('');
     setRequestId(crypto.randomUUID());
   };
 
@@ -293,9 +300,9 @@ function RecordPayment({
               label={t('paymentDate')}
               hint={t('paymentDateHint')}
               type="date"
-              max={laToday()}
-              value={day}
-              onChange={(e) => e.target.value && setDay(e.target.value)}
+              max={today}
+              value={day || today}
+              onChange={(e) => e.target.value && setDay(e.target.value === laToday() ? '' : e.target.value)}
             />
           )}
           <TextField

@@ -377,6 +377,7 @@ export default function Schedule() {
     supabase!.rpc('save_appointment', {
       p: {
         id: a.id,
+        updated_at: a.updated_at,
         start: wallText(a.day, a.start),
         minutes,
         staff_id: a.staff_id,
@@ -392,6 +393,10 @@ export default function Schedule() {
     const { a, day: d, min, minutes } = move!;
     if (minutes !== undefined) {
       const { error } = await saveLength(a, minutes, scope);
+      if (error?.code === 'LPSTL') {
+        void reload();
+        return t('calStale');
+      }
       if (error) return error.message;
       await reload();
       setMove(null);
@@ -1241,6 +1246,8 @@ function AppointmentDialog({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Someone else saved this appointment first: closing reloads the calendar.
+  const [stale, setStale] = useState(false);
 
   const svc = services.find((s) => s.name === f.service);
   // Other: start and end picked from 15-minute lists (a time off the list stays listed); the length follows.
@@ -1281,7 +1288,8 @@ function AppointmentDialog({
     setError('');
     const { error: e } = await supabase!.rpc(fn, args);
     setBusy(false);
-    if (e) setError(e.message);
+    if (e?.code === 'LPSTL') setStale(true);
+    if (e) setError(e.code === 'LPSTL' ? t('calStale') : e.message);
     else onSaved();
   };
   /** status: give every booking this status (No-show or Late cancel from the cancel step). */
@@ -1289,6 +1297,7 @@ function AppointmentDialog({
     run('save_appointment', {
       p: {
         id: a?.id,
+        ...(a ? { updated_at: a.updated_at } : {}),
         start: wallText(f.date, toMin(f.time)),
         minutes: f.minutes,
         staff_id: f.staff !== OTHER ? f.staff : null,
@@ -1322,7 +1331,7 @@ function AppointmentDialog({
   };
 
   return (
-    <Modal title={title} width="w-[min(calc(100%-2rem),34rem)]" onClose={onClose}>
+    <Modal title={title} width="w-[min(calc(100%-2rem),34rem)]" onClose={stale ? onSaved : onClose}>
       <div className="mt-5 grid gap-4 border-t border-ink/10 pt-6">
         <div className={ROW}>
           <label htmlFor={`${id}-staff`} className={LABEL}>

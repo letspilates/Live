@@ -43,14 +43,19 @@ export default function Dashboard() {
   // owners every payment, everyone else only the ones they recorded.
   const [today, setToday] = useState<Today | null>(null);
   const [todayFailed, setTodayFailed] = useState(false);
+  // Moves on to the next day at midnight in Los Angeles.
+  const [day, setDay] = useState(laToday);
+  useEffect(() => {
+    const timer = window.setInterval(() => setDay(laToday()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!owner && !paymentsMenu) return;
-    const day = laToday();
     Promise.all([loadPayments(day, day), loadMethods()])
       .then(([rows, methods]) => setToday({ rows, methods }))
       .catch(() => setTodayFailed(true));
-  }, [owner, paymentsMenu]);
+  }, [owner, paymentsMenu, day]);
 
   const date = new Intl.DateTimeFormat(lang === 'ko' ? 'ko-KR' : 'en-US', {
     timeZone: 'America/Los_Angeles',

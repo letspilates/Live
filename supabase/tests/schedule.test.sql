@@ -110,7 +110,7 @@ select t.expect_error('same client twice', '23505',
     {"student_id":"00000000-0000-0000-0000-0000000000c1"},{"student_id":"00000000-0000-0000-0000-0000000000c1"}]}')$$);
 
 -- Edit clients: added from Clients, removed ones cancelled (kept) ----------------------------
-select public.save_appointment(jsonb_build_object('id', current_setting('t.dst1'), 'start', '2026-03-08 10:00', 'minutes', 50,
+select public.save_appointment(jsonb_build_object('id', current_setting('t.dst1'), 'updated_at', (select updated_at from public.appointments where id = current_setting('t.dst1')::uuid), 'start', '2026-03-08 10:00', 'minutes', 50,
   'staff_id', '00000000-0000-0000-0000-0000000000b2', 'service', 'Duet', 'capacity', 2, 'clients', jsonb_build_array(
     jsonb_build_object('id', (select id from public.appointment_clients where appointment_id = current_setting('t.dst1')::uuid),
                        'student_id', '00000000-0000-0000-0000-0000000000c1', 'status', 'CONFIRMED', 'notes', 'Knee'),
@@ -120,10 +120,10 @@ select t.check('edit: status changed, client added', (select count(*) = 2 from p
 select t.check('edit: no series, not marked changed', (select service = 'Duet' and capacity = 2 and not series_changed
   from public.appointments where id = current_setting('t.dst1')::uuid));
 select t.expect_error('edit: capacity below bookings', '23514',
-  $$select public.save_appointment(jsonb_build_object('id', current_setting('t.dst1'), 'start', '2026-03-08 10:00', 'minutes', 50,
+  $$select public.save_appointment(jsonb_build_object('id', current_setting('t.dst1'), 'updated_at', (select updated_at from public.appointments where id = current_setting('t.dst1')::uuid), 'start', '2026-03-08 10:00', 'minutes', 50,
     'service', 'Duet', 'capacity', 1, 'clients', (select jsonb_agg(jsonb_build_object('id', id)) from public.appointment_clients
       where appointment_id = current_setting('t.dst1')::uuid)))$$);
-select public.save_appointment(jsonb_build_object('id', current_setting('t.dst1'), 'start', '2026-03-08 10:00', 'minutes', 50,
+select public.save_appointment(jsonb_build_object('id', current_setting('t.dst1'), 'updated_at', (select updated_at from public.appointments where id = current_setting('t.dst1')::uuid), 'start', '2026-03-08 10:00', 'minutes', 50,
   'staff_id', '00000000-0000-0000-0000-0000000000b2', 'service', 'Private', 'capacity', 1, 'clients', jsonb_build_array(
     jsonb_build_object('id', (select id from public.appointment_clients
                                where appointment_id = current_setting('t.dst1')::uuid and student_id = '00000000-0000-0000-0000-0000000000c1')))));
@@ -176,7 +176,7 @@ select public.move_appointment(t.nth(1), '2026-10-26 09:00', 'one', false);
 select t.check('undo: time and flag back', t.la(t.nth(1)) = '2026-10-26 09:00'
   and not (select series_changed from public.appointments where id = t.nth(1)));
 -- Save scope 'one' with a new instructor marks only that date.
-select public.save_appointment(jsonb_build_object('id', t.nth(2), 'start', '2026-10-28 09:00', 'minutes', 50,
+select public.save_appointment(jsonb_build_object('id', t.nth(2), 'updated_at', (select updated_at from public.appointments where id = t.nth(2)::uuid), 'start', '2026-10-28 09:00', 'minutes', 50,
   'staff_id', '00000000-0000-0000-0000-0000000000a1', 'service', 'Pilates Group', 'capacity', 5, 'scope', 'one',
   'clients', (select jsonb_agg(jsonb_build_object('id', id)) from public.appointment_clients where appointment_id = t.nth(2))));
 select t.check('save one: only this date changed and marked', (select series_changed and staff_id = '00000000-0000-0000-0000-0000000000a1'
@@ -184,7 +184,7 @@ select t.check('save one: only this date changed and marked', (select series_cha
   and (select bool_and(not series_changed and staff_id = '00000000-0000-0000-0000-0000000000b2')
          from public.appointments where id in (t.nth(1), t.nth(3), t.nth(4))));
 -- Save scope 'following' from date 3: new service and time on dates 3 and 4; clients only on date 3.
-select public.save_appointment(jsonb_build_object('id', t.nth(3), 'start', '2026-11-02 08:00', 'minutes', 55,
+select public.save_appointment(jsonb_build_object('id', t.nth(3), 'updated_at', (select updated_at from public.appointments where id = t.nth(3)::uuid), 'start', '2026-11-02 08:00', 'minutes', 55,
   'staff_id', '00000000-0000-0000-0000-0000000000b2', 'service', 'Gyrotonic Group', 'capacity', 3, 'scope', 'following',
   'clients', jsonb_build_array(jsonb_build_object('student_id', '00000000-0000-0000-0000-0000000000c3'))));
 select t.check('save following: dates 3-4 changed, 1-2 not', t.la(t.nth(3)) = '2026-11-02 08:00' and t.la(t.nth(4)) = '2026-11-04 08:00'
@@ -300,7 +300,7 @@ select set_config('t.gb', public.save_appointment('{"start":"2026-11-07 14:00","
 select t.check('appointment names its guest only without staff',
   (select guest_instructor = 'Ana Guest' and staff_id is null from public.appointments where id = current_setting('t.ga')::uuid)
   and (select guest_instructor = '' from public.appointments where id = current_setting('t.gb')::uuid));
-select public.save_appointment(jsonb_build_object('id', current_setting('t.ga'), 'start', '2026-11-07 10:00', 'minutes', 120,
+select public.save_appointment(jsonb_build_object('id', current_setting('t.ga'), 'updated_at', (select updated_at from public.appointments where id = current_setting('t.ga')::uuid), 'start', '2026-11-07 10:00', 'minutes', 120,
   'staff_id', null, 'guest_instructor', 'Bo Guest', 'service', 'Reformer Workshop', 'capacity', 10, 'clients', '[]'::jsonb));
 select t.check('edit changes the guest', (select guest_instructor = 'Bo Guest' from public.appointments where id = current_setting('t.ga')::uuid));
 select t.expect_error('guest name up to 80', '22023', $$select public.save_appointment(jsonb_build_object('start', '2026-11-08 10:00',
@@ -495,6 +495,38 @@ select public.merge_clients('00000000-0000-0000-0000-0000000000c1', '00000000-00
 select t.check('merge: bookings follow the kept client', not exists (select 1 from public.appointment_clients
   where student_id = '00000000-0000-0000-0000-0000000000c2')
   and exists (select 1 from public.appointment_clients where client_name = 'Hana Cho' and student_id = '00000000-0000-0000-0000-0000000000c1'));
+reset role;
+
+-- A save from an older copy of an appointment is refused (audit AUDIT-004) -----------------
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select set_config('t.st', public.save_appointment('{"start":"2026-12-01 10:00","minutes":60,
+  "staff_id":"00000000-0000-0000-0000-0000000000b2","service":"Pilates Group","capacity":5,
+  "clients":[{"student_id":"00000000-0000-0000-0000-0000000000c1"}]}')::text, true);
+select set_config('t.st_old', (select updated_at::text from public.appointments where id = current_setting('t.st')::uuid), true);
+-- Someone else adds a second client.
+select public.save_appointment(jsonb_build_object('id', current_setting('t.st'), 'updated_at', current_setting('t.st_old'),
+  'start', '2026-12-01 10:00', 'minutes', 60, 'staff_id', '00000000-0000-0000-0000-0000000000b2', 'service', 'Pilates Group', 'capacity', 5,
+  'clients', jsonb_build_array(
+    jsonb_build_object('id', (select id from public.appointment_clients where appointment_id = current_setting('t.st')::uuid)),
+    jsonb_build_object('student_id', '00000000-0000-0000-0000-0000000000c2'))));
+-- The first screen, not reloaded, changes the length with its old client list.
+select t.expect_error('stale save refused', 'LPSTL',
+  $$select public.save_appointment(jsonb_build_object('id', current_setting('t.st'), 'updated_at', current_setting('t.st_old'),
+    'start', '2026-12-01 10:00', 'minutes', 90, 'staff_id', '00000000-0000-0000-0000-0000000000b2', 'service', 'Pilates Group', 'capacity', 5,
+    'clients', jsonb_build_array(jsonb_build_object('id', (select id from public.appointment_clients
+      where appointment_id = current_setting('t.st')::uuid and student_id = '00000000-0000-0000-0000-0000000000c1')))))$$);
+select t.check('stale save: the added client stays booked, length unchanged',
+  (select count(*) = 2 from public.appointment_clients where appointment_id = current_setting('t.st')::uuid and status = 'BOOKED')
+  and (select minutes = 60 from public.appointments where id = current_setting('t.st')::uuid));
+select t.expect_error('edit without updated_at refused', 'LPSTL',
+  $$select public.save_appointment(jsonb_build_object('id', current_setting('t.st'), 'start', '2026-12-01 10:00', 'minutes', 90,
+    'staff_id', '00000000-0000-0000-0000-0000000000b2', 'service', 'Pilates Group', 'capacity', 5, 'clients', '[]'::jsonb))$$);
+
+-- Someone with appointments can't be deleted; deactivate instead (audit AUDIT-003) --------
+select t.expect_error('delete instructor with appointments refused', 'LPREF',
+  $$select public.delete_staff_user('00000000-0000-0000-0000-0000000000b2')$$);
+select t.check('instructor still on their appointments',
+  exists (select 1 from public.appointments where staff_id = '00000000-0000-0000-0000-0000000000b2'));
 reset role;
 
 select app.check_api_exposure();

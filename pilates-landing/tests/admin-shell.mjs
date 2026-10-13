@@ -90,6 +90,8 @@ const MEMBERS = [
   member({ id: 's-new', full_name: 'Walk Newman' }),
 ];
 let duplicateOnce = false;
+let staleOnce = false; // save_appointment refuses once: someone else saved the appointment first
+let apptLoads = 0;
 
 // Expenses (this month at the studio)
 const MONTH = `${LA_TODAY.slice(0, 8)}01`;
@@ -154,7 +156,7 @@ const laISO = (day, min) => {
 const booking = (b) => ({ student_id: null, client_phone: '', status: 'BOOKED', notes: '', students: null, ...b });
 const APPTS = [
   { id: 'a-1', starts_at: laISO(LA_TODAY, 540), minutes: 50, staff_id: 'i-sun', service: 'Private', capacity: 1, series_id: 'ser-1', series_changed: false,
-    status: 'BOOKED', appointment_clients: [booking({ id: 'b-1', student_id: 's-mina', client_name: 'Mina C', students: { full_name: 'Mina Cho' } })] },
+    updated_at: '2026-10-12T20:00:00.123456+00:00', status: 'BOOKED', appointment_clients: [booking({ id: 'b-1', student_id: 's-mina', client_name: 'Mina C', students: { full_name: 'Mina Cho' } })] },
   { id: 'a-2', starts_at: laISO(LA_TODAY, 540), minutes: 50, staff_id: 'i-suk', service: 'Pilates Group', capacity: 5, series_id: 'ser-2', series_changed: true,
     status: 'BOOKED', appointment_clients: [booking({ id: 'b-2', client_name: 'Leo Park' }), booking({ id: 'b-3', client_name: 'Sara Kim', status: 'CANCELLED' }),
       booking({ id: 'b-4', client_name: 'Ana Lee', notes: 'Knee' })] },
@@ -345,7 +347,7 @@ async function open(who, width, path = '', options = {}) {
     });
   }
   await context.route(`${SUPABASE}/rest/v1/appointments?**`, (r) => {
-    if (r.request().method() !== 'HEAD') return r.fulfill({ json: APPTS });
+    if (r.request().method() !== 'HEAD') return apptLoads++, r.fulfill({ json: APPTS });
     // Settings › Schedule counts a service's booked appointments before deleting it.
     const q = new URL(r.request().url()).searchParams;
     sched.push(['count appointments', q.get('service'), q.get('status')]);
@@ -366,6 +368,10 @@ async function open(who, width, path = '', options = {}) {
     await context.route(`${SUPABASE}/rest/v1/rpc/${name}`, (r) => {
       const body = r.request().postDataJSON();
       sched.push([name, body]);
+      if (name === 'save_appointment' && staleOnce) {
+        staleOnce = false;
+        return r.fulfill({ status: 400, json: { code: 'LPSTL', message: 'Someone else changed this appointment. Close it and open it again.' } });
+      }
       if (name === 'save_appointment') return r.fulfill({ json: 'a-new' });
       if (name === 'save_schedule_service' || name === 'save_schedule_category') return r.fulfill({ json: body.p.id ?? `${name}-new` });
       if (name !== 'import_schedule') return r.fulfill({ status: 204 });
@@ -805,6 +811,50 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const { page, context } = await open('STAFF', 1280, 'payments/?tab=history');
   await page.getByPlaceholder('Search name or phone').waitFor();
   check(!(await page.getByRole('tab').count()) && !(await page.getByText('Net revenue').count()), 'staff: ?tab=history still shows only the form and own day panel');
+  await context.close();
+}
+
+// 9c. Owner leaves Record payment open past LA midnight: the next payment is the new day's.
+{
+  const { page, context } = await open('OWNER', 1280, 'payments/');
+  await context.route(`${SUPABASE}/auth/v1/token?grant_type=refresh_token`, (r) => r.fulfill({ json: {
+    access_token: 'mock', refresh_token: 'mock', token_type: 'bearer', expires_in: 86400 * 3, expires_at: Math.floor(Date.now() / 1000) + 86400 * 3,
+    user: { id: 'u-owner', email: 'owner@example.com', aud: 'authenticated', role: 'authenticated' } } }));
+  await page.clock.install({ time: new Date(laISO(LA_TODAY, 23 * 60 + 50)) });
+  await page.clock.resume();
+  await page.reload();
+  await page.getByPlaceholder('Search name or phone').waitFor();
+  check(await page.getByLabel('Payment date').inputValue() === LA_TODAY, 'midnight: the date field shows today at 11:50 pm');
+  await page.clock.fastForward(20 * 60 * 1000); // 12:10 am the next day in Los Angeles
+  await page.waitForTimeout(300);
+  const next = await page.evaluate(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date()));
+  check(next !== LA_TODAY && await page.getByLabel('Payment date').inputValue() === next, 'midnight: the date field moves on to the new day');
+  calls.length = 0;
+  await page.getByPlaceholder('Search name or phone').fill('mina');
+  await page.locator('form').getByRole('button', { name: /Mina Cho/ }).click();
+  await page.getByRole('button', { name: /^Received \$100\.00/ }).click();
+  await page.getByText('Payment saved').waitFor();
+  check(!('p_business_date' in (calls.find(([n]) => n === 'record_payment')?.[1] ?? { p_business_date: 1 })),
+    'midnight: the payment is not back-dated to the day the page was opened');
+  await context.close();
+}
+{
+  const { page, context } = await open('OWNER', 1280, '');
+  await context.route(`${SUPABASE}/auth/v1/token?grant_type=refresh_token`, (r) => r.fulfill({ json: {
+    access_token: 'mock', refresh_token: 'mock', token_type: 'bearer', expires_in: 86400 * 3, expires_at: Math.floor(Date.now() / 1000) + 86400 * 3,
+    user: { id: 'u-owner', email: 'owner@example.com', aud: 'authenticated', role: 'authenticated' } } }));
+  const days = [];
+  page.on('request', (r) => {
+    const m = r.url().match(/payment_transactions\?.*business_date=gte\.(\d{4}-\d{2}-\d{2})/);
+    if (m) days.push(m[1]);
+  });
+  await page.clock.install({ time: new Date(laISO(LA_TODAY, 23 * 60 + 50)) });
+  await page.clock.resume();
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await page.clock.fastForward(20 * 60 * 1000);
+  await page.waitForTimeout(500);
+  check(days.some((d) => d > LA_TODAY), `dashboard: today's payments reload after LA midnight (${days.join(', ')})`);
   await context.close();
 }
 
@@ -1481,6 +1531,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const p = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
   check(p?.id === 'a-1' && p.start === `${LA_TODAY} 09:00` && p.minutes === 50 && p.staff_id === 'i-sun' && p.scope === 'one'
     && p.clients.length === 1 && p.clients[0].id === 'b-1' && p.clients[0].student_id === 's-mina', 'schedule: edit saves 09:00 studio time, booking kept');
+  check(p?.updated_at === '2026-10-12T20:00:00.123456+00:00', 'schedule: edit sends the updated_at it loaded');
 
   // Close X instead of a Cancel button; Cancel Appointment stands out (danger). Duration steps by 5 with − / +.
   sched.length = 0;
@@ -1514,6 +1565,20 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   await dlg.getByRole('button', { name: 'Close' }).click();
   await dlg.waitFor({ state: 'detached' });
   check(!sched.some(([n]) => n === 'save_appointment'), 'schedule: the Close X closes without saving');
+
+  // Someone else saved it first: the database refuses; the dialog says so and closing reloads the calendar.
+  staleOnce = true;
+  await mina.click();
+  await dlg.getByRole('heading', { name: 'Edit Appointment' }).waitFor();
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  await dlg.getByText('Someone else changed this appointment first.', { exact: false }).waitFor();
+  check(await dlg.isVisible(), 'schedule: a save refused as out of date keeps the dialog open with a message');
+  const loadsBefore = apptLoads;
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  await page.waitForTimeout(300);
+  check(apptLoads > loadsBefore, 'schedule: closing after an out-of-date save reloads the calendar');
+  sched.length = 0;
 
   // Drag the 2-hour workshop down one hour: the Close X puts it back; drag again, confirm, then Undo.
   const w = await workshop.boundingBox();

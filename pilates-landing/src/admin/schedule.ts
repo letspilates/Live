@@ -32,6 +32,8 @@ export interface Appointment {
   capacity: number;
   series_id: string | null;
   series_changed: boolean;
+  /** Sent back on save; the database refuses a save from an older copy. */
+  updated_at: string;
   /** CANCELLED stays on the calendar, striped. */
   status: 'BOOKED' | 'CANCELLED';
   /** Bookings that are not cancelled. */
@@ -103,7 +105,7 @@ export async function loadAppointments(from: string, to: string): Promise<Appoin
   const { data, error } = await supabase!
     .from('appointments')
     .select(
-      'id, starts_at, minutes, staff_id, guest_instructor, service, capacity, series_id, series_changed, status, appointment_clients(id, student_id, client_name, client_phone, status, notes, students(full_name))',
+      'id, starts_at, minutes, staff_id, guest_instructor, service, capacity, series_id, series_changed, status, updated_at, appointment_clients(id, student_id, client_name, client_phone, status, notes, students(full_name))',
     )
     .gte('starts_at', laInstant(from))
     .lt('starts_at', laInstant(to))
