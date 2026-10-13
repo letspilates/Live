@@ -145,6 +145,11 @@ select t.check('owner: back-dates', (select business_date = current_date - 1
                              p_business_date => current_date - 1)));
 select t.expect_error('owner: no future date', '22023',
   $$select public.record_payment(gen_random_uuid(), 100, 'CASH', p_payer_name => 'X', p_business_date => current_date + 5)$$);
+-- AUDIT-009: a year typed as "26" (0026) or any date before 2020 is refused
+select t.expect_error('owner: year 0026 refused', 'LPOLD',
+  $$select public.record_payment(gen_random_uuid(), 100, 'CASH', p_payer_name => 'X', p_business_date => '0026-10-12')$$);
+select t.expect_error('owner: date before 2020 refused', 'LPOLD',
+  $$select public.record_payment(gen_random_uuid(), 100, 'CASH', p_payer_name => 'X', p_business_date => '2019-12-31')$$);
 reset role;
 
 -- Corrections and voids ----------------------------------------------------------------
@@ -189,6 +194,8 @@ select t.check('owner: edit moves the date', (select business_date = current_dat
   from public.correct_payment(current_setting('t.a3')::uuid, 5000, 'VENMO', p_business_date => current_date - 2)));
 select t.expect_error('owner: edit cannot move to the future', '22023',
   format($$select public.correct_payment('%s', 5000, 'VENMO', p_business_date => current_date + 3)$$, current_setting('t.a3')));
+select t.expect_error('owner: edit cannot move to year 0026', 'LPOLD',
+  format($$select public.correct_payment('%s', 5000, 'VENMO', p_business_date => '0026-10-12')$$, current_setting('t.a3')));
 select public.correct_payment(current_setting('t.a3')::uuid, 5000, 'VENMO', p_business_date => current_date - 1);
 reset role;
 
@@ -270,7 +277,7 @@ select t.check('owner: changes the receiver', (select collected_by = '00000000-0
                               3300, 'CASH', p_collected_by => '00000000-0000-0000-0000-0000000000c1')));
 reset role;
 
--- "Other" method needs a description; the client's history is visible to every active staff member -----
+-- "Other" method needs a description; staff see a client's history only for today's payments they recorded or received -----
 select t.login('00000000-0000-0000-0000-0000000000b2');
 select t.expect_error('other: needs a description', '22023',
   $$select public.record_payment(gen_random_uuid(), 3000, 'OTHER', current_setting('t.mina')::uuid)$$);
@@ -283,9 +290,19 @@ select t.expect_error('other: correcting to Other needs a description', '22023',
   format($$select public.correct_payment('%s', 3000, 'OTHER')$$, current_setting('t.o1')));
 select t.check('other: correcting away from Other clears it', (select method_other = '' from public.correct_payment(
   current_setting('t.o1')::uuid, 3000, 'ZELLE')));
-select t.check('history: shows payments others recorded', (select count(*) >= 3 and bool_or(amount_cents = 3100)
-  from public.client_payments(current_setting('t.mina')::uuid)));
+-- AUDIT-010 (Calvin: YES): A's and the owner's payments for Mina are not shown to Ben.
+select t.check('history: staff see only their own payments of today', (select count(*) = 2
+  and bool_and(amount_cents in (3000, 3100)) from public.client_payments(current_setting('t.mina')::uuid)));
 reset role;
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.check('history: owner sees everyone''s', (select count(*) = 5 and bool_or(amount_cents = 12000) and bool_or(kind = 'REFUND')
+  from public.client_payments(current_setting('t.mina')::uuid)));
+select t.check('date floor: 2020-01-01 is accepted', (select business_date = '2020-01-01'
+  from public.record_payment(gen_random_uuid(), 100, 'CASH', p_payer_name => 'Floor', p_business_date => '2020-01-01')));
+reset role;
+-- The table check catches any writer that skips the functions.
+select t.expect_error('date floor: payments table check', '23514',
+  format($$update public.payment_transactions set business_date = '0026-10-12' where id = '%s'$$, current_setting('t.a3')));
 
 -- S10: anon gets nothing ---------------------------------------------------------------------
 select t.as_anon();

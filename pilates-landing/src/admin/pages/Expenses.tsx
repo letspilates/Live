@@ -33,7 +33,13 @@ type Lists = { categories: Category[]; staff: Staff[] };
 type Flash = { tone: 'success' | 'error'; text: string } | null;
 
 function errorText(t: T, error: { code?: string }): string {
-  return error.code === 'LPCLS' ? t('expenseMonthClosed') : error.code === '42501' ? t('noPermission') : t('somethingWrong');
+  return error.code === 'LPCLS'
+    ? t('expenseMonthClosed')
+    : error.code === 'LPOLD'
+      ? t('dateTooEarly')
+      : error.code === '42501'
+        ? t('noPermission')
+        : t('somethingWrong');
 }
 
 const thisMonth = () => `${laToday().slice(0, 8)}01`;
@@ -840,6 +846,7 @@ function DateField({ label, value, onChange, required = false }: { label: string
       <span className="text-sm font-medium text-ink">{label}</span>
       <input
         type="date"
+        min="2020-01-01"
         value={value}
         required={required}
         onChange={(e) => (e.target.value || !required) && onChange(e.target.value)}
@@ -853,7 +860,7 @@ function MonthField({ label, value, error, onChange }: { label: string; value: s
   return (
     <label className="flex min-w-0 flex-col gap-2">
       <span className="text-sm font-medium text-ink">{label}</span>
-      <input type="month" value={value} onChange={(e) => onChange(e.target.value)} className={`${inputCls} px-3 py-2.5`} />
+      <input type="month" min="2020-01" value={value} onChange={(e) => onChange(e.target.value)} className={`${inputCls} px-3 py-2.5`} />
       {error && <span className="text-sm text-red-700">{error}</span>}
     </label>
   );

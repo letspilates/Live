@@ -112,7 +112,31 @@ select t.expect_error('owner cannot delete', '42501', $$delete from public.expen
 select t.expect_error('owner cannot delete a rule', '42501', $$delete from public.recurring_expense_rules$$);
 select t.expect_error('unknown payment method', '23514',
   $$update public.expenses set payment_status = 'PAID', paid_on = current_setting('t.today')::date, payment_method = 'BITCOIN' where description = 'Credit'$$);
+-- AUDIT-009: a year typed as "26" (0026) or any date before 2020 is refused with LPOLD
+select t.expect_error('date floor: expense dated 0026', 'LPOLD',
+  $$insert into public.expenses (category, description, amount_cents, expense_date) values ('OTHER', 'Typo year', 100, '0026-10-12')$$);
+select t.expect_error('date floor: expense moved to 2019', 'LPOLD',
+  $$update public.expenses set expense_date = '2019-12-31' where description = 'Credit'$$);
+select t.expect_error('date floor: due date 0026', 'LPOLD',
+  $$update public.expenses set due_date = '0026-10-28' where description = 'Credit'$$);
+select t.expect_error('date floor: paid on 0026', 'LPOLD',
+  $$update public.expenses set payment_status = 'PAID', paid_on = '0026-10-12', payment_method = 'CASH' where description = 'Credit'$$);
+select t.expect_error('date floor: rule starting 0026', 'LPOLD',
+  $$insert into public.recurring_expense_rules (category, description, amount_cents, due_day, start_month) values ('OTHER', 'Typo rule', 100, 1, '0026-10-01')$$);
+select t.expect_error('date floor: rule ending 2019', 'LPOLD',
+  $$update public.recurring_expense_rules set end_month = '2019-12-01' where description = 'Monthly studio rent'$$);
+update public.expenses set due_date = '2020-01-01' where description = 'Credit';
+select t.check('date floor: 2020-01-01 is accepted', (select due_date = '2020-01-01' from public.expenses where description = 'Credit'));
+update public.expenses set due_date = null where description = 'Credit';
 reset role;
+-- Table checks catch any writer that skips the triggers.
+savepoint floor;
+set local session_replication_role = replica;
+select t.expect_error('date floor: expenses table check', '23514',
+  $$insert into public.expenses (category, description, amount_cents, expense_date) values ('OTHER', 'Typo year', 100, '0026-10-12')$$);
+select t.expect_error('date floor: rules table check', '23514',
+  $$insert into public.recurring_expense_rules (category, description, amount_cents, due_day, start_month) values ('OTHER', 'Typo rule', 100, 1, '0026-10-01')$$);
+rollback to savepoint floor;
 select t.check('audit: changes are logged', (select count(*) >= 10 from public.audit_logs
   where entity_type in ('expenses', 'recurring_expense_rules')));
 

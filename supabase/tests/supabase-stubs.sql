@@ -13,6 +13,7 @@ grant usage on schema auth to anon, authenticated, service_role;
 create table auth.users (
   id uuid primary key,
   email text,
+  email_confirmed_at timestamptz default now(),  -- tests make confirmed logins unless they pass null
   last_sign_in_at timestamptz
 );
 

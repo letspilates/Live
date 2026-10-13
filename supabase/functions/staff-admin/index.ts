@@ -9,11 +9,12 @@
 // but an owner.
 //
 // POST JSON { action, ... }:
-//   create       { email, profile, password }  sign-in made now, no email sent
+//   create       { email, profile, password, redirectTo }  sign-in made now, no email sent
 //   invite       { email, profile, redirectTo } Supabase Auth emails an invitation;
 //                the person sets their own password at /admin/set-password/
 //   resend       { userId, redirectTo }        sends the invitation again
-//                (create/invite: an email that already has a login is linked as is)
+//                (create/invite: an email that already has a confirmed login is linked
+//                as is; an unconfirmed one is invited instead, see below)
 //   deactivate   { userId }  blocks data access, then sign-in
 //   reactivate   { userId }  restores both
 //   delete       { userId }  removes the user (refused when they have records)
@@ -34,6 +35,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function envKey(jsonName: string, legacyName: string): string {
   const json = Deno.env.get(jsonName);
   return json ? JSON.parse(json).default : Deno.env.get(legacyName)!;
+}
+
+// A password nobody knows (letters, digits and a symbol, so any password rule accepts it).
+function randomPassword(): string {
+  return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24)))) + 'aA1!';
 }
 
 Deno.serve(async (req) => {
@@ -99,7 +105,7 @@ Deno.serve(async (req) => {
     if (createError && !existed) return reply(400, { error: createError.message, code: createError.code });
 
     // The database checks again that the caller may do this (and owner rules).
-    const { error: linkError } = await asCaller.rpc('add_staff_user', {
+    const { data: linkedId, error: linkError } = await asCaller.rpc('add_staff_user', {
       p_user_id: created?.user?.id ?? null,
       p_email: email,
       p_invited: action === 'invite' && !existed,
@@ -109,6 +115,22 @@ Deno.serve(async (req) => {
       // Never leave a new login behind without a profile.
       if (created?.user) await admin.auth.admin.deleteUser(created.user.id);
       return reply(400, { error: linkError.message, code: linkError.code });
+    }
+    if (existed) {
+      // The database links an existing login as ACTIVE only when its email was confirmed.
+      // Otherwise anyone could have signed up with this address first (AUDIT-008): the
+      // person stays INVITED, the login gets a password nobody knows, and the invitation
+      // goes to the address, so only the mailbox owner can set a password.
+      const { data: rows } = await asCaller.from('staff_profiles').select('status').eq('user_id', linkedId);
+      if (rows?.[0]?.status === 'INVITED') {
+        const { error: passwordError } = await admin.auth.admin.updateUserById(linkedId, { password: randomPassword() });
+        if (passwordError) {
+          await asCaller.rpc('cancel_staff_invite', { p_user_id: linkedId });
+          return reply(400, { error: 'Could not reset the existing login. Try again.' });
+        }
+        const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, redirectOk ? { redirectTo } : undefined);
+        return reply(200, { invitedExisting: true, inviteSent: !inviteError });
+      }
     }
     return reply(200, { linkedExisting: existed });
   }

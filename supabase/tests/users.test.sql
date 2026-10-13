@@ -150,6 +150,27 @@ select t.check('admin: back-dates a Mindbody payment', (select business_date = (
   p_business_date => (now() at time zone 'America/Los_Angeles')::date - 1)));
 reset role;
 
+-- AUDIT-008: a login whose email was never confirmed (anyone can sign up with a new hire's
+-- address) is not linked as ACTIVE. It waits as INVITED; staff-admin sends the invitation.
+insert into auth.users (id, email, email_confirmed_at) values
+  ('00000000-0000-0000-0000-0000000000d1', 'pre.signup@test.local', null),
+  ('00000000-0000-0000-0000-0000000000d2', 'pre.invite@test.local', null),
+  ('00000000-0000-0000-0000-0000000000d3', 'confirmed@test.local', now());
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select public.add_staff_user(null, 'Pre.Signup@test.local', false, '{"full_name":"Pre Signup","roles":["ADMIN"]}');
+select public.add_staff_user('00000000-0000-0000-0000-0000000000d2', 'pre.invite@test.local', false, '{"full_name":"Pre Invite","roles":["STAFF"]}');
+select public.add_staff_user(null, 'confirmed@test.local', false, '{"full_name":"Con Firmed","roles":["STAFF"]}');
+select t.check('unconfirmed login (found by email): INVITED, not ACTIVE', (select status = 'INVITED' and invited_at is not null
+  from public.staff_profiles where user_id = '00000000-0000-0000-0000-0000000000d1'));
+select t.check('unconfirmed login (by id): INVITED, not ACTIVE', (select status = 'INVITED'
+  from public.staff_profiles where user_id = '00000000-0000-0000-0000-0000000000d2'));
+select t.check('confirmed login: linked as ACTIVE', (select status = 'ACTIVE' and invited_at is null
+  from public.staff_profiles where user_id = '00000000-0000-0000-0000-0000000000d3'));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000d1');
+select t.check('invited, not yet signed in: no admin access', not app.is_owner() and not app.can('payments'));
+reset role;
+
 select app.check_api_exposure();
 
 rollback;

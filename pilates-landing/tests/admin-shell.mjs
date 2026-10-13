@@ -62,9 +62,11 @@ const METHODS = [
   { code: 'CREDIT', label_en: 'Credit card', label_ko: '신용카드' },
   { code: 'OTHER', label_en: 'Other', label_ko: '기타' },
 ];
+// `by` = who recorded the last payment (the search mock hides it from others, like the database).
 const HITS = [
-  { id: 's-mina', full_name: 'Mina Cho', phone_last4: '0142', last_paid_on: LA_YESTERDAY, last_amount_cents: 10000, last_method: 'ZELLE' },
+  { id: 's-mina', full_name: 'Mina Cho', phone_last4: '0142', last_paid_on: LA_TODAY, last_amount_cents: 10000, last_method: 'ZELLE', by: 'u-ins' },
   { id: 's-leo', full_name: 'Leo Park', phone_last4: '', last_paid_on: null, last_amount_cents: null, last_method: null },
+  { id: 's-sara', full_name: 'Sara Kim', phone_last4: '0100', last_paid_on: LA_YESTERDAY, last_amount_cents: 25000, last_method: 'CREDIT', by: 'u-owner' },
 ];
 const pay = (r) => ({ method_other: '', collected_by: r.recorded_by, collected_by_name: r.recorded_by_name, kind: 'PAYMENT', status: 'VALID', student_id: null, related_transaction_id: null, notes: '', reason: '', business_date: LA_TODAY, ...r });
 const PAYMENTS = [
@@ -96,6 +98,8 @@ let apptLoads = 0;
 
 // Expenses (this month at the studio)
 const MONTH = `${LA_TODAY.slice(0, 8)}01`;
+const shiftMonth = (n, day = 1) => { const d = new Date(`${MONTH}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + n, day); return d.toISOString().slice(0, 10); };
+const MONTH_END = shiftMonth(1, 0);
 const CATEGORIES = [['RENT', 'Studio Rent'], ['INSTRUCTOR_PAY', 'Salary'], ['UTILITIES', 'Utilities'], ['SOFTWARE', 'Software Subscriptions'], ['OTHER', 'Other Expenses']]
   .map(([code, name_en]) => ({ code, name_en, name_ko: name_en }));
 const exp = (e) => ({ vendor: '', due_date: null, payment_status: 'UNPAID', paid_on: null, payment_method: null, status: 'ACTIVE', void_reason: '',
@@ -235,6 +239,9 @@ async function open(who, width, path = '', options = {}) {
     if (b.action === 'delete' && b.userId === 'u-ins') {
       return r.fulfill({ status: 400, json: { error: 'This person has records.', code: 'LPREF' } });
     }
+    // The email already had a login that was never confirmed: invited instead of linked.
+    if (b.email === 'presignup@example.com') return r.fulfill({ json: { invitedExisting: true, inviteSent: true } });
+    if (b.email === 'presignup2@example.com') return r.fulfill({ json: { invitedExisting: true, inviteSent: false } });
     return r.fulfill({ json: {} });
   });
   for (const [table, rows] of [['training_courses', COURSES], ['training_registrations', REGS]]) {
@@ -265,14 +272,20 @@ async function open(who, width, path = '', options = {}) {
     submitted = r.request().postDataJSON().p;
     return r.fulfill({ json: 'r-new' });
   });
+  // Like the database: staff and instructors see only today's payments they recorded or received (also in a
+  // client's history), and a client's last amount only when it is one of those. Owners and admins see everything.
+  const full = who === 'OWNER' || who === 'ADMIN';
+  const mine = (p) => p.recorded_by === staff?.user_id || p.collected_by === staff?.user_id;
   await context.route(`${SUPABASE}/rest/v1/payment_methods?**`, (r) => r.fulfill({ json: METHODS }));
   await context.route(`${SUPABASE}/rest/v1/payment_transactions?**`, (r) => {
     const q = new URL(r.request().url()).searchParams;
     if (q.get('related_transaction_id')) return r.fulfill({ json: [] });
-    if (q.get('student_id')) return r.fulfill({ json: PAYMENTS.filter((p) => `eq.${p.student_id}` === q.get('student_id')) });
+    if (q.get('student_id')) {
+      return r.fulfill({ json: PAYMENTS.filter((p) => `eq.${p.student_id}` === q.get('student_id') && (full || (mine(p) && p.business_date === LA_TODAY))) });
+    }
     const [from, to] = q.getAll('business_date').map((v) => v.slice(4));
-    // RLS stand-in: staff see only what they recorded.
-    const rows = PAYMENTS.filter((p) => (who === 'OWNER' || p.recorded_by === staff?.user_id)
+    // RLS stand-in.
+    const rows = PAYMENTS.filter((p) => (full || (mine(p) && p.business_date === LA_TODAY))
       && (!from || p.business_date >= from) && (!to || p.business_date <= to));
     return r.fulfill({ json: rows });
   });
@@ -281,11 +294,13 @@ async function open(who, width, path = '', options = {}) {
   );
   await context.route(`${SUPABASE}/rest/v1/rpc/search_students`, (r) => {
     const q = (r.request().postDataJSON().p_query ?? '').toLowerCase();
-    return r.fulfill({ json: q.length < 2 ? HITS.filter((h) => h.last_paid_on) : HITS.filter((h) => h.full_name.toLowerCase().includes(q)) });
+    const hits = (q.length < 2 ? HITS.filter((h) => h.last_paid_on) : HITS.filter((h) => h.full_name.toLowerCase().includes(q)))
+      .map(({ by, ...h }) => (full || (by === staff?.user_id && h.last_paid_on === LA_TODAY) ? h : { ...h, last_amount_cents: null, last_method: null }));
+    return r.fulfill({ json: hits });
   });
   await context.route(`${SUPABASE}/rest/v1/rpc/client_payments`, (r) => {
     const id = r.request().postDataJSON().p_student_id;
-    return r.fulfill({ json: PAYMENTS.filter((p) => p.student_id === id) });
+    return r.fulfill({ json: PAYMENTS.filter((p) => p.student_id === id && (full || (mine(p) && p.business_date === LA_TODAY))) });
   });
   await context.route(`${SUPABASE}/rest/v1/students?**`, (r) => r.fulfill({ json: MEMBERS }));
   for (const name of ['import_members', 'update_member']) {
@@ -299,6 +314,9 @@ async function open(who, width, path = '', options = {}) {
       const body = r.request().postDataJSON();
       calls.push([name, body]);
       if (name === 'add_student') return r.fulfill({ json: 's-new' });
+      if ((name === 'record_payment' || name === 'correct_payment') && body.p_business_date && body.p_business_date < '2020-01-01') {
+        return r.fulfill({ status: 400, json: { code: 'LPOLD', message: 'Dates before 2020-01-01 cannot be saved. Check the year.' } });
+      }
       if (name === 'record_payment' && duplicateOnce && !body.p_confirm_duplicate) {
         duplicateOnce = false;
         return r.fulfill({ status: 400, json: { code: 'LPDUP', message: 'A payment like this was saved in the last 10 minutes.' } });
@@ -314,6 +332,9 @@ async function open(who, width, path = '', options = {}) {
       const req = r.request();
       if (req.method() !== 'GET') {
         writes.push([table, req.method(), req.postDataJSON(), decodeURIComponent(req.url())]);
+        if ((req.postDataJSON()?.expense_date ?? '9') < '2020-01-01') {
+          return r.fulfill({ status: 400, json: { code: 'LPOLD', message: 'Dates before 2020-01-01 cannot be saved. Check the year.' } });
+        }
         return r.fulfill({ status: 201, body: '' });
       }
       const month = new URL(req.url()).searchParams.get('period_month');
@@ -806,6 +827,48 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   await context.close();
 }
 
+// 9a. Staff (the front desk shares one STAFF login): the database shows them only their own payments of today
+// and no one else's amounts (AUDIT-010). Where an amount is hidden nothing reads "$0.00"; the screens still work.
+{
+  calls.length = 0;
+  const { page, context, errors } = await open('STAFF', 393, 'payments/');
+  const day = page.getByRole('region', { name: /^My payments · / });
+  await day.getByText('No payments yet today.').waitFor();
+  check(await day.locator('dd').first().innerText() === '$0.00' && !(await day.getByText('Mina Cho').count()), 'staff payments: day panel shows only own payments of today');
+  const history = page.locator('section[aria-label="Payment history"]');
+  for (const [query, name] of [['mina', 'Mina Cho'], ['sara', 'Sara Kim']]) {
+    await page.getByPlaceholder('Search name or phone').fill(query);
+    await page.locator('form').getByRole('button', { name: new RegExp(name) }).click();
+    await history.getByText('No payments yet', { exact: true }).waitFor();
+    check(!(await history.innerText()).includes('$'), `staff payments: ${name}'s history shows no one else's payments`);
+    check(await page.getByLabel('Amount ($)').inputValue() === '' && await page.getByLabel('Payment method').inputValue() === ''
+      && await page.getByRole('button', { name: 'Save payment', exact: true }).isVisible(), `staff payments: no hidden amount filled in or shown as $0.00 (${name})`);
+    if (name === 'Mina Cho') await page.getByRole('button', { name: 'Change' }).click();
+  }
+  await page.getByLabel('Amount ($)').fill('30');
+  await page.getByLabel('Payment method').selectOption('CASH');
+  await page.getByRole('button', { name: 'Received $30.00 · Cash · Save' }).click();
+  await page.getByText('Payment saved').waitFor();
+  const sent = calls.find(([n]) => n === 'record_payment')?.[1];
+  check(sent?.p_student_id === 's-sara' && sent.p_amount_cents === 3000 && !('p_business_date' in sent), 'staff payments: still records a payment');
+  check(errors.length === 0, `staff payments: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+{
+  const { page, context, errors } = await open('STAFF', 1280, 'clients/');
+  await page.getByRole('button', { name: /Mina Cho/ }).click();
+  const dialog = page.locator('dialog[open]');
+  await dialog.getByText('No payments yet', { exact: true }).waitFor();
+  check(!(await dialog.getByText(/\$\d/).count()), "staff clients: a client's payments by others are not shown");
+  await context.close();
+  const dash = await open('INSTRUCTOR', 1280, '');
+  const card = dash.page.locator('main').getByText('My payments today').locator('xpath=ancestor::div[1]');
+  await card.getByText('$100.00').waitFor();
+  check(await card.getByText(/^1 payments?$/).isVisible() && !(await dash.page.getByText('Old Friend').count()), "instructor dashboard: today's own payments only");
+  check(errors.length === 0 && dash.errors.length === 0, `staff screens: no page errors ${[...errors, ...dash.errors].join(' | ')}`);
+  await dash.context.close();
+}
+
 // 9b. Payments: the day's payments beside the form (owner sees everyone; staff can't open Transactions)
 for (const [device, width] of Object.entries(WIDTHS)) {
   const { page, context, errors } = await open('OWNER', width, 'payments/');
@@ -845,6 +908,26 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await dlg.getByRole('button', { name: 'Save' }).click();
     await page.getByText('Payment updated.').waitFor();
     check(calls.find(([n]) => n === 'correct_payment')?.[1].p_business_date === LA_YESTERDAY, 'desktop owner: edit sends the new date');
+    // AUDIT-009: no dates before 2020 (typing "26" in the year gives 0026)
+    await day.getByRole('button', { name: /Leo Park/ }).click();
+    await dlg.getByRole('button', { name: 'Edit' }).click();
+    check(await dlg.getByLabel('Payment date').getAttribute('min') === '2020-01-01', 'desktop owner: edit date cannot go before 2020');
+    await page.keyboard.press('Escape');
+    await page.getByLabel('Payment date').nth(1).waitFor({ state: 'detached' }); // the closed dialog is gone too
+    check(await page.getByLabel('Payment date').getAttribute('min') === '2020-01-01', 'desktop owner: payment date cannot go before 2020');
+    calls.length = 0;
+    await page.getByPlaceholder('Search name or phone').fill('mina');
+    await page.locator('form').getByRole('button', { name: /Mina Cho/ }).click();
+    await page.getByLabel('Payment date').fill('0026-10-12');
+    await page.getByRole('button', { name: /Received \$100\.00/ }).click();
+    await page.waitForTimeout(300);
+    check(!calls.some(([n]) => n === 'record_payment') && await page.getByLabel('Payment date').evaluate((el) => el.validity.rangeUnderflow),
+      'desktop owner: a year typed as 0026 is stopped before saving');
+    // If a browser lets it through anyway, the database refuses it and says why.
+    await page.locator('form').first().evaluate((f) => { f.noValidate = true; });
+    await page.getByRole('button', { name: /Received \$100\.00/ }).click();
+    check(await page.getByText('Dates before January 1, 2020 cannot be saved. Check the year.').waitFor({ timeout: 3000 }).then(() => true, () => false),
+      'desktop owner: the database refusal of an old date is explained');
   }
   await shot(page, `${device}-owner-record`);
   await day.getByRole('button', { name: 'All transactions' }).click();
@@ -1107,6 +1190,15 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     check(await dialog.getByText('Add a note saying what the credit is for.').isVisible(), 'credit: needs a note');
     check(!(await dialog.getByLabel('Paid to (staff)').count()), 'add expense: staff field only for instructor pay');
     await dialog.getByLabel('Note').fill('Refund for a broken spring');
+    check(await dialog.getByLabel('Expense date').getAttribute('min') === '2020-01-01' && await dialog.getByLabel('Due date').getAttribute('min') === '2020-01-01',
+      'add expense: dates cannot go before 2020');
+    await dialog.getByLabel('Expense date').fill('0026-10-12');
+    await dialog.locator('form').evaluate((f) => { f.noValidate = true; });
+    await dialog.getByRole('button', { name: 'Save expense' }).click();
+    check(await dialog.getByText('Dates before January 1, 2020 cannot be saved. Check the year.').waitFor({ timeout: 3000 }).then(() => true, () => false),
+      'add expense: the database refusal of an old date is explained');
+    await dialog.getByLabel('Expense date').fill(LA_TODAY);
+    writes.length = 0;
     await shot(page, 'phone-add-expense');
     await dialog.getByRole('button', { name: 'Save expense' }).click();
     await page.getByText('Expense saved.').waitFor();
@@ -1120,6 +1212,8 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await rule.getByLabel('Description').fill('Water');
     await rule.getByLabel('Amount ($)').fill('60');
     await rule.getByLabel('Due day').fill('31');
+    check(await rule.getByLabel('From', { exact: true }).getAttribute('min') === '2020-01' && await rule.getByLabel('Until (optional)', { exact: true }).getAttribute('min') === '2020-01',
+      'rule: months cannot go before 2020');
     await shot(page, 'phone-add-rule');
     await rule.getByRole('button', { name: 'Save' }).click();
     await page.getByText('Recurring expense saved.').waitFor();
@@ -1157,7 +1251,9 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const month = page.locator('section', { hasText: 'This month' });
   await month.getByText('$19,800.00').waitFor();
   check(await month.getByText('Expenses ($3,000.00 unpaid)').isVisible() && await month.getByText('$11,800.00').isVisible(), `${device} dashboard: this month's expenses and profit`);
-  check(finance.some(([, b]) => b.p_from === MONTH && b.p_to === LA_TODAY), `${device} dashboard: this month asked up to today`);
+  // AUDIT-006: to the month's last day like Reports, so rent dated the 28th counts (chart too).
+  check(finance.some(([, b]) => b.p_from === MONTH && b.p_to === MONTH_END), `${device} dashboard: this month asked to its last day`);
+  check(finance.some(([, b]) => b.p_from === shiftMonth(-11) && b.p_to === MONTH_END), `${device} dashboard: 12-month chart ends with the whole of this month`);
   check((await page.locator('main figure ul > li').count()) === 12, `${device} dashboard: 12 months in the chart`);
   check(await page.locator('main figcaption').getByText('Operating expenses').isVisible(), `${device} dashboard: chart legend`);
   check(await noOverflow(page), `${device} dashboard: no sideways scroll`);
@@ -1281,6 +1377,22 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   await dlg.getByRole('button', { name: 'Add user' }).click();
   await page.getByText('Pat Password can now sign in to the portal.').waitFor();
   check(adminCalls.at(-1)?.action === 'create' && adminCalls.at(-1)?.password === 'Temp-pass-123', 'add user: password mode creates the login');
+  check(/\/staging\/admin\/set-password\/$/.test(adminCalls.at(-1)?.redirectTo ?? ''), 'add user: password mode also sends the return link (for an invitation if needed)');
+
+  // AUDIT-008: the email already had a login that was never confirmed: invited, not linked
+  for (const [email, text] of [
+    ['presignup@example.com', 'This email already had a login that was never confirmed, so it was not linked as is. An invitation email was sent to Pre Signup'],
+    ['presignup2@example.com', 'Pre Signup was added as invited, but the invitation email could not be sent. Use Resend invitation.'],
+  ]) {
+    await page.getByRole('button', { name: 'Add user' }).click();
+    await dlg.getByLabel('Email', { exact: true }).fill(email);
+    await dlg.getByLabel('Full name', { exact: true }).fill('Pre Signup');
+    await dlg.getByLabel('Set a password now').check();
+    await dlg.getByLabel('First password').fill('Temp-pass-123');
+    await dlg.getByRole('button', { name: 'Add user' }).click();
+    check(await page.getByText(text).waitFor({ timeout: 3000 }).then(() => true, () => false) && !(await page.getByText(/existing password is unchanged/).count()),
+      `add user: ${email === 'presignup@example.com' ? 'an unconfirmed login is invited, not linked' : 'says when that invitation could not be sent'}`);
+  }
 
   await page.getByRole('button', { name: 'Edit user: Ana Park' }).click();
   check(await dlg.getByText('ana@example.com').isVisible(), 'edit user: email shown, not editable');

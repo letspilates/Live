@@ -34,7 +34,15 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Where invitation links land (must also be in Supabase Auth → URL Configuration).
 const SET_PASSWORD_URL = `${window.location.origin}${import.meta.env.BASE_URL}admin/set-password/`;
 
-type AdminResult = { error?: string; code?: string; warning?: string; linkedExisting?: boolean };
+type AdminResult = {
+  error?: string;
+  code?: string;
+  warning?: string;
+  linkedExisting?: boolean;
+  // The email had a login that was never confirmed: invited instead of linked (AUDIT-008).
+  invitedExisting?: boolean;
+  inviteSent?: boolean;
+};
 
 async function staffAdmin(body: Record<string, unknown>): Promise<AdminResult> {
   const { data, error } = await supabase!.functions.invoke('staff-admin', { body });
@@ -227,10 +235,10 @@ export default function StaffPage() {
         isMe={editing !== null && editing !== 'new' && editing.user_id === me.user_id}
         busy={busy}
         onClose={() => setEditing(null)}
-        onSaved={(text) => {
+        onSaved={(text, tone = 'success') => {
           if (editing && editing !== 'new') reloadMe(editing.user_id);
           setEditing(null);
-          setMessage({ tone: 'success', text });
+          setMessage({ tone, text });
           reload();
         }}
         onAction={(action, row) => setPending({ action, row })}
@@ -288,7 +296,7 @@ function UserDialog({
   isMe: boolean;
   busy: boolean;
   onClose: () => void;
-  onSaved: (message: string) => void;
+  onSaved: (message: string, tone?: Message['tone']) => void;
   onAction: (action: Pending['action'], row: UserRow) => void;
   onResend: (row: UserRow) => void;
 }) {
@@ -338,11 +346,12 @@ function UserDialog({
     setSaving(true);
     let failure: string | null = null;
     let linked = false;
+    let invited: AdminResult | null = null;
     if (adding) {
       const result = await staffAdmin(
         f.join === 'invite'
           ? { action: 'invite', email: f.email.trim(), profile, redirectTo: SET_PASSWORD_URL }
-          : { action: 'create', email: f.email.trim(), profile, password: f.password },
+          : { action: 'create', email: f.email.trim(), profile, password: f.password, redirectTo: SET_PASSWORD_URL },
       );
       if (result.error !== undefined) {
         failure =
@@ -355,6 +364,7 @@ function UserDialog({
                 : result.error || t('somethingWrong');
       }
       linked = Boolean(result.linkedExisting);
+      if (result.invitedExisting) invited = result;
     } else {
       const { error } = await supabase!.rpc('update_staff_user', { p_user_id: existing!.user_id, p: profile });
       if (error) failure = error.code === '42501' ? t('ownerOnly') : error.message;
@@ -362,6 +372,9 @@ function UserDialog({
     setSaving(false);
     if (failure) return setErrors({ form: failure });
     const name = profile.full_name;
+    if (invited) {
+      return onSaved(t(invited.inviteSent ? 'staffInvitedExisting' : 'existingInviteFailed', { name }), invited.inviteSent ? 'success' : 'info');
+    }
     onSaved(
       !adding
         ? t('userSaved')

@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowRight, ChartColumn, ClipboardList, Plus, ReceiptText, TrendingUp, Users, Wallet, type LucideIcon } from 'lucide-react';
 import { isAdmin, useStaff } from '../auth';
 import { addMonths } from '../expenses';
-import { loadReport, thisMonth, type Report } from '../finance';
+import { loadReport, monthEnd, type Report } from '../finance';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
 import MonthChart from '../MonthChart';
@@ -82,7 +82,7 @@ export default function Dashboard() {
       </div>
 
       {owner ? (
-        <OwnerBoard today={today} todayFailed={todayFailed} />
+        <OwnerBoard month={`${day.slice(0, 8)}01`} today={today} todayFailed={todayFailed} />
       ) : (
         <div className="grid gap-4 lg:grid-cols-3">
           {paymentsMenu && (
@@ -104,17 +104,19 @@ export default function Dashboard() {
 
 // Owner: this month's money and the last 12 months. Recurring expenses are
 // created first so this month's rent is already counted (master plan J.3).
-function OwnerBoard({ today, todayFailed }: { today: Today | null; todayFailed: boolean }) {
+// Up to the month's last day, like Reports: an expense dated later this month
+// (rent on the 28th) is part of this month's expenses and profit.
+function OwnerBoard({ month, today, todayFailed }: { month: string; today: Today | null; todayFailed: boolean }) {
   const [data, setData] = useState<{ month: Report; year: Report } | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    const day = laToday();
+    const end = monthEnd(month);
     Promise.resolve(supabase!.rpc('generate_recurring_expenses'))
-      .then(() => Promise.all([loadReport(thisMonth(), day), loadReport(addMonths(thisMonth(), -11), day)]))
-      .then(([month, year]) => setData({ month, year }))
+      .then(() => Promise.all([loadReport(month, end), loadReport(addMonths(month, -11), end)]))
+      .then(([m, year]) => setData({ month: m, year }))
       .catch(() => setFailed(true));
-  }, []);
+  }, [month]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">

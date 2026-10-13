@@ -290,6 +290,7 @@ const en = {
   monthClosed: 'That month is closed. Ask the owner.',
   sameDayOnly: 'Only the Owner or an Admin can change a payment after the day it was recorded.',
   noPermission: 'You do not have permission to do this.',
+  dateTooEarly: 'Dates before January 1, 2020 cannot be saved. Check the year.',
   student: 'Client',
   searchStudent: 'Search name or phone',
   noStudentFound: 'No client found. Check the spelling. New clients are added on the Clients screen first.',
@@ -499,6 +500,10 @@ const en = {
   staffAdded: '{name} can now sign in to the portal.',
   alreadyStaff: 'This person is already on the staff list.',
   staffLinked: '{name} already had a login, so it was linked. Their existing password is unchanged.',
+  staffInvitedExisting:
+    'This email already had a login that was never confirmed, so it was not linked as is. An invitation email was sent to {name}: they set their own password from it. Any password set before no longer works.',
+  existingInviteFailed:
+    'This email already had a login that was never confirmed. {name} was added as invited, but the invitation email could not be sent. Use Resend invitation.',
   firstPassword: 'First password',
   firstPasswordHint: 'At least 8 characters. They can change it in My account.',
   confirmDeactivate: 'Deactivate {name}? They lose access right away. Their past records stay.',
@@ -1125,6 +1130,7 @@ const ko: Dict = {
   monthClosed: '마감된 달입니다. 오너에게 문의하세요.',
   sameDayOnly: '기록한 날이 지나면 Owner나 Admin만 수정할 수 있습니다.',
   noPermission: '이 작업을 할 권한이 없습니다.',
+  dateTooEarly: '2020년 1월 1일 이전 날짜는 저장할 수 없습니다. 연도를 확인해 주세요.',
   student: '클라이언트',
   searchStudent: '이름 또는 전화번호 검색',
   noStudentFound: '찾는 클라이언트가 없습니다. 철자를 확인하세요. 새 클라이언트는 먼저 클라이언트 메뉴에서 추가해야 합니다.',
@@ -1332,6 +1338,10 @@ const ko: Dict = {
   staffAdded: '{name} 님이 이제 포털에 로그인할 수 있습니다.',
   alreadyStaff: '이미 직원 목록에 있는 사람입니다.',
   staffLinked: '{name} 님은 이미 로그인 계정이 있어 그대로 연결했습니다. 기존 비밀번호는 바뀌지 않습니다.',
+  staffInvitedExisting:
+    '이 이메일로 확인되지 않은 로그인 계정이 이미 있어 그대로 연결하지 않았습니다. {name} 님에게 초대 메일을 보냈습니다. 본인이 메일에서 비밀번호를 설정해야 하며, 이전에 설정된 비밀번호로는 로그인할 수 없습니다.',
+  existingInviteFailed:
+    '이 이메일로 확인되지 않은 로그인 계정이 이미 있습니다. {name} 님을 초대 상태로 추가했지만 초대 메일을 보내지 못했습니다. 초대 다시 보내기를 눌러 주세요.',
   firstPassword: '처음 비밀번호',
   firstPasswordHint: '8자 이상. 본인이 내 계정에서 바꿀 수 있습니다.',
   confirmDeactivate: '{name} 님을 비활성화할까요? 즉시 접근이 막히고, 지난 기록은 그대로 남습니다.',

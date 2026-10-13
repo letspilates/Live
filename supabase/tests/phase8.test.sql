@@ -171,6 +171,50 @@ begin
   end loop;
 end $$;
 
+-- AUDIT-010 (Calvin: YES): Staff and Instructors see only the payments they recorded or received
+-- today (LA date): in the table, in a client's history and in client search. Owner/Admin see all.
+savepoint today_only;
+insert into public.payment_transactions (student_id, payer_name, amount_cents, method, business_date,
+  recorded_by, recorded_by_name, collected_by, collected_by_name, client_request_id)
+values (current_setting('t.client')::uuid, 'Mina Cho', 4400, 'CASH', current_setting('t.today')::date - 1,
+  '00000000-0000-0000-0000-0000000000b1', 'Sam', '00000000-0000-0000-0000-0000000000b2', 'Ian', gen_random_uuid());
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select set_config('t.p_owner', (select id from public.record_payment(gen_random_uuid(), 9900, 'CREDIT', current_setting('t.client')::uuid,
+  p_confirm_duplicate => true))::text, true);
+reset role;
+-- The owner's payment is the client's latest one.
+update public.payment_transactions set recorded_at = now() + interval '1 minute' where id = current_setting('t.p_owner')::uuid;
+do $$
+declare
+  u uuid;
+begin
+  foreach u in array array['00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b2']::uuid[] loop
+    perform t.login(u);
+    perform t.check(u || ': own payment dated yesterday is hidden', (select count(*) = 0 from public.payment_transactions
+      where business_date <> current_setting('t.today')::date));
+    perform t.check(u || ': own payment of today still shown', (select count(*) = 1 from public.payment_transactions));
+    perform t.check(u || ': client history shows only own payments of today', (select count(*) = 1
+      and bool_and(business_date = current_setting('t.today')::date and amount_cents not in (9900, 4400))
+      from public.client_payments(current_setting('t.client')::uuid)));
+    perform t.check(u || ': client search shows no one else''s last amount or method', (select count(*) = 1
+      and bool_and(last_amount_cents is null and last_method is null) from public.search_students('mina')));
+    perform t.check(u || ': recently paid list shows no one else''s amounts', (select count(*) = 1
+      and bool_and(last_amount_cents is null and last_method is null) from public.search_students('')));
+    reset role;
+  end loop;
+  foreach u in array array['00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000a2']::uuid[] loop
+    perform t.login(u);
+    perform t.check(u || ': owner/admin see every date', (select count(*) = 1 from public.payment_transactions
+      where business_date = current_setting('t.today')::date - 1));
+    perform t.check(u || ': owner/admin client history unchanged', (select bool_or(amount_cents = 9900) and bool_or(amount_cents = 4400)
+      and bool_or(amount_cents = 12000) from public.client_payments(current_setting('t.client')::uuid)));
+    perform t.check(u || ': owner/admin search shows the last amount and method', (select last_amount_cents = 9900
+      and last_method = 'CREDIT' from public.search_students('mina')));
+    reset role;
+  end loop;
+end $$;
+rollback to savepoint today_only;
+
 -- Settings › Admin switches are enforced by the database, not only by the menu.
 select t.login('00000000-0000-0000-0000-0000000000a1');
 select public.set_role_menu_access('INSTRUCTOR', 'payments', false);

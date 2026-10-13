@@ -31,6 +31,8 @@ import { Button, Card, CardTitle, Chip, Dialog, Initials, Notice, Skeleton, Text
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 const LAST_METHOD_KEY = 'lp-admin-last-method';
+// The database refuses earlier dates (a year typed as "26" becomes 0026).
+const MIN_DATE = '2020-01-01';
 
 type T = ReturnType<typeof useT>['t'];
 type DbError = { code?: string; message?: string };
@@ -41,6 +43,8 @@ function errorText(t: T, error: DbError): string {
       return t('monthClosed');
     case 'LPDAY':
       return t('sameDayOnly');
+    case 'LPOLD':
+      return t('dateTooEarly');
     case '42501':
       return t('noPermission');
     default:
@@ -300,6 +304,7 @@ function RecordPayment({
               label={t('paymentDate')}
               hint={t('paymentDateHint')}
               type="date"
+              min={MIN_DATE}
               max={today}
               value={day || today}
               onChange={(e) => e.target.value && setDay(e.target.value === laToday() ? '' : e.target.value)}
@@ -1186,6 +1191,7 @@ function PaymentDialog({
             <TextField
               label={t('paymentDate')}
               type="date"
+              min={MIN_DATE}
               max={laToday()}
               value={day}
               onChange={(e) => e.target.value && setDay(e.target.value)}
