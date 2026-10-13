@@ -90,6 +90,7 @@ const MEMBERS = [
   member({ id: 's-new', full_name: 'Walk Newman' }),
 ];
 let duplicateOnce = false;
+let saves = 0;
 let staleOnce = false; // save_appointment refuses once: someone else saved the appointment first
 let apptLoads = 0;
 
@@ -372,7 +373,11 @@ async function open(who, width, path = '', options = {}) {
         staleOnce = false;
         return r.fulfill({ status: 400, json: { code: 'LPSTL', message: 'Someone else changed this appointment. Close it and open it again.' } });
       }
-      if (name === 'save_appointment') return r.fulfill({ json: 'a-new' });
+      if (name === 'save_appointment') {
+        const row = APPTS.find((x) => x.id === body.p.id);
+        if (row) row.updated_at = `2026-10-13T03:${String(++saves).padStart(2, '0')}:00+00:00`; // a save moves the version on
+        return r.fulfill({ json: 'a-new' });
+      }
       if (name === 'save_schedule_service' || name === 'save_schedule_category') return r.fulfill({ json: body.p.id ?? `${name}-new` });
       if (name !== 'import_schedule') return r.fulfill({ status: 204 });
       // Rows for instructor "Nobody" fail like an unknown instructor does in the database.
@@ -1711,10 +1716,13 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const len = sched.filter(([nm]) => nm === 'save_appointment').map(([, b]) => b.p);
   check(len[0]?.id === 'a-4' && len[0].start === `${LA_TODAY} 15:00` && len[0].minutes === 60 && len[0].clients[0]?.id === 'b-5'
     && !sched.some(([nm]) => nm === 'move_appointment'), 'schedule: dragging the bottom edge 10 minutes saves 60 minutes, same start');
+  const afterLength = APPTS.find((x) => x.id === 'a-4').updated_at;
   await page.getByRole('button', { name: 'Undo' }).click();
   await page.waitForTimeout(300);
   const back = sched.filter(([nm]) => nm === 'save_appointment').map(([, b]) => b.p)[1];
   check(back?.id === 'a-4' && back.minutes === 50, 'schedule: Undo puts the length back');
+  check(back?.updated_at === afterLength && afterLength !== len[0].updated_at,
+    'schedule: Undo sends the version saved by the length change, not the old one');
 
   // New appointment: client search uses the Schedule search (no payment data).
   await page.getByRole('button', { name: 'New Appointment' }).click();

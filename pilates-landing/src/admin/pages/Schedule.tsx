@@ -133,8 +133,14 @@ export default function Schedule() {
   const reload = useCallback(() => {
     const n = ++seq.current; // only the latest request may land
     return loadAppointments(from, to).then(
-      (rows) => n === seq.current && setAppts(rows),
-      () => n === seq.current && setFailed(true),
+      (rows) => {
+        if (n === seq.current) setAppts(rows);
+        return rows;
+      },
+      () => {
+        if (n === seq.current) setFailed(true);
+        return null;
+      },
     );
   }, [from, to]);
 
@@ -398,7 +404,8 @@ export default function Schedule() {
         return t('calStale');
       }
       if (error) return error.message;
-      await reload();
+      // Undo saves from the copy loaded after this save; the old copy is out of date now.
+      const fresh = (await reload())?.find((x) => x.id === a.id) ?? a;
       setMove(null);
       setGhost(null);
       setToast({
@@ -408,7 +415,7 @@ export default function Schedule() {
           ? undefined
           : async () => {
               setToast(null);
-              const { error: undoError } = await saveLength(a, a.minutes, 'one');
+              const { error: undoError } = await saveLength(fresh, a.minutes, 'one');
               if (undoError) setToast({ text: undoError.message });
               setVersion((v) => v + 1);
             },
