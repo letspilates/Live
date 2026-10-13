@@ -1,3 +1,4 @@
+import './frameGuard'; // first: stops here inside a frame
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../index.css';

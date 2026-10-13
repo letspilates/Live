@@ -1,7 +1,9 @@
 // Trainings › Courses: one line per course grouped by what the site shows, a
 // switch to show/hide right away, and an edit panel that slides in from the right
-// (full screen on phones). Every change saves the whole list through
-// save_training_courses, which also re-letters A, B, C… in schedule order.
+// (full screen on phones). Every change saves only that course
+// (save_training_course / delete_training_course; a screen older than the saved
+// course is refused), then the letters A, B, C… that no longer follow the schedule
+// order are stored with set_training_course_codes.
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Copy, Minus, Plus, Trash2, Upload, X } from 'lucide-react';
 import {
@@ -26,6 +28,8 @@ import { Button, Card, Chip, Dialog, Switch, TextField, inputCls } from '../ui';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 type Status = { tone: 'ok' | 'error'; text: string } | null;
+type DbError = { code?: string; message?: string };
+type Write = () => PromiseLike<{ error: DbError | null }>;
 
 /** Opens the file picker and hands over the chosen CSV file's text. */
 export function CsvButton({ onText }: { onText: (text: string) => void }) {
@@ -52,10 +56,11 @@ export function CsvButton({ onText }: { onText: (text: string) => void }) {
   );
 }
 
-/** What save_training_courses takes for one course. */
+/** What save_training_course takes (no id inserts; the letter only counts for a new course). */
 function toRow(c: Course) {
   return {
     id: c.uid,
+    updated_at: c.updated_at,
     code: c.id,
     name_en: c.name_en.trim(),
     name_kr: c.name_kr.trim(),
@@ -74,6 +79,25 @@ function toRow(c: Course) {
     ends_on: c.ends_on,
     held_seats: c.held_seats || 0,
   };
+}
+
+const saveCourse = (c: Course) => supabase!.rpc('save_training_course', { p: toRow(c) });
+
+/** Saved letter order (A … Z, AA …), so courses on the same date keep their letters. */
+const byCode = (list: Course[]) => [...list].sort((a, b) => a.id.length - b.id.length || a.id.localeCompare(b.id));
+
+/** The list in schedule order, lettered A, B, C…, and the courses whose saved letter differs. */
+function lettered(list: Course[]) {
+  const ordered = autoOrder(byCode(list));
+  const saved = new Map(list.map((c) => [c.uid, c.id]));
+  return { ordered, moved: ordered.filter((c) => saved.get(c.uid) !== c.id) };
+}
+
+/** New courses (no database id yet) with the letter each takes next to `list`. */
+function withLetters(list: Course[], added: Course[]): Course[] {
+  const key = (i: number) => `\u0000new${i}`;
+  const order = autoOrder([...byCode(list), ...added.map((c, i) => ({ ...c, uid: key(i) }))]);
+  return added.map((c, i) => ({ ...c, id: order.find((o) => o.uid === key(i))?.id ?? '' }));
 }
 
 const isPast = (c: Course, today = studioToday()) => Boolean(c.ends_on) && c.ends_on < today;
@@ -105,6 +129,7 @@ type Form = {
   desc_kr: string;
   active: boolean;
   taken: number;
+  updated_at?: string;
 };
 
 const EMPTY_RANGE: DateRange = { start: '', end: '' };
@@ -133,6 +158,7 @@ function toForm(c: Course): Form {
     desc_kr: c.desc_kr,
     active: c.active,
     taken: Number(c.taken) || 0,
+    updated_at: c.updated_at,
   };
 }
 
@@ -159,6 +185,7 @@ function fromForm(f: Form): Course {
     desc_kr: f.desc_kr,
     ends_on: rangesEnd(picked),
     held_seats: f.held,
+    updated_at: f.updated_at,
   };
 }
 
@@ -189,30 +216,47 @@ const NEW_COURSE: Course = {
 
 export function CourseEditor({ initial, reload }: { initial: Course[]; reload: () => Promise<Course[]> }) {
   const { t } = useT();
-  const [list, setList] = useState(() => autoOrder(initial));
+  const [list, setList] = useState(() => lettered(initial).ordered);
   const [status, setStatus] = useState<Status>(() =>
-    autoOrder(initial).some((c, i) => c.id !== initial[i].id || c.uid !== initial[i].uid)
-      ? { tone: 'ok', text: t('reordered') }
-      : null,
+    lettered(initial).moved.length ? { tone: 'ok', text: t('reordered') } : null,
   );
   const [form, setForm] = useState<Form | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  /** Saves the whole list, then reads back what the site now shows. */
-  const persist = async (next: Course[], ok: string) => {
+  /** Reads back what the site now shows and stores the letters that no longer follow the
+   *  schedule order (best effort: a letter left behind is stored with the next change). */
+  const refresh = async () => {
+    const { ordered, moved } = lettered(await reload());
+    if (!moved.length) return ordered;
+    const { error: e } = await supabase!.rpc('set_training_course_codes', { p: Object.fromEntries(moved.map((c) => [c.uid, c.id])) });
+    return e ? ordered : lettered(await reload()).ordered;
+  };
+
+  const messageOf = (err: DbError, fail: 'saveFailed' | 'deleteFailed') =>
+    err.code === 'LPSTL' ? t('courseStale') : err.code === 'LPREG' ? t('courseHasRegistrants') : t(fail, { reason: err.message ?? '' });
+  /** The same message in the edit panel, where an out-of-date course has to be opened again. */
+  const panelMessage = (err: DbError, fail: 'saveFailed' | 'deleteFailed') =>
+    err.code === 'LPSTL' ? t('courseStaleOpen') : messageOf(err, fail);
+
+  /** Runs one write (a single course), then refreshes the list. Returns the error, or null
+   *  when it worked; the message also shows above the list. */
+  const persist = async (write: Write, ok: string, fail: 'saveFailed' | 'deleteFailed' = 'saveFailed') => {
     setBusy(true);
     setStatus(null);
     try {
-      const { error: e } = await supabase!.rpc('save_training_courses', { p_courses: autoOrder(next).map(toRow) });
+      const { error: e } = await write();
       if (e) throw e;
-      setList(autoOrder(await reload()));
+      setList(await refresh());
       setStatus({ tone: 'ok', text: ok });
-      return true;
+      return null;
     } catch (e) {
-      setStatus({ tone: 'error', text: t('saveFailed', { reason: (e as { message?: string }).message ?? '' }) });
-      return false;
+      const err = e as DbError;
+      setStatus({ tone: 'error', text: messageOf(err, fail) });
+      // Someone else saved first: show the list as it is now.
+      if (err.code === 'LPSTL') await reload().then((fresh) => setList(lettered(fresh).ordered), () => {});
+      return err;
     } finally {
       setBusy(false);
     }
@@ -222,7 +266,10 @@ export function CourseEditor({ initial, reload }: { initial: Course[]; reload: (
     const before = list;
     const next = list.map((x) => (x.uid === c.uid ? { ...x, active: on } : x));
     setList(next);
-    persist(next, t(on ? 'shownNow' : 'hiddenNow')).then((ok) => !ok && setList(before));
+    // Undo the switch unless the list was reloaded in the meantime.
+    persist(() => saveCourse({ ...c, active: on }), t(on ? 'shownNow' : 'hiddenNow')).then(
+      (err) => err && setList((cur) => (cur === next ? before : cur)),
+    );
   };
 
   const saveForm = async () => {
@@ -232,15 +279,18 @@ export function CourseEditor({ initial, reload }: { initial: Course[]; reload: (
       return;
     }
     const course = fromForm(form);
-    const next = form.uid ? list.map((c) => (c.uid === form.uid ? course : c)) : [...list, course];
-    if (await persist(next, t('coursesSaved'))) setForm(null);
+    const err = await persist(() => saveCourse(form.uid ? course : withLetters(list, [course])[0]), t('coursesSaved'));
+    if (err) setError(panelMessage(err, 'saveFailed'));
+    else setForm(null);
   };
 
   const remove = async () => {
     if (!form) return;
     setDeleting(false);
-    if (form.uid && !(await persist(list.filter((c) => c.uid !== form.uid), t('courseDeleted')))) return;
-    setForm(null);
+    const uid = form.uid;
+    const err = uid ? await persist(() => supabase!.rpc('delete_training_course', { p_id: uid }), t('courseDeleted'), 'deleteFailed') : null;
+    if (err) setError(panelMessage(err, 'deleteFailed'));
+    else setForm(null);
   };
 
   // Old sheet's Courses tab → saved right away (names already in the list are skipped).
@@ -253,7 +303,13 @@ export function CourseEditor({ initial, reload }: { initial: Course[]; reload: (
       setStatus({ tone: 'error', text: t('nothingImported') });
       return;
     }
-    persist([...list, ...found], t('coursesImported', { n: String(found.length) }));
+    persist(async () => {
+      for (const c of withLetters(list, found)) {
+        const { error: e } = await saveCourse(c);
+        if (e) return { error: e };
+      }
+      return { error: null };
+    }, t('coursesImported', { n: String(found.length) }));
   };
 
   const open = (c: Course) => {
@@ -263,7 +319,7 @@ export function CourseEditor({ initial, reload }: { initial: Course[]; reload: (
   const duplicate = () => {
     if (!form) return;
     setError('');
-    setForm({ ...form, uid: '', id: '', name_en: form.name_en + t('copySuffix'), ranges: [EMPTY_RANGE], legacy: '', taken: 0, held: 0 });
+    setForm({ ...form, uid: '', id: '', name_en: form.name_en + t('copySuffix'), ranges: [EMPTY_RANGE], legacy: '', taken: 0, held: 0, updated_at: undefined });
   };
 
   const today = studioToday();

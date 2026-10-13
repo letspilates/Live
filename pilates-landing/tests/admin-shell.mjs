@@ -34,9 +34,9 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? 
 
 // training_courses rows. Letters are out of schedule order on purpose (the page must re-letter them).
 const COURSES = [
-  { id: 'c-a', code: 'A', name_en: 'Gyrotoner® Part 1', name_kr: '자이로토너 1', dates: '11/14 - 11/16', length_days: 3, capacity: 1, class_time: '9:00 AM - 5:00 PM', price: '$1,050', fee: '$350', fee_early: '$250', early_until: '2099-01-01', conducted_by: "Master Trainer Rich O'Connor", desc_en: 'Part one', desc_kr: '한글 설명', active: true },
-  { id: 'c-b', code: 'B', name_en: 'Jumping Stretching Board', name_kr: '점핑 보드', dates: '10/24 - 10/25', length_days: 2, capacity: null, class_time: '', price: '', fee: '$200', fee_early: '', early_until: null, conducted_by: '', desc_en: '', desc_kr: '', active: true },
-  { id: 'c-c', code: 'C', name_en: 'Old Course', name_kr: '', dates: '1/5 - 1/7', length_days: null, capacity: 4, class_time: '', price: '', fee: '', fee_early: '', early_until: null, conducted_by: '', desc_en: '', desc_kr: '', active: false },
+  { id: 'c-a', code: 'A', name_en: 'Gyrotoner® Part 1', name_kr: '자이로토너 1', dates: '11/14 - 11/16', length_days: 3, capacity: 1, class_time: '9:00 AM - 5:00 PM', price: '$1,050', fee: '$350', fee_early: '$250', early_until: '2099-01-01', conducted_by: "Master Trainer Rich O'Connor", desc_en: 'Part one', desc_kr: '한글 설명', active: true, updated_at: '2026-10-12T20:00:00.111111+00:00' },
+  { id: 'c-b', code: 'B', name_en: 'Jumping Stretching Board', name_kr: '점핑 보드', dates: '10/24 - 10/25', length_days: 2, capacity: null, class_time: '', price: '', fee: '$200', fee_early: '', early_until: null, conducted_by: '', desc_en: '', desc_kr: '', active: true, updated_at: '2026-10-12T20:00:00.222222+00:00' },
+  { id: 'c-c', code: 'C', name_en: 'Old Course', name_kr: '', dates: '1/5 - 1/7', length_days: null, capacity: 4, class_time: '', price: '', fee: '', fee_early: '', early_until: null, conducted_by: '', desc_en: '', desc_kr: '', active: false, updated_at: '2026-10-12T20:00:00.333333+00:00' },
 ];
 const reg = (r) => ({ certification: '', studio: '', city_state: '', questions: '', stage: '', prereq: '', availability: '', anything_else: '', phone: '', source: 'form', ...r });
 const REGS = [
@@ -44,7 +44,13 @@ const REGS = [
   // One of Leo's courses was deleted since.
   reg({ id: 'r-2', submitted_at: '2026-10-06T16:41:00Z', course_ids: ['c-b', 'c-gone'], courses_text: 'B - Jumping Stretching Board, Z - Retired course', full_name: 'Leo Park', email: 'leo@example.com' }),
 ];
-let saved = null;
+const courseSaves = []; // save_training_course bodies (p), one course each
+const codeSets = []; // set_training_course_codes bodies (p)
+let deletedCourse = null;
+let courseStaleOnce = false; // save_training_course refuses once: someone else saved the course first
+let deleteRefuseOnce = false; // delete_training_course refuses once: the course has registrants
+let oldCourseSave = false; // the old whole-list save_training_courses was called
+let courseLoads = 0;
 let imported = null;
 let deletedReg = null;
 let addedReg = null;
@@ -245,13 +251,36 @@ async function open(who, width, path = '', options = {}) {
     return r.fulfill({ json: {} });
   });
   for (const [table, rows] of [['training_courses', COURSES], ['training_registrations', REGS]]) {
-    await context.route(`${SUPABASE}/rest/v1/${table}?**`, (r) =>
-      loadMode === 'fail' ? r.fulfill({ status: 500, json: { message: 'boom' } }) : r.fulfill({ json: rows }),
-    );
+    await context.route(`${SUPABASE}/rest/v1/${table}?**`, (r) => {
+      if (table === 'training_courses') courseLoads += 1;
+      return loadMode === 'fail' ? r.fulfill({ status: 500, json: { message: 'boom' } }) : r.fulfill({ json: rows });
+    });
   }
+  // Like the database since AUDIT-011: the whole-list save only asks for a refresh.
   await context.route(`${SUPABASE}/rest/v1/rpc/save_training_courses`, (r) => {
-    saved = r.request().postDataJSON().p_courses;
-    return r.fulfill({ json: saved.length });
+    oldCourseSave = true;
+    return r.fulfill({ status: 400, json: { code: 'LPSTL', message: 'This page is out of date. Refresh the page and try again.' } });
+  });
+  await context.route(`${SUPABASE}/rest/v1/rpc/save_training_course`, (r) => {
+    const p = r.request().postDataJSON().p;
+    courseSaves.push(p);
+    if (courseStaleOnce) {
+      courseStaleOnce = false;
+      return r.fulfill({ status: 400, json: { code: 'LPSTL', message: 'Someone else changed this course. Refresh the page and make your change again.' } });
+    }
+    return r.fulfill({ json: p.id || 'c-new' });
+  });
+  await context.route(`${SUPABASE}/rest/v1/rpc/delete_training_course`, (r) => {
+    if (deleteRefuseOnce) {
+      deleteRefuseOnce = false;
+      return r.fulfill({ status: 400, json: { code: 'LPREG', message: 'This course has registrants, so it can\'t be deleted.' } });
+    }
+    deletedCourse = r.request().postDataJSON().p_id;
+    return r.fulfill({ status: 204, body: '' });
+  });
+  await context.route(`${SUPABASE}/rest/v1/rpc/set_training_course_codes`, (r) => {
+    codeSets.push(r.request().postDataJSON().p);
+    return r.fulfill({ status: 204, body: '' });
   });
   await context.route(`${SUPABASE}/rest/v1/rpc/import_training_registrations`, (r) => {
     imported = r.request().postDataJSON().p_rows;
@@ -593,22 +622,25 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   await context.close();
 }
 
-// 5. Saving courses: what goes to save_training_courses
+// 5. Saving courses: one course per save (save_training_course), never the whole list
 {
-  saved = null;
+  courseSaves.length = 0;
+  codeSets.length = 0;
   const { page, context, errors } = await open('OWNER', 1280, 'trainings/');
   await page.getByRole('button', { name: /^Edit course:/ }).first().waitFor();
-  // Switch saves right away.
+  // Switch saves right away: only that course, with the version the page loaded.
   await page.getByRole('switch', { name: 'Show on the site: Old Course' }).check({ force: true });
   await page.getByText('Shown on the site.').waitFor();
-  let byName = Object.fromEntries((saved ?? []).map((c) => [c.name_en, c]));
-  check(saved?.length === 3 && byName['Old Course']?.active === true, 'switch shows a hidden course right away');
-  check(saved?.map((c) => c.code).join() === 'A,B,C', 'saved IDs follow schedule order');
-  check(byName['Jumping Stretching Board']?.id === 'c-b' && byName['Old Course']?.id === 'c-c', 'existing courses keep their database id');
-  check(!('taken' in (saved?.[0] ?? {})) && !('key' in (saved?.[0] ?? {})) && !('tag_en' in (saved?.[0] ?? {})), 'no screen-only fields sent');
+  const s = courseSaves[0];
+  check(courseSaves.length === 1 && s?.id === 'c-c' && s.active === true, 'switch saves only that course, right away');
+  check(s?.updated_at === COURSES[2].updated_at, 'save sends the version the page loaded');
+  check(!('taken' in (s ?? {})) && !('key' in (s ?? {})) && !('tag_en' in (s ?? {})), 'no screen-only fields sent');
+  const codes = codeSets[0] ?? {};
+  check(codeSets.length === 1 && codes['c-b'] === 'A' && codes['c-a'] === 'B' && !('c-c' in codes),
+    'letters that no longer follow the schedule order are stored (letters only)');
 
   // Edit panel: early bird off, new instructor, held seat.
-  saved = null;
+  courseSaves.length = 0;
   await page.getByRole('button', { name: 'Edit course: Gyrotoner® Part 1' }).click();
   const panel = page.locator('dialog[open]');
   await panel.getByRole('switch', { name: 'Use an early-bird fee' }).uncheck({ force: true });
@@ -617,8 +649,8 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   await panel.getByRole('button', { name: 'One more' }).nth(1).click();
   await panel.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByText('Saved. The site shows the change now.').waitFor();
-  byName = Object.fromEntries((saved ?? []).map((c) => [c.name_en, c]));
-  const g = byName['Gyrotoner® Part 1'];
+  const g = courseSaves[0];
+  check(courseSaves.length === 1 && g?.id === 'c-a' && g.updated_at === COURSES[0].updated_at, 'panel saves only the course it edits, with its version');
   check(g?.fee_early === '' && g?.early_until === '', 'early bird switched off is saved empty');
   check(g?.conducted_by === 'Pre-Trainer Test', 'new instructor saved with the course');
   check(g?.held_seats === 1, 'held seat saved');
@@ -626,28 +658,55 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   check(!(await page.locator('dialog[open]').count()), 'panel closes after saving');
 
   // New course from date pickers; a name is required.
-  saved = null;
+  courseSaves.length = 0;
   await page.getByRole('button', { name: 'Add course' }).click();
   await panel.getByRole('button', { name: 'Save', exact: true }).click();
-  check(await panel.getByText('Enter the English course name.').isVisible() && saved === null, 'new course needs a name');
+  check(await panel.getByText('Enter the English course name.').isVisible() && courseSaves.length === 0, 'new course needs a name');
   await panel.getByLabel('English', { exact: true }).fill('New Course');
   await panel.getByLabel('First day').fill('2099-03-01');
   await panel.getByLabel('Last day').fill('2099-03-03');
   check(await panel.getByText('3 days · shows as "3/1 - 3/3"').isVisible(), 'schedule summary from the dates');
   await panel.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByText('Saved. The site shows the change now.').waitFor();
-  const n = (saved ?? []).find((c) => c.name_en === 'New Course');
-  check(n && n.id === '' && n.dates === '3/1 - 3/3' && n.length_days === '3' && n.ends_on === '2099-03-03' && n.capacity === '8', 'new course saved from the date pickers');
+  const n = courseSaves[0];
+  check(courseSaves.length === 1 && n?.name_en === 'New Course' && n.id === '' && n.dates === '3/1 - 3/3' && n.length_days === '3' && n.ends_on === '2099-03-03' && n.capacity === '8',
+    'new course saved from the date pickers');
+  check(n?.code === 'C' && !n.updated_at, 'new course gets its letter in schedule order (after the two shown courses)');
 
-  // Delete asks first
-  saved = null;
-  await page.getByRole('button', { name: 'Edit course: Gyrotoner® Part 1' }).click();
+  // Someone else saved the course first: refused, the panel says so and stays open, the list reloads.
+  courseSaves.length = 0;
+  courseStaleOnce = true;
+  await page.getByRole('button', { name: 'Edit course: Jumping Stretching Board' }).click();
+  await panel.getByRole('button', { name: 'One more' }).last().click();
+  const loadsBefore = courseLoads;
+  await panel.getByRole('button', { name: 'Save', exact: true }).click();
+  await panel.getByText('Someone else changed this course first. Close this and open it again').waitFor();
+  check(courseSaves.length === 1 && courseSaves[0].id === 'c-b' && await panel.isVisible(), 'stale save: refused, panel stays open with the reason');
+  check(await page.getByText('Someone else changed this course first. The list now shows the latest.').count() === 1
+    && courseLoads > loadsBefore, 'stale save: the list reloads and says so');
+  await panel.getByRole('button', { name: 'Close' }).click();
+
+  // A course with registrants can't be deleted: the panel says to hide it instead.
+  deleteRefuseOnce = true;
+  deletedCourse = null;
+  await page.getByRole('button', { name: 'Edit course: Jumping Stretching Board' }).click();
   await panel.getByRole('button', { name: 'Delete course' }).click();
   const confirm = page.locator('dialog[open]').filter({ hasText: 'Delete the course' });
+  check(await confirm.getByText('A course with registrants can\'t be deleted').isVisible(), 'delete confirmation says courses with registrants are hidden instead');
+  await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+  await panel.getByText('This course has registrants, so it can\'t be deleted. Turn off "Show on the site" to hide it instead.').waitFor();
+  check(deletedCourse === null && await panel.isVisible(), 'delete refused for a course with registrants: panel says to hide it instead');
+  await panel.getByRole('button', { name: 'Close' }).click();
+
+  // Delete asks first and sends only that course
+  courseSaves.length = 0;
+  await page.getByRole('button', { name: 'Edit course: Gyrotoner® Part 1' }).click();
+  await panel.getByRole('button', { name: 'Delete course' }).click();
   check(await confirm.getByText('Gyrotoner® Part 1').isVisible(), 'delete asks for confirmation');
   await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByText('Course deleted.').waitFor();
-  check(saved?.length === 2 && !saved.some((c) => c.id === 'c-a'), 'deleted course left out of the save');
+  check(deletedCourse === 'c-a' && courseSaves.length === 0, 'delete sends only that course id');
+  check(!oldCourseSave, 'the old whole-list save is never called');
 
   // Registrant added by hand
   addedReg = null;
@@ -681,7 +740,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
 
 // 7. One-time import of the old Google Sheet (CSV downloads)
 {
-  saved = null;
+  courseSaves.length = 0;
   imported = null;
   const { page, context, errors } = await open('OWNER', 1280, 'trainings/');
   await page.getByRole('button', { name: /^Edit course:/ }).first().waitFor();
@@ -692,8 +751,9 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   await page.locator('input[type="file"]').setInputFiles({ name: 'Courses.csv', mimeType: 'text/csv', buffer: Buffer.from(coursesCsv) });
   await page.getByText('Courses added from the file and saved: 1.').waitFor({ timeout: 5000 }).catch(() => {});
   check(await page.getByText('Courses added from the file and saved: 1.').isVisible(), 'course CSV adds only the new course, saved right away');
-  const lvl = (saved ?? []).find((c) => c.name_en === 'Level 1, Foundation');
-  check(lvl && lvl.id === '' && lvl.length_days === '12' && lvl.capacity === '8' && lvl.fee === '$400', 'imported course saved as a new row');
+  const lvl = courseSaves.find((c) => c.name_en === 'Level 1, Foundation');
+  check(courseSaves.length === 1 && lvl && lvl.id === '' && lvl.length_days === '12' && lvl.capacity === '8' && lvl.fee === '$400' && lvl.code === 'C',
+    'imported course saved as a new row with its letter');
 
   await page.getByRole('tab', { name: /Registrants/ }).click();
   await page.getByText('Mina Cho').waitFor();
@@ -721,12 +781,47 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
   await page.getByPlaceholder('you@example.com').fill('test@example.com');
   await page.getByPlaceholder('(555) 123-4567').fill('2135550100');
   await page.getByPlaceholder('e.g., Level 1 Pre-Training completed').fill('None yet');
+  const trap = await page.locator('input[name="lp_extra"]').evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { tab: el.tabIndex, ac: el.getAttribute('autocomplete'), hidden: Boolean(el.closest('[aria-hidden="true"]')), right: r.right };
+  }).catch(() => null);
+  check(trap?.tab === -1 && trap.ac === 'off' && trap.hidden && trap.right <= 0,
+    'form: bot trap field is off-screen, hidden from screen readers, skipped by Tab, autocomplete off');
+  const widths = await page.locator('input[name="lp_extra"]').evaluate((el) => {
+    const box = el.closest('[aria-hidden="true"]');
+    const withTrap = [document.documentElement.scrollWidth, document.documentElement.scrollHeight];
+    box.style.display = 'none';
+    const without = [document.documentElement.scrollWidth, document.documentElement.scrollHeight];
+    box.style.display = '';
+    return `${withTrap} vs ${without}`;
+  }).catch((e) => e.message);
+  check(/^(\d+),(\d+) vs \1,\2$/.test(widths), `form: bot trap changes no page size (${widths})`);
   await page.getByRole('button', { name: 'Next' }).click();
   await page.getByRole('button', { name: 'Submit registration' }).click();
   await page.getByText('Thank you', { exact: true }).waitFor();
   check(submitted?.course_ids?.join() === 'c-b' && submitted.email === 'test@example.com', 'form submits to Supabase with the course id');
   check(submitted?.courses_text === 'B - Jumping Stretching Board', 'form keeps the course text as picked');
   check(errors.length === 0, `form: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 8b. A bot that fills the trap field sees the usual thank-you, and nothing is sent
+{
+  submitted = null;
+  const { page, context, errors } = await open(null, 393, '../#register');
+  await page.getByRole('button', { name: 'Jumping Stretching Board' }).click();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByPlaceholder('Your full name').fill('Bot');
+  await page.getByPlaceholder('you@example.com').fill('bot@example.com');
+  await page.getByPlaceholder('(555) 123-4567').fill('2135550100');
+  await page.getByPlaceholder('e.g., Level 1 Pre-Training completed').fill('x');
+  await page.locator('input[name="lp_extra"]').fill('https://spam.example', { force: true, timeout: 3000 }).catch(() => {});
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: 'Submit registration' }).click();
+  await page.getByText('Thank you', { exact: true }).waitFor({ timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  check(await page.getByText('Thank you', { exact: true }).isVisible() && submitted === null, 'form: bot trap filled → thank-you shown, nothing sent');
+  check(errors.length === 0, `form trap: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 
@@ -2102,6 +2197,10 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
     '2026-03-09 10:00:00,360,,Gyrotonic Workshop,Sara Kim,sara@example.com,,,,"Bring socks\nand water",',
     'not a date,50,Sunnie,Private with Sunnie,Zed Quinn,,,,,,',
   ].join('\n'));
+  // A later import never updates bookings already imported (AUDIT-017): said in the hint and in the preview.
+  const once = 'Bookings already imported are never updated by a later import, so changes made in Schedulista after the first import are not picked up';
+  check(await page.getByText(/Rows already imported are skipped, so the same file can be imported again\. Bookings already imported are never updated/).isVisible(),
+    'import: the hint says a later import never updates imported bookings');
   const file = page.locator('input[type=file]');
   await file.setInputFiles(`${dir}/wrong.csv`);
   await page.getByText(/not a Schedulista appointments export/).waitFor();
@@ -2118,6 +2217,8 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
   const stat = (label) => page.locator('dt', { hasText: label }).locator('xpath=following-sibling::dd').innerText();
   check(await stat('Total records') === '4' && await stat('Ready to import') === '2' && await stat("Can't import") === '2', 'import: preview counts');
   check(await page.getByText(/Instructor not found: Nobody/).isVisible() && await page.getByText(/Missing or invalid date\/time/).isVisible(), 'import: reasons with row numbers');
+  check(await page.getByText(once).count() === 2 && await page.getByText(once).last().isVisible(),
+    'import: the preview says changes made in Schedulista after the first import are not picked up');
   await page.getByRole('button', { name: 'Import 2 rows' }).click();
   await page.getByText('Import finished.').waitFor();
   const commit = sched.filter(([n]) => n === 'import_schedule').map(([, b]) => b)[1];
@@ -2471,6 +2572,23 @@ const withGuests = async (context) => {
   check(await dlg.getByLabel('Service').inputValue() !== 'Reformer Workshop', 'others: switching from Other to our instructor picks one of their services');
   await dlg.getByRole('button', { name: 'Close' }).click();
   check(errors.length === 0, `others schedule: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// The portal refuses to run inside a frame (clickjacking, AUDIT-019); opened on its own it runs as usual.
+{
+  const { page, context } = await open('OWNER', 1280);
+  check(await page.getByRole('button', { name: 'Account menu' }).isVisible(), 'frame guard: the portal runs in its own tab');
+  // The framing page is the homepage (the portal's own CSP would block any frame it opened).
+  await page.goto(new URL('../', ROOT).href, { waitUntil: 'domcontentloaded' });
+  const frameErrors = [];
+  page.on('pageerror', (e) => frameErrors.push(e.message));
+  await page.setContent(`<p>Other page</p><iframe src="${ROOT}" width="1000" height="700"></iframe>`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1500);
+  const frame = page.frames().find((f) => f !== page.mainFrame());
+  const drawn = await frame?.evaluate(() => document.getElementById('root')?.childElementCount ?? -1).catch(() => -1);
+  check(frame && drawn === 0, `frame guard: inside a frame the portal draws nothing (${drawn} elements)`);
+  check(frameErrors.some((m) => m.includes('does not run inside a frame')), 'frame guard: it stops with a clear reason');
   await context.close();
 }
 

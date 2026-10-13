@@ -26,6 +26,8 @@ export interface Course {
   ends_on: string;
   /** Seats held by hand (verbal yes); count as taken. */
   held_seats: number;
+  /** Version loaded from the database (sent back on save; a newer one there means someone else saved first). */
+  updated_at?: string;
 }
 
 /** public.training_courses row */
@@ -48,6 +50,7 @@ export interface CourseRow {
   active: boolean;
   ends_on: string | null;
   held_seats: number | null;
+  updated_at?: string;
 }
 
 /** public.training_registrations row */
@@ -320,6 +323,7 @@ export function fromRow(r: CourseRow, regs: Registration[]): Course {
     desc_kr: r.desc_kr,
     ends_on: r.ends_on ?? '',
     held_seats: r.held_seats ?? 0,
+    updated_at: r.updated_at,
   };
 }
 

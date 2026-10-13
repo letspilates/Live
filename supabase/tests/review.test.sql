@@ -110,12 +110,10 @@ select t.expect_error('moving it to a deactivated person is refused', '22023',
   format('select public.correct_payment(%L, 10500, %L, %L, %L, %L)', current_setting('t.pay'), 'CASH', '', '', '00000000-0000-0000-0000-0000000000b2'));
 
 -- 6. Full and closed courses refuse sign-ups ---------------------------------------------
-select public.save_training_courses('[{"code":"A","name_en":"One seat","capacity":1,"active":true},
-  {"code":"B","name_en":"Closed","capacity":0,"active":true},{"code":"C","name_en":"No limit","active":true}]');
+select set_config('t.a', public.save_training_course('{"code":"A","name_en":"One seat","capacity":1,"active":true}')::text, true);
+select set_config('t.b', public.save_training_course('{"code":"B","name_en":"Closed","capacity":0,"active":true}')::text, true);
+select set_config('t.c', public.save_training_course('{"code":"C","name_en":"No limit","active":true}')::text, true);
 reset role;
-select set_config('t.a', (select id::text from public.training_courses where code = 'A'), true);
-select set_config('t.b', (select id::text from public.training_courses where code = 'B'), true);
-select set_config('t.c', (select id::text from public.training_courses where code = 'C'), true);
 select t.anon();
 select public.submit_training_registration(jsonb_build_object('course_ids', jsonb_build_array(current_setting('t.a')),
   'full_name', 'First', 'email', 'first@x.com', 'phone', '1', 'certification', 'c'));

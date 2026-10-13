@@ -247,6 +247,9 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
   const [stepError, setStepError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // Bot trap: a field people never see or reach (step 2). Bots that fill every field get
+  // the normal thank-you, and nothing is sent.
+  const [trap, setTrap] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -298,6 +301,11 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
   };
 
   const submit = async () => {
+    if (trap) {
+      setSubmitted(true);
+      wrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     setSubmitting(true);
     const data = {
       timestamp: new Date().toISOString(),
@@ -634,6 +642,23 @@ export default function TrainingForm({ open, onClose }: { open: boolean; onClose
                         className={`${inputCls} resize-y`}
                       />
                     </div>
+                  </div>
+                  {/* Bot trap: off-screen, hidden from screen readers, skipped by Tab, never autofilled. */}
+                  <div
+                    aria-hidden="true"
+                    style={{ position: 'absolute', left: '-10000px', top: 'auto', width: 1, height: 1, overflow: 'hidden' }}
+                  >
+                    <label>
+                      Leave this field empty
+                      <input
+                        type="text"
+                        name="lp_extra"
+                        tabIndex={-1}
+                        autoComplete="off"
+                        value={trap}
+                        onChange={(e) => setTrap(e.target.value)}
+                      />
+                    </label>
                   </div>
                   {stepError && <p className="mt-4 text-sm text-red-500">{stepError}</p>}
                   <div className="mt-8 flex items-center justify-between border-t border-ink/10 pt-6">

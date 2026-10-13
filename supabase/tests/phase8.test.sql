@@ -75,13 +75,14 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000b3', 'gone@test.local'),
   ('00000000-0000-0000-0000-0000000000c1', 'stranger@test.local');
 select app.grant_owner('owner@test.local', 'Owner');
+delete from public.training_courses;  -- start from no courses (the seed migration adds the studio's real ones)
 select t.login('00000000-0000-0000-0000-0000000000a1');
 select public.add_staff_user('00000000-0000-0000-0000-0000000000a2', 'admin@test.local', false, '{"full_name":"Ada","roles":["ADMIN"]}');
 select public.add_staff_user('00000000-0000-0000-0000-0000000000b1', 'staff@test.local', false, '{"full_name":"Sam","roles":["STAFF"]}');
 select public.add_staff_user('00000000-0000-0000-0000-0000000000b2', 'inst@test.local', false, '{"full_name":"Ian","roles":["INSTRUCTOR"]}');
 select public.add_staff_user('00000000-0000-0000-0000-0000000000b3', 'gone@test.local', false, '{"full_name":"Gil","roles":["INSTRUCTOR"]}');
 select set_config('t.client', public.add_student('Mina Cho', '213-555-0142')::text, true);
-select public.save_training_courses('[{"code":"T1","name_en":"Mat 1","active":true}]');
+select public.save_training_course('{"code":"T1","name_en":"Mat 1","active":true}');
 reset role;
 
 -- Payments and expenses this month and last month (owner back-dates last month's).

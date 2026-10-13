@@ -882,7 +882,9 @@ function ImportCard({ onImported }: { onImported: () => void }) {
   return (
     <Card className="lg:col-span-2">
       <CardTitle icon={Upload} title={t('ssImportTitle')} />
-      <p className="mb-4 max-w-[70ch] text-sm text-mute">{t('ssImportHint')}</p>
+      <p className="mb-4 max-w-[70ch] text-sm text-mute">
+        {t('ssImportHint')} {t('ssImportOnce')}
+      </p>
       <input
         ref={input}
         type="file"
@@ -912,6 +914,7 @@ function ImportCard({ onImported }: { onImported: () => void }) {
         <div className="mt-5 grid gap-4">
           {done && <Notice tone="success">{t('ssImportDone')}</Notice>}
           <Summary result={result} problems={file.problems} committed={Boolean(done)} />
+          {check && <p className="max-w-[70ch] text-sm text-mute">{t('ssImportOnce')}</p>}
           {check && (
             <div>
               <Button disabled={busy || !check.importable} onClick={() => void run(file.rows, true)}>
