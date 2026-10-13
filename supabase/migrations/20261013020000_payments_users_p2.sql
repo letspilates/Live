@@ -200,14 +200,23 @@ end;
 $$;
 
 -- Expenses and recurring rules are written directly by owners/admins (RLS), so
--- the same check runs as a trigger before the closed-month one.
+-- the same check runs as a trigger before the closed-month one. On an update only
+-- the dates that change are checked: real Staging data has one March 2026 rent
+-- row with due date 0006-03-01 (the typo this fixes), and it must stay editable
+-- so it can be corrected on the Expenses screen.
 create or replace function app.enforce_expense_dates() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 begin
-  perform app.require_book_date(new.expense_date);
-  perform app.require_book_date(new.due_date);
-  perform app.require_book_date(new.paid_on);
+  if tg_op = 'INSERT' or new.expense_date is distinct from old.expense_date then
+    perform app.require_book_date(new.expense_date);
+  end if;
+  if tg_op = 'INSERT' or new.due_date is distinct from old.due_date then
+    perform app.require_book_date(new.due_date);
+  end if;
+  if tg_op = 'INSERT' or new.paid_on is distinct from old.paid_on then
+    perform app.require_book_date(new.paid_on);
+  end if;
   return new;
 end;
 $$;
@@ -216,25 +225,35 @@ create or replace function app.enforce_rule_dates() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 begin
-  perform app.require_book_date(new.start_month);
-  perform app.require_book_date(new.end_month);
+  if tg_op = 'INSERT' or new.start_month is distinct from old.start_month then
+    perform app.require_book_date(new.start_month);
+  end if;
+  if tg_op = 'INSERT' or new.end_month is distinct from old.end_month then
+    perform app.require_book_date(new.end_month);
+  end if;
   return new;
 end;
 $$;
 
+drop trigger if exists expenses_book_dates on public.expenses;
 create trigger expenses_book_dates
   before insert or update on public.expenses
   for each row execute function app.enforce_expense_dates();
+drop trigger if exists recurring_expense_rules_book_dates on public.recurring_expense_rules;
 create trigger recurring_expense_rules_book_dates
   before insert or update on public.recurring_expense_rules
   for each row execute function app.enforce_rule_dates();
 
--- Backstop for any other writer. Every row so far is from 2026.
+-- Backstop for any other writer (checked against real Staging data 2026-10-13).
+-- Expenses' due date has no table check: the 0006-03-01 row above would fail it,
+-- and a check is re-tested on every update of that row. The trigger covers it.
+alter table public.payment_transactions drop constraint if exists payment_transactions_business_date_floor;
 alter table public.payment_transactions
   add constraint payment_transactions_business_date_floor check (business_date >= date '2020-01-01');
+alter table public.expenses drop constraint if exists expenses_dates_floor;
 alter table public.expenses
-  add constraint expenses_dates_floor check (expense_date >= date '2020-01-01'
-    and due_date >= date '2020-01-01' and paid_on >= date '2020-01-01');
+  add constraint expenses_dates_floor check (expense_date >= date '2020-01-01' and paid_on >= date '2020-01-01');
+alter table public.recurring_expense_rules drop constraint if exists recurring_expense_rules_start_floor;
 alter table public.recurring_expense_rules
   add constraint recurring_expense_rules_start_floor check (start_month >= date '2020-01-01');
 

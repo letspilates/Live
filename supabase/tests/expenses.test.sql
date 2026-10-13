@@ -137,6 +137,22 @@ select t.expect_error('date floor: expenses table check', '23514',
 select t.expect_error('date floor: rules table check', '23514',
   $$insert into public.recurring_expense_rules (category, description, amount_cents, due_day, start_month) values ('OTHER', 'Typo rule', 100, 1, '0026-10-01')$$);
 rollback to savepoint floor;
+-- A row saved before the floor existed (real Staging: rent with due date 0006-03-01)
+-- stays editable, and can be corrected; a new bad due date is still refused.
+savepoint legacy;
+set local session_replication_role = replica;
+insert into public.expenses (category, description, amount_cents, expense_date, due_date)
+values ('RENT', 'Legacy rent', 100, current_setting('t.today')::date, '0006-03-01');
+set local session_replication_role = origin;
+update public.expenses set notes = 'still editable' where description = 'Legacy rent';
+select t.check('date floor: an old row with a bad due date can still be edited',
+  (select notes = 'still editable' from public.expenses where description = 'Legacy rent'));
+select t.expect_error('date floor: a new bad due date on that row is refused', 'LPOLD',
+  $$update public.expenses set due_date = '0007-03-01' where description = 'Legacy rent'$$);
+update public.expenses set due_date = current_setting('t.today')::date where description = 'Legacy rent';
+select t.check('date floor: the bad due date can be corrected',
+  (select due_date = current_setting('t.today')::date from public.expenses where description = 'Legacy rent'));
+rollback to savepoint legacy;
 select t.check('audit: changes are logged', (select count(*) >= 10 from public.audit_logs
   where entity_type in ('expenses', 'recurring_expense_rules')));
 
