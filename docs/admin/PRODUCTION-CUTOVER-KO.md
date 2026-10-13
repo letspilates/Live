@@ -1,6 +1,6 @@
 # 관리자 포털 운영(main) 반영 체크리스트
 
-> Phase 8 최종 점검 결과(2026-10-10). **main 반영은 Calvin이 명시적으로 승인한 뒤에만 한다.**
+> Phase 8 최종 점검 결과(2026-10-10). 최신 점검은 `docs/staging-audit/`(2026-10-13). **main 반영은 Calvin이 명시적으로 승인한 뒤에만 한다.**
 > 지금 main을 병합해도 운영 사이트는 안전하다: 운영용 Supabase 값이 비어 있어서 홈페이지 트레이닝 신청 폼은
 > 계속 구글 시트에 저장되고, `/admin`은 "프로젝트 미설정" 상태로만 보인다.
 
@@ -27,23 +27,41 @@
 
 **B. 홈페이지 트레이닝 신청 폼**: 운영 Supabase 값을 넣는 순간 운영 폼이 구글 시트 대신 Supabase에 저장한다(신청 알림 메일 없음, 2026-10-10 결정대로). 괜찮은지 확인.
 
-## 3. 반영 순서 (A-①을 고른 경우)
+## 3. 반영 순서 (2026-10-13 개정, AUDIT-007)
 
-1. **스테이징 최종 확인 (Calvin)**: https://letspilatesla.com/staging/admin/ 에서 Owner 계정과 테스트 Staff 계정으로 Dashboard, Clients, Trainings, Payments, Expenses, Reports(월 마감 포함), Users, Admin access, My account를 한 번씩 열어 본다. 아이폰, 아이패드에서도.
-2. **운영 Supabase 프로젝트 생성 (Calvin)**: Pro 플랜 추천(매일 백업, 일시정지 없음). GitHub 연동을 `main` 브랜치에 연결하면 마이그레이션과 `staff-admin` 함수가 자동 적용된다.
-3. **인증 설정 (Calvin)**: Site URL `https://letspilatesla.com/admin/`, Redirect URL `https://letspilatesla.com/admin/set-password/`, Custom SMTP(초대·비밀번호 재설정 메일용). 절차는 `docs/admin/SETUP-KO.md`와 같고 주소만 `/staging`이 빠진다.
-4. **공개 키 전달 (Calvin → Claude)**: 운영 프로젝트 URL과 publishable key. Claude가 `src/supabaseProject.ts`의 `production`에 넣어 Staging에 올린다(운영에는 아직 영향 없음).
-5. **첫 Owner (Calvin)**: Authentication › Users › Add user로 본인 계정을 만들고 SQL Editor에서 `select app.grant_owner('이메일', '이름');` 한 줄 실행. 이후 유저는 포털 Users에서 추가.
-6. **데이터 가져오기 (Calvin, main 병합 직후 바로)**: 포털 Trainings › CSV 가져오기로 구글 시트의 Courses와 신청자 탭, Clients › 가져오기로 Mindbody·Schedulista CSV. 가져온 CSV 파일은 삭제(개인정보). 코스가 비어 있으면 홈페이지 폼에 코스가 안 보이므로 **병합과 코스 가져오기 사이 간격을 짧게** 한다.
-7. **main 반영 (Calvin 승인 후 Claude)**: `Staging` → `main` PR 생성, 병합. 배포 자동.
-8. **반영 후 확인**: 홈페이지가 전과 같은지(폰·태블릿·데스크톱, EN/KR 전환, 스케줄 위젯), 트레이닝 폼에 코스가 보이고 신청이 들어가는지, `/admin` 로그인과 역할별 메뉴. 운영에서는 테스트 결제를 넣지 않는다(지울 수 없음).
-9. **정리**: 폼이 Supabase로 옮겨진 걸 확인한 뒤 Apps Script와 ADMIN_KEY 폐기 여부 결정.
+> 예전 순서(2026-10-10)는 그대로 따라 할 수 없었다. `main`에는 병합 전까지 `supabase/` 폴더가 없어서, 병합 전에는 운영 DB에 마이그레이션도 `grant_owner`도 없다.
+> 또 스케줄, Knowledge, Backup, 지출, Admin access, 가입 끄기가 빠져 있었다. 아래 순서대로 한다.
+> 데이터 복사 방법(11·12단계 세부)은 P0 AUDIT-001에서 정한 뒤 채운다 (`docs/staging-audit/REMEDIATION_BACKLOG.md` 1번).
 
-**되돌리기**: main에서 그 PR을 되돌리는 PR 하나면 홈페이지 폼은 구글 시트로 돌아간다. 운영 DB 데이터는 그대로 남는다.
+### 준비 (병합 전, 운영 사이트에 영향 없음)
 
-## 4. 고치지 않고 남겨 둔 것 (필요하면 말해 주세요)
+1. **스테이징 최종 확인 (Calvin)**: https://letspilatesla.com/staging/admin/ 에서 모든 메뉴(Dashboard, Clients, Trainings, Knowledge, Schedule, Payments, Expenses, Reports·월 마감, Users, Notifications, Admin access, Schedule settings, Backup, My account)를 Owner 계정과 공용 Staff 계정으로 열어 본다. 아이폰, 아이패드에서도.
+2. **운영 Supabase 프로젝트 생성 (Calvin)**: 플랜은 Calvin 결정(2026-10-13): Pro 없이 시작하고, 운영 반영 후 매일 로컬 백업 경로를 만든다.
+3. **GitHub 연동 (Calvin)**: 운영 프로젝트 → Integrations → GitHub: 저장소 `letspilates/Live`, Working directory `.`, Production branch **`main`**, Deploy to production ON, Automatic branching OFF. 이 시점에는 `main`에 `supabase/`가 없어서 아무것도 적용되지 않는 게 정상이다. SQL을 손으로 붙여넣지 않는다(SETUP-KO.md 3단계 경고).
+4. **인증 설정 (Calvin)**: Authentication → Sign In / Providers → **Allow new users to sign up 끄기**, Confirm email 켜 둠, 비밀번호 최소 8자. URL Configuration → Site URL `https://letspilatesla.com/admin/`, Redirect URL `https://letspilatesla.com/admin/set-password/`. Custom SMTP(초대·비밀번호 재설정 메일).
+5. **공개 키 전달 (Calvin → Claude)**: 운영 프로젝트 URL과 publishable key. Claude가 `pilates-landing/src/supabaseProject.ts`의 `production`에 넣고 Staging에 올린다(운영에는 아직 영향 없음).
+6. **데이터 복사 리허설 (Claude + Calvin)**: 정한 방법으로 빈 테스트 프로젝트에 한 번 복사해 보고 대조한다: 표별 행 수, 1~10월 월별 `finance_report` 합계, 결제의 받은 사람 이름, 강사별 월별 일정 수가 Staging과 같아야 한다.
 
-- Staff와 Instructor도 결제 화면에서 고른 클라이언트의 최근 결제 10건을 본다(다른 직원이 받은 것 포함). Calvin이 요청한 기능이라 그대로 둠.
-- 화면에는 Walk-in이 없지만 DB 함수는 클라이언트 없는 결제를 아직 받는다. 화면이 항상 클라이언트를 보내서 실제로 생기지는 않는다.
-- 홈페이지 트레이닝 신청은 로그인 없이 누구나 보낼 수 있고 스팸 방지가 없다. 운영 전환 전에 길이 제한과 간단한 스팸 방지를 넣는 걸 추천.
-- 이 작업 환경에서는 실제 Supabase(스테이징) DB에 직접 접속할 수 없어서, 보안 점검은 같은 마이그레이션을 적용한 로컬 DB에서 했다.
+### 반영 (손님이 적은 시간에, 짧게 연달아)
+
+7. **입력 멈춤 + 최종 백업 (Calvin)**: 이 시점부터 Staging에 결제·일정·클라이언트를 넣지 않는다(그 사이 결제는 메모해 두었다가 운영에 넣는다). Settings › Backup › Everything (JSON)을 받는다.
+8. **main 병합 (Calvin 승인 후 Claude)**: `Staging` → `main` PR 병합. 홈페이지 배포와 운영 DB 마이그레이션이 동시에 돈다. 마이그레이션이 끝나기 전 몇 분 동안은 홈페이지 신청 폼이 코스를 못 불러올 수 있다.
+9. **적용 확인**: 운영 SQL Editor에서 `select count(*) from supabase_migrations.schema_migrations;` 결과가 저장소 `supabase/migrations/` 파일 수와 같은지, Edge Functions에 `staff-admin`이 있는지.
+10. **첫 Owner (Calvin)**: Authentication › Users › Add user(Auto Confirm User 체크) → SQL Editor에서 `select app.grant_owner('이메일', '이름');`.
+11. **직원 계정**: 복사 방법에 따라 Staging 직원과 같은 ID로 만들거나(방법 A), 포털 Users에서 추가한다. 강사 이름·색이 일정과 맞아야 한다.
+12. **데이터 복사 + 대조 (Claude + Calvin)**: 리허설한 방법 그대로. 빠짐없이 들어가야 하는 것: 클라이언트, 결제(1~10월), 지출과 반복 지출, 월 마감, 일정과 일정별 클라이언트, 스케줄 서비스·카테고리·설정(문자 지연, Other 색)·강사 색, Trainings 코스와 신청자, Knowledge 목록과 Storage 파일, Admin access 설정. Staging 테스트 결제를 뺄지 정한다. 6단계와 같은 대조를 다시 한다.
+13. **반영 후 확인**: 홈페이지가 전과 같은지(폰·태블릿·데스크톱, EN/KR 전환, 스케줄 위젯), 신청 폼에 코스가 보이는지, `/admin` 로그인과 역할별 메뉴, Reports 1~10월 합계가 Staging과 같은지. 운영에는 테스트 결제를 넣지 않는다(지울 수 없음).
+14. **정리 (Calvin)**:
+    - Google Apps Script 웹앱 끄기: Apps Script → Deploy → Manage deployments → Archive (AUDIT-020, 반드시).
+    - 직원 폰의 홈 화면 즐겨찾기를 `/staging/admin/`에서 `/admin/`으로 바꾼다. 이후 Staging에는 실제 데이터를 넣지 않는다.
+    - 매일 로컬 백업 경로 설정.
+    - `/admin/legacy/`와 ADMIN_KEY 폐기 여부 결정.
+
+**되돌리기**: main에서 그 PR을 되돌리는 PR 하나면 홈페이지 폼은 구글 시트로 돌아가고 `/admin`은 "연결 안 됨" 화면이 된다. 운영 DB 데이터는 그대로 남는다. 되돌린 동안 결제를 어디에 적을지 미리 정한다(Staging에는 넣지 않는다). Staging 프로젝트와 최종 백업은 운영에서 한 달을 마감할 때까지 지우지 않는다.
+
+## 4. 고치지 않고 남겨 둔 것 (2026-10-13 갱신)
+
+- 결제 화면의 "지난 결제 10건"과 직원의 결제 보기 범위: 2026-10-13 Calvin 결정에 따라 바뀜(AUDIT-010).
+- 화면에는 Walk-in이 없지만 DB 함수는 클라이언트 없는 결제를 아직 받는다(AUDIT-038, P3). 화면이 항상 클라이언트를 보내서 실제로 생기지는 않는다.
+- 홈페이지 트레이닝 신청: 길이 제한·횟수 제한은 있고, 봇 방지는 AUDIT-018에서 추가 중.
+- 이 작업 환경에서는 실제 Supabase DB에 직접 접속할 수 없어서, DB 점검은 같은 마이그레이션을 적용한 로컬 DB에서 한다.

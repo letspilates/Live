@@ -19,12 +19,12 @@
 ## 1단계 — Publishable key 전달
 
 1. Supabase 대시보드 → 프로젝트 화면의 **Copy** (또는 Connect) → **Publishable key** 복사.
-2. 채팅에 붙여넣기 → Claude가 `pilates-landing/src/admin/supabase.ts`에 넣고 Staging에 푸시한다.
+2. 채팅에 붙여넣기 → Claude가 `pilates-landing/src/supabaseProject.ts`에 넣고 Staging에 푸시한다.
 
 ## 2단계 — 인증(Authentication) 설정
 
-1. **(나중에) 가입 막기:** Authentication → Sign In / Providers → **Allow new users to sign up → 끄기**.
-   지금은 켜 둬도 된다: 가입해도 직원 프로필이 없으면 데이터에 접근할 수 없다. 실제 운영 전에는 끈다.
+1. **가입 막기:** Authentication → Sign In / Providers → **Allow new users to sign up → 끄기**.
+   직원 초대·"비밀번호 바로 설정"·비밀번호 재설정은 꺼도 그대로 된다. 켜 두면 외부인이 직원 이메일로 먼저 가입해 둘 수 있다(AUDIT-008).
 2. **주소 설정:** Authentication → URL Configuration
    - **Site URL:** `https://letspilatesla.com/staging/admin/`
    - **Redirect URLs** (Add URL로 하나씩):
