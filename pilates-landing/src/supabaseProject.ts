@@ -10,8 +10,11 @@ const PROJECTS = {
     url: 'https://prklzkcrhfnnlefvmxhb.supabase.co',
     publishableKey: 'sb_publishable_f8xs6ixyPvqZGjf3nGl_1Q_7dj0CQZL',
   },
-  // Created before real payments are recorded (master plan, Phase 5).
-  production: { url: '', publishableKey: '' },
+  // Production project (letspilatesla.com/admin/), created 2026-10-13.
+  production: {
+    url: 'https://ibizgxqwndyxzebusrwb.supabase.co',
+    publishableKey: 'sb_publishable_10q-6_hjdVMBSLF2pmYKRA_aKNFHM2T',
+  },
 };
 
 /** Local dev and the /staging/ build use the staging project. */
