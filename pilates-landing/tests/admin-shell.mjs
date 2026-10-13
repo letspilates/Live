@@ -2177,6 +2177,40 @@ const withGuests = async (context) => {
 
 check(!browserCalledSheet, 'staging never calls the Google Sheet');
 
+// Staging is marked on phones, on the sign-in screen and in the tab title (Calvin chose the top strip, 2026-10-13).
+{
+  const { page, context } = await open('OWNER', 393);
+  const strip = page.locator('div.sm\\:hidden', { hasText: /^Staging$/ });
+  const top = (await strip.count()) ? await strip.boundingBox() : null;
+  check(top && top.y < 2 && top.width >= 390, 'staging: phone shows a Staging strip at the very top');
+  check(!(await page.locator('header span', { hasText: /^Staging$/ }).isVisible()), 'staging: phone header keeps the whole title (no badge there)');
+  check((await page.title()).startsWith('Staging · '), 'staging: tab title starts with "Staging · "');
+  await context.close();
+  const wide = await open('OWNER', 1280);
+  check(!(await wide.page.locator('div.sm\\:hidden', { hasText: /^Staging$/ }).isVisible())
+    && (await wide.page.locator('header span', { hasText: /^Staging$/ }).isVisible()), 'staging: computer keeps the header badge, no strip');
+  await wide.context.close();
+  for (const width of [393, 1280]) {
+    const c = await browser.newContext({ viewport: { width, height: 800 } });
+    const p = await c.newPage();
+    await p.goto(ROOT + 'login/');
+    await p.getByRole('heading', { name: 'Sign in' }).waitFor();
+    check(await p.getByText('Staging', { exact: true }).isVisible(), `staging: sign-in screen shows Staging at ${width}`);
+    await c.close();
+  }
+}
+
+// iPad landscape (1024): money is readable and nothing runs off the side (Calvin approved the layout, 2026-10-13).
+for (const [who, path] of [['OWNER', ''], ['OWNER', 'payments/'], ['STAFF', 'payments/']]) {
+  const { page, context } = await open(who, 1024, path);
+  await page.waitForTimeout(500);
+  const cut = await page.evaluate(() => [...document.querySelectorAll('main *')].filter((e) =>
+    e.offsetParent !== null && e.children.length === 0 && /^-?\$[\d,]+\.\d\d$/.test(e.textContent.trim()) && e.scrollWidth > e.clientWidth + 1
+    || (e.offsetParent !== null && /^\$…$|^\$[\d,]*…$/.test(e.textContent.trim()))).map((e) => e.textContent.trim()));
+  check(cut.length === 0 && (await noOverflow(page)), `ipad 1024 ${who} /${path}: no cut-off amounts, no sideways scroll ${cut.join(' ')}`);
+  await context.close();
+}
+
 await browser.close();
 console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
 process.exit(failures ? 1 : 0);

@@ -177,6 +177,9 @@ export default function Layout({
       </dialog>
 
       <div className={`md:pl-[72px] ${collapsed ? '' : 'lg:pl-60'}`}>
+        {IS_STAGING && (
+          <div className="bg-clay/20 py-1 text-center text-xs font-semibold text-ink sm:hidden">{t('staging')}</div>
+        )}
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 bg-canvas/85 px-4 backdrop-blur-md sm:px-6 lg:px-8">
           <button
             type="button"

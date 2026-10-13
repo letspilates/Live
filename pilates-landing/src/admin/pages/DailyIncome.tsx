@@ -113,7 +113,7 @@ export default function DailyIncome() {
           <Skeleton className="h-32 w-full rounded-2xl" />
         </div>
       ) : tab === 'record' ? (
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
           <RecordPayment {...data} onSaved={() => setSaves((n) => n + 1)} onShowHistory={owner ? () => show('history') : undefined} />
           <aside className="grid min-w-0 gap-4">
             <DayPayments {...data} saves={saves} onShowAll={owner ? () => show('history') : undefined} />

@@ -205,7 +205,7 @@ function KpiStrip({
 
   return (
     <Card pad={false} label={t('thisMonth')} className="overflow-hidden lg:col-span-3">
-      <dl className="grid grid-cols-2 gap-px bg-ink/[0.07] lg:grid-cols-4 [&>*]:bg-paper">
+      <dl className="grid grid-cols-2 gap-px bg-ink/[0.07] xl:grid-cols-4 [&>*]:bg-paper">
         <TodayKpi today={today} failed={todayFailed} label="todayIncome" />
         <Kpi icon={TrendingUp} label={`${t('netRevenue')} · ${t('thisMonth')}`}>
           {cell(<Big value={formatCents(m?.net ?? 0)} note={t('nPayments', { n: String(m?.payment_count ?? 0) })} />)}

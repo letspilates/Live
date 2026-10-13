@@ -12,6 +12,7 @@ import {
 import { CircleAlert, CircleCheck, Info, X, type LucideIcon } from 'lucide-react';
 import LogoIcon from '../components/LogoIcon';
 import { useT } from './i18n';
+import { IS_STAGING } from './supabase';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const;
 
@@ -148,6 +149,7 @@ export function Notice({ tone, children }: { tone: keyof typeof NOTICE; children
 
 /** Full-screen centered card for sign-in and account-state screens. */
 export function CenteredCard({ title, children }: { title?: string; children: ReactNode }) {
+  const { t } = useT();
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-canvas px-4 py-10">
       <div className="w-full max-w-sm">
@@ -157,6 +159,9 @@ export function CenteredCard({ title, children }: { title?: string; children: Re
             <p className="font-display text-lg font-semibold tracking-tightest text-ink">Let&rsquo;s Pilates LA</p>
             <p className="text-sm text-mute">Studio Admin</p>
           </div>
+          {IS_STAGING && (
+            <span className="ml-auto rounded-full bg-clay/20 px-2.5 py-1 text-xs font-semibold text-ink">{t('staging')}</span>
+          )}
         </div>
         <Card>
           {title && <h1 className="mb-5 font-display text-xl font-semibold text-ink">{title}</h1>}
