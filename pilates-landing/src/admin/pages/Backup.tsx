@@ -43,7 +43,10 @@ type Data = Record<Table | 'staff' | 'schedule_instructors', Row[]>;
 async function readAll(table: Table, order: readonly string[]): Promise<Row[]> {
   const rows: Row[] = [];
   for (let from = 0; ; from += 1000) {
-    let query = supabase!.from(table).select('*');
+    // Booked clients' phone, email and price aren't readable from the table; this function
+    // returns every column to someone with Clients access (Owner/Admin).
+    let query =
+      table === 'appointment_clients' ? supabase!.rpc('appointment_clients_full').select('*') : supabase!.from(table).select('*');
     for (const col of order) query = query.order(col);
     const { data, error } = await query.range(from, from + 999);
     if (error) throw error;

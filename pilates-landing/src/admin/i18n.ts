@@ -611,6 +611,11 @@ const en = {
   calMovedTo: 'Moved to {when}',
   calLengthTo: 'Now {when}',
   calUndo: 'Undo',
+  calClientClash: '{name} is already booked at {time} ({what}, {instructor}).',
+  calBookAnyway: 'Book anyway',
+  calDuplicate: '{name} is already booked with this instructor at {when}.',
+  calFullOn: 'Class is full on {day}. Nothing was saved.',
+  calOwnOnly: 'Instructors can only book, change or cancel their own appointments.',
   // schedule settings
   ssInstructors: 'Instructors',
   ssInstructorsHint: "Instructors are staff accounts in Users. Each has one color; a color someone else uses can't be picked. Other is for guest instructors and events.",
@@ -1439,6 +1444,11 @@ const ko: Dict = {
   calMovedTo: '{when}(으)로 옮겼어요',
   calLengthTo: '{when}(으)로 바꿨어요',
   calUndo: '되돌리기',
+  calClientClash: '{name} 클라이언트는 {time}에 이미 예약이 있어요 ({what}, {instructor}).',
+  calBookAnyway: '그래도 예약',
+  calDuplicate: '{name} 클라이언트는 {when}에 이 강사와 이미 예약이 있어요.',
+  calFullOn: '{day} 수업이 꽉 찼어요. 저장하지 않았어요.',
+  calOwnOnly: '강사는 본인 일정만 예약, 변경, 취소할 수 있어요.',
   // schedule settings
   ssInstructors: '강사',
   ssInstructorsHint: '강사는 Users에 등록된 직원 계정이에요. 색은 강사마다 하나씩, 다른 강사가 쓰는 색은 고를 수 없어요. Other는 초대 강사와 이벤트 색이에요.',

@@ -154,10 +154,11 @@ const laISO = (day, min) => {
   }
   return new Date(t).toISOString();
 };
-const booking = (b) => ({ student_id: null, client_phone: '', status: 'BOOKED', notes: '', students: null, ...b });
+// The calendar reads only the last 4 digits of a booked client's phone (AUDIT-015).
+const booking = (b) => ({ student_id: null, phone_last4: '', status: 'BOOKED', notes: '', students: null, ...b });
 const APPTS = [
   { id: 'a-1', starts_at: laISO(LA_TODAY, 540), minutes: 50, staff_id: 'i-sun', service: 'Private', capacity: 1, series_id: 'ser-1', series_changed: false,
-    updated_at: '2026-10-12T20:00:00.123456+00:00', status: 'BOOKED', appointment_clients: [booking({ id: 'b-1', student_id: 's-mina', client_name: 'Mina C', students: { full_name: 'Mina Cho' } })] },
+    updated_at: '2026-10-12T20:00:00.123456+00:00', status: 'BOOKED', appointment_clients: [booking({ id: 'b-1', student_id: 's-mina', client_name: 'Mina C', phone_last4: '0142', students: { full_name: 'Mina Cho' } })] },
   { id: 'a-2', starts_at: laISO(LA_TODAY, 540), minutes: 50, staff_id: 'i-suk', service: 'Pilates Group', capacity: 5, series_id: 'ser-2', series_changed: true,
     status: 'BOOKED', appointment_clients: [booking({ id: 'b-2', client_name: 'Leo Park' }), booking({ id: 'b-3', client_name: 'Sara Kim', status: 'CANCELLED' }),
       booking({ id: 'b-4', client_name: 'Ana Lee', notes: 'Knee' })] },
@@ -182,6 +183,14 @@ const SERVICES = [['Private', 1, 'c-ind', null], ['Gyrotonic', 1, 'c-ind', null]
   .map(([name, capacity, category_id, staff_ids], i) => ({ id: `v-${i + 1}`, name, minutes: 50, capacity, active: true, sort: i + 1, category_id,
     price_cents: null, cleanup_minutes: 0, description: '', staff_ids }));
 const sched = []; // [rpc, body]
+// Booking columns only Clients access reads, through appointment_clients_full() (AUDIT-015).
+const HIDDEN_BOOKING = ['client_phone', 'client_email', 'price_cents', 'source_key'];
+const fullBookings = () => APPTS.flatMap((a) => a.appointment_clients.map(({ students, ...b }) => ({ ...b, appointment_id: a.id,
+  client_phone: b.phone_last4 ? `(213) 555-${b.phone_last4}` : '', client_email: '', price_cents: null, source_key: null,
+  source_created_at: null, created_at: '2026-10-12T20:00:00Z' })));
+let apptSelect = ''; // what the calendar last asked appointments for
+let clientClash = []; // schedule_client_clashes answer
+let refuseOnce = null; // save_appointment refuses once with this error
 
 /** A page signed in as `who` (or signed out when null) at the given width. */
 async function open(who, width, path = '', options = {}) {
@@ -348,14 +357,36 @@ async function open(who, width, path = '', options = {}) {
     });
   }
   await context.route(`${SUPABASE}/rest/v1/appointments?**`, (r) => {
-    if (r.request().method() !== 'HEAD') return apptLoads++, r.fulfill({ json: APPTS });
+    if (r.request().method() !== 'HEAD') {
+      apptSelect = new URL(r.request().url()).searchParams.get('select') ?? '';
+      // Like the database: asking for a booked client's full phone (etc.) is refused.
+      const embed = /appointment_clients\(([^)]*)/.exec(apptSelect)?.[1] ?? '';
+      if (HIDDEN_BOOKING.some((c) => embed.split(',').includes(c))) {
+        return r.fulfill({ status: 403, json: { code: '42501', message: 'permission denied for table appointment_clients' } });
+      }
+      return apptLoads++, r.fulfill({ json: APPTS });
+    }
     // Settings › Schedule counts a service's booked appointments before deleting it.
     const q = new URL(r.request().url()).searchParams;
     sched.push(['count appointments', q.get('service'), q.get('status')]);
     return r.fulfill({ headers: { 'access-control-allow-origin': '*', 'access-control-expose-headers': 'content-range',
       'content-range': `*/${{ 'eq.Private': 312, 'eq.Gyrotonic': 1 }[q.get('service')] ?? 0}` } });
   });
-  await context.route(`${SUPABASE}/rest/v1/appointment_clients?**`, (r) => r.fulfill({ json: APPTS.flatMap((a) => a.appointment_clients) }));
+  await context.route(`${SUPABASE}/rest/v1/appointment_clients?**`, (r) => {
+    const cols = (new URL(r.request().url()).searchParams.get('select') ?? '*').split(',');
+    if (cols.includes('*') || HIDDEN_BOOKING.some((c) => cols.includes(c))) {
+      return r.fulfill({ status: 403, json: { code: '42501', message: 'permission denied for table appointment_clients' } });
+    }
+    return r.fulfill({ json: APPTS.flatMap((a) => a.appointment_clients) });
+  });
+  await context.route(`${SUPABASE}/rest/v1/rpc/appointment_clients_full**`, (r) => {
+    sched.push(['appointment_clients_full', new URL(r.request().url()).search]);
+    return r.fulfill({ json: fullBookings() });
+  });
+  await context.route(`${SUPABASE}/rest/v1/rpc/schedule_client_clashes`, (r) => {
+    sched.push(['schedule_client_clashes', r.request().postDataJSON()]);
+    return r.fulfill({ json: clientClash });
+  });
   await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) => r.fulfill({ json: SERVICES }));
   await context.route(`${SUPABASE}/rest/v1/schedule_categories?**`, (r) => r.fulfill({ json: SERVICE_CATEGORIES }));
   await context.route(`${SUPABASE}/rest/v1/schedule_settings?**`, (r) => r.fulfill({ json: [{ change_text_minutes: 15 }] }));
@@ -372,6 +403,15 @@ async function open(who, width, path = '', options = {}) {
       if (name === 'save_appointment' && staleOnce) {
         staleOnce = false;
         return r.fulfill({ status: 400, json: { code: 'LPSTL', message: 'Someone else changed this appointment. Close it and open it again.' } });
+      }
+      // Only an Instructor: their own appointments only (AUDIT-016).
+      if (name === 'save_appointment' && !staff.roles.some((x) => ['OWNER', 'ADMIN', 'STAFF'].includes(x)) && body.p.staff_id !== staff.user_id) {
+        return r.fulfill({ status: 400, json: { code: 'LPOWN', message: 'Instructors can only book, change or cancel their own appointments.' } });
+      }
+      if (name === 'save_appointment' && refuseOnce) {
+        const json = refuseOnce;
+        refuseOnce = null;
+        return r.fulfill({ status: 400, json });
       }
       if (name === 'save_appointment') {
         const row = APPTS.find((x) => x.id === body.p.id);
@@ -1498,6 +1538,11 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     && json.schedule_categories.length === SERVICE_CATEGORIES.length && json.schedule_settings.length === 1
     && json.schedule_instructors.length === INSTRUCTORS.length && json.staff.length === Object.keys(PEOPLE).length,
     'backup: JSON holds the schedule, services, categories, settings and staff');
+  const bookings = APPTS.flatMap((a) => a.appointment_clients);
+  check(json.appointment_clients.length === bookings.length && sched.some(([n]) => n === 'appointment_clients_full')
+    && ['client_phone', 'client_email', 'price_cents', 'source_key', 'notes', 'phone_last4'].every((c) => c in json.appointment_clients[0])
+    && json.appointment_clients.some((b) => b.client_phone === '(213) 555-0142'),
+    'backup: booked clients with every column (full phone, email, price) through appointment_clients_full');
   // Every table the migrations create is in the file (or deliberately left out).
   const dir = new URL('../../supabase/migrations/', import.meta.url);
   const made = [...new Set(fs.readdirSync(dir)
@@ -1785,6 +1830,148 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
   const h1 = await page.locator('h1').innerText();
   check((h1 === 'Schedule' || h1 === 'Schedule settings') === ok, `${who} ${path}: ${ok ? 'opens' : 'not allowed (Settings → Admin access / owner only)'}`);
   await context.close();
+}
+
+// 22b. Staging audit P2. AUDIT-015: the calendar asks only for the last 4 digits of a client's phone.
+//      AUDIT-014: a client already booked elsewhere at that time is a warning first, then "Book anyway".
+//      AUDIT-013: a repeating appointment offers "This and following" for a client change too.
+//      Refusals (exact duplicate, a later date full) in the user's words.
+{
+  sched.length = 0;
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule/');
+  const dlg = page.locator('dialog[open]');
+  const mina = page.getByRole('button', { name: /Mina Cho - Private/ });
+  await mina.waitFor();
+  check(apptSelect.includes('phone_last4') && !HIDDEN_BOOKING.some((c) => apptSelect.includes(c)),
+    `schedule: the calendar reads bookings without full phone, email or price (${apptSelect})`);
+  await mina.click();
+  await dlg.getByRole('heading', { name: 'Edit Appointment' }).waitFor();
+  check(await dlg.getByText('···0142').isVisible(), 'schedule: the dialog still shows the last 4 digits of the phone');
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  await dlg.waitFor({ state: 'detached' });
+  check(sched.some(([n]) => n === 'save_appointment') && !sched.some(([n]) => n === 'schedule_client_clashes'),
+    'schedule: a save with no new client and no new time skips the clash check');
+
+  // Leo already has a class at 9:30 with Su kyung: booking him at 10:00 warns first.
+  sched.length = 0;
+  clientClash = [{ student_id: 's-leo', client_name: 'Leo Park', starts_at: `${LA_TODAY} 09:30`, minutes: 50, service: 'Pilates Group', instructor: 'Su kyung YI' }];
+  await page.getByRole('button', { name: 'New Appointment' }).click();
+  await dlg.getByRole('heading', { name: 'New Appointment' }).waitFor();
+  await dlg.getByPlaceholder(/Search/).fill('leo');
+  await dlg.getByRole('button', { name: /Leo Park/ }).click();
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  const warn = dlg.getByText('Leo Park is already booked at 9:30 - 10:20 (Pilates Group, Su kyung YI).');
+  await warn.waitFor();
+  const ask = sched.find(([n]) => n === 'schedule_client_clashes')?.[1]?.p;
+  check(ask?.start === `${LA_TODAY} 10:00` && ask.minutes === 50 && ask.student_ids.join() === 's-leo' && !ask.id
+    && !sched.some(([n]) => n === 'save_appointment'), 'schedule: a client booked elsewhere at that time is a warning first, nothing saved');
+  check((await warn.getAttribute('class')).includes('bg-clay/10') && (await warn.locator('svg').count()) === 1
+    && await dlg.getByRole('button', { name: 'Book anyway' }).isVisible(),
+    'schedule: the warning looks like the instructor clash warning, and Save becomes Book anyway');
+  await shot(page, 'schedule-client-clash');
+  await dlg.getByRole('button', { name: '5 minutes longer' }).click();
+  check(!(await warn.count()) && await dlg.getByRole('button', { name: 'Save', exact: true }).isVisible(), 'schedule: a change clears the warning');
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  await dlg.getByRole('button', { name: 'Book anyway' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  const booked = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
+  check(booked?.clients?.[0]?.student_id === 's-leo' && booked.minutes === 55
+    && sched.filter(([n]) => n === 'schedule_client_clashes').length === 2, 'schedule: Book anyway saves it');
+
+  // No clash: saved straight away. The database refuses an exact duplicate: said in the user's words.
+  sched.length = 0;
+  clientClash = [];
+  refuseOnce = { code: 'LPDBL', message: `Leo Park is already booked with this instructor at ${LA_TODAY} 10:00.`, details: 'Leo Park', hint: `${LA_TODAY} 10:00` };
+  await page.getByRole('button', { name: 'New Appointment' }).click();
+  await dlg.getByPlaceholder(/Search/).fill('leo');
+  await dlg.getByRole('button', { name: /Leo Park/ }).click();
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  const fd = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', weekday: 'short' }).format(new Date(`${LA_TODAY}T12:00:00Z`));
+  await dlg.getByText(`Leo Park is already booked with this instructor at ${fd} 10:00 am.`).waitFor();
+  check(sched.filter(([n]) => n === 'schedule_client_clashes').length === 1 && sched.filter(([n]) => n === 'save_appointment').length === 1,
+    'schedule: with no clash it saves straight away; an exact duplicate is refused with a clear message');
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await dlg.waitFor({ state: 'detached' });
+
+  // A repeating class: removing a client offers "This and following" like any other change.
+  sched.length = 0;
+  refuseOnce = { code: '23514', message: 'Class is full on 2026-11-10. Nothing was saved.', details: '2026-11-10' };
+  await page.getByRole('button', { name: /2\/5 - Pilates Group/ }).click();
+  await dlg.getByRole('heading', { name: 'Edit Class' }).waitFor();
+  await dlg.getByRole('button', { name: 'Remove Ana Lee' }).click();
+  await dlg.getByLabel('This and following').check();
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  await dlg.getByText('Class is full on Tue, Nov 10. Nothing was saved.').waitFor();
+  const cl = sched.find(([n]) => n === 'save_appointment')?.[1]?.p;
+  check(cl?.id === 'a-2' && cl.scope === 'following' && cl.clients.map((c) => c.id).join() === 'b-2',
+    'schedule: a client change on a repeating class can go to this and following');
+  check(true, 'schedule: a later date that would overfill is named in the user\'s words');
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  check(errors.length === 0, `schedule P2: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+// AUDIT-016: someone who is only an Instructor (Schedule turned on) moves and resizes only their own blocks;
+// they still open the others. Staff (the studio computer) moves anyone's.
+{
+  sched.length = 0;
+  ACCESS.push({ role: 'INSTRUCTOR', menu: 'schedule' });
+  INSTRUCTORS.push({ user_id: 'u-ins', full_name: 'Ana Park', calendar_color: '#3C78C8', active: true });
+  APPTS.push({ id: 'a-own', starts_at: laISO(LA_TODAY, 660), minutes: 50, staff_id: 'u-ins', service: 'Private', capacity: 1, series_id: null,
+    series_changed: false, updated_at: '2026-10-12T20:00:00+00:00', status: 'BOOKED', appointment_clients: [booking({ id: 'b-own', client_name: 'Ivy Moon' })] });
+  const { page, context, errors } = await open('INSTRUCTOR', 1280, 'schedule/');
+  const dlg = page.locator('dialog[open]');
+  const own = page.getByRole('button', { name: /Ivy Moon - Private/ });
+  const other = page.getByRole('button', { name: /Mina Cho - Private/ });
+  await own.waitFor();
+  check((await own.locator('[data-resize]').count()) === 1 && (await other.locator('[data-resize]').count()) === 0,
+    'schedule instructor: the length handle only on their own blocks');
+  const drag = async (el) => {
+    await el.scrollIntoViewIfNeeded();
+    const b = await el.boundingBox();
+    await page.mouse.move(b.x + b.width / 2, b.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2, b.y + 40, { steps: 6 });
+    await page.mouse.move(b.x + b.width / 2, b.y + 80, { steps: 6 });
+    await page.mouse.up();
+  };
+  await drag(other);
+  await page.waitForTimeout(300);
+  check(!(await page.getByRole('heading', { name: 'Reschedule Appointment' }).count()) && !(await page.locator('[data-grid] button[aria-hidden="true"]').count()),
+    'schedule instructor: another instructor\'s block does not move');
+  await dlg.getByRole('heading', { name: 'Edit Appointment' }).waitFor();
+  check(await dlg.getByText('Mina Cho').isVisible(), 'schedule instructor: another instructor\'s appointment still opens');
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  await dlg.getByText('Instructors can only book, change or cancel their own appointments.').waitFor();
+  check(true, 'schedule instructor: saving another instructor\'s appointment is refused with a clear message');
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  await drag(own);
+  await page.getByRole('heading', { name: 'Reschedule Appointment' }).waitFor();
+  check(true, 'schedule instructor: their own block moves');
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  // The same refusal in Korean.
+  await page.evaluate(() => localStorage.setItem('reforme-lang', 'ko'));
+  await page.reload();
+  await other.waitFor();
+  await other.click();
+  await dlg.getByRole('button', { name: '저장', exact: true }).click();
+  await dlg.getByText('강사는 본인 일정만 예약, 변경, 취소할 수 있어요.').waitFor();
+  check(!sched.some(([n]) => n === 'move_appointment'), 'schedule instructor: the refusal in Korean, nothing moved');
+  await page.evaluate(() => localStorage.setItem('reforme-lang', 'en'));
+  check(errors.length === 0, `schedule instructor: no page errors ${errors.join(' | ')}`);
+  await context.close();
+  {
+    const { page: p2, context: c2 } = await open('STAFF', 1280, 'schedule/');
+    const m2 = p2.getByRole('button', { name: /Mina Cho - Private/ });
+    await m2.waitFor();
+    check((await m2.locator('[data-resize]').count()) === 1 && (await p2.getByRole('button', { name: /Ivy Moon - Private/ }).locator('[data-resize]').count()) === 1,
+      'schedule staff: every instructor\'s block can be moved and resized');
+    await c2.close();
+  }
+  resetAccess();
+  INSTRUCTORS.pop();
+  APPTS.pop();
 }
 
 // 23. Settings › Schedule: Schedulista CSV dry run → counts → import; a wrong file sends nothing

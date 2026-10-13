@@ -15,6 +15,7 @@ export interface Booking {
   id?: string;
   student_id: string | null;
   name: string;
+  /** Last 4 digits only (the full number needs Clients access). */
   phone: string;
   status: BookingStatus;
   notes: string;
@@ -93,7 +94,7 @@ type Row = Omit<Appointment, 'clients' | 'day' | 'start'> & {
     id: string;
     student_id: string | null;
     client_name: string;
-    client_phone: string;
+    phone_last4: string;
     status: BookingStatus | 'CANCELLED';
     notes: string;
     students: { full_name: string } | null;
@@ -105,7 +106,7 @@ export async function loadAppointments(from: string, to: string): Promise<Appoin
   const { data, error } = await supabase!
     .from('appointments')
     .select(
-      'id, starts_at, minutes, staff_id, guest_instructor, service, capacity, series_id, series_changed, status, updated_at, appointment_clients(id, student_id, client_name, client_phone, status, notes, students(full_name))',
+      'id, starts_at, minutes, staff_id, guest_instructor, service, capacity, series_id, series_changed, status, updated_at, appointment_clients(id, student_id, client_name, phone_last4, status, notes, students(full_name))',
     )
     .gte('starts_at', laInstant(from))
     .lt('starts_at', laInstant(to))
@@ -124,7 +125,7 @@ export async function loadAppointments(from: string, to: string): Promise<Appoin
           id: b.id,
           student_id: b.student_id,
           name: b.students?.full_name ?? b.client_name,
-          phone: b.client_phone,
+          phone: b.phone_last4,
           status: b.status as BookingStatus,
           notes: b.notes,
         })),

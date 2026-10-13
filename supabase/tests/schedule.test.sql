@@ -74,7 +74,7 @@ select t.check('DST start day: 10:00 PDT = 17:00 UTC',
   (select starts_at = '2026-03-08 17:00:00+00' from public.appointments where id = current_setting('t.dst1')::uuid));
 select t.check('DST end day: 10:00 PST = 18:00 UTC',
   (select starts_at = '2026-11-01 18:00:00+00' from public.appointments where id = current_setting('t.dst2')::uuid));
-select t.check('booking copies name and phone from Clients', exists (select 1 from public.appointment_clients
+select t.check('booking copies name and phone from Clients', exists (select 1 from public.appointment_clients_full()
   where appointment_id = current_setting('t.dst1')::uuid and student_id = '00000000-0000-0000-0000-0000000000c1'
     and client_name = 'Mina Park' and client_phone = '(310) 555-0101' and status = 'BOOKED' and notes = 'Knee'));
 select t.check('created_by is the caller, no series', (select created_by = '00000000-0000-0000-0000-0000000000a1'
@@ -183,7 +183,7 @@ select t.check('save one: only this date changed and marked', (select series_cha
   from public.appointments where id = t.nth(2))
   and (select bool_and(not series_changed and staff_id = '00000000-0000-0000-0000-0000000000b2')
          from public.appointments where id in (t.nth(1), t.nth(3), t.nth(4))));
--- Save scope 'following' from date 3: new service and time on dates 3 and 4; clients only on date 3.
+-- Save scope 'following' from date 3: new service and time on dates 3 and 4; the client change too (AUDIT-013).
 select public.save_appointment(jsonb_build_object('id', t.nth(3), 'updated_at', (select updated_at from public.appointments where id = t.nth(3)::uuid), 'start', '2026-11-02 08:00', 'minutes', 55,
   'staff_id', '00000000-0000-0000-0000-0000000000b2', 'service', 'Gyrotonic Group', 'capacity', 3, 'scope', 'following',
   'clients', jsonb_build_array(jsonb_build_object('student_id', '00000000-0000-0000-0000-0000000000c3'))));
@@ -191,10 +191,14 @@ select t.check('save following: dates 3-4 changed, 1-2 not', t.la(t.nth(3)) = '2
   and (select bool_and(service = 'Gyrotonic Group' and minutes = 55 and capacity = 3 and not series_changed)
          from public.appointments where id in (t.nth(3), t.nth(4)))
   and (select bool_and(service = 'Pilates Group' and minutes = 50) from public.appointments where id in (t.nth(1), t.nth(2))));
-select t.check('save following: clients only on this date', exists (select 1 from public.appointment_clients
-  where appointment_id = t.nth(3) and student_id = '00000000-0000-0000-0000-0000000000c3' and status = 'BOOKED')
-  and (select array_agg(student_id) = '{00000000-0000-0000-0000-0000000000c1}' from public.appointment_clients
-        where appointment_id = t.nth(4) and status = 'BOOKED'));
+select t.check('save following: added client booked on this and later dates', (select count(*) = 2 from public.appointment_clients
+  where appointment_id in (t.nth(3), t.nth(4)) and student_id = '00000000-0000-0000-0000-0000000000c3' and status = 'BOOKED')
+  and not exists (select 1 from public.appointment_clients
+                   where appointment_id in (t.nth(1), t.nth(2)) and student_id = '00000000-0000-0000-0000-0000000000c3'));
+select t.check('save following: removed client cancelled on later dates too', (select count(*) = 2 and bool_and(status = 'CANCELLED')
+  from public.appointment_clients where appointment_id in (t.nth(3), t.nth(4)) and student_id = '00000000-0000-0000-0000-0000000000c1')
+  and (select bool_and(status = 'BOOKED') from public.appointment_clients
+        where appointment_id in (t.nth(1), t.nth(2)) and student_id = '00000000-0000-0000-0000-0000000000c1'));
 select t.check('save following: removed client cancelled on this date', exists (select 1 from public.appointment_clients
   where appointment_id = t.nth(3) and student_id = '00000000-0000-0000-0000-0000000000c1' and status = 'CANCELLED'));
 -- Cancel 'following' from date 3; bookings untouched.
@@ -445,7 +449,7 @@ select set_config('t.again', public.import_schedule(current_setting('t.csv')::js
 select t.check('import again: all duplicates, nothing new', current_setting('t.again')::jsonb - 'errors'
   = '{"total":8,"importable":0,"duplicates":6,"failed":2,"appointments_new":0}'::jsonb
   and (select count(*) = 3 from public.appointments where source_key is not null)
-  and (select count(*) = 5 from public.appointment_clients where source_key is not null));
+  and (select count(*) = 5 from public.appointment_clients_full() where source_key is not null));
 select set_config('t.late', public.import_schedule('[{"row":2,"start":"2026-01-05 18:00","minutes":50,"service":"Group Mat",
   "instructor":"jo ann","source_service":"Group Mat","client_name":"Theo Grant","client_phone":"","client_email":"","notes":"",
   "price_cents":null,"created":""}]', true)::text, true);
@@ -527,6 +531,329 @@ select t.expect_error('delete instructor with appointments refused', 'LPREF',
   $$select public.delete_staff_user('00000000-0000-0000-0000-0000000000b2')$$);
 select t.check('instructor still on their appointments',
   exists (select 1 from public.appointments where staff_id = '00000000-0000-0000-0000-0000000000b2'));
+reset role;
+
+-- P2 audit fixes (AUDIT-012 … AUDIT-016) ---------------------------------------------------
+-- Jo Lee teaches; Kim Both is front desk and teaches. Three more clients.
+insert into auth.users (id, email) values
+  ('00000000-0000-0000-0000-0000000000b4', 'jo@test.local'),
+  ('00000000-0000-0000-0000-0000000000b5', 'kim@test.local');
+insert into public.staff_profiles (user_id, full_name, email, role, roles, status) values
+  ('00000000-0000-0000-0000-0000000000b4', 'Jo Lee', 'jo@test.local', 'INSTRUCTOR', '{INSTRUCTOR}', 'ACTIVE'),
+  ('00000000-0000-0000-0000-0000000000b5', 'Kim Both', 'kim@test.local', 'STAFF', '{STAFF,INSTRUCTOR}', 'ACTIVE');
+insert into public.students (id, full_name, phone, email) values
+  ('00000000-0000-0000-0000-0000000000c4', 'Ava Moon', '(424) 555-0144', 'ava@example.com'),
+  ('00000000-0000-0000-0000-0000000000c5', 'Ben Ray', '818-555-0155', ''),
+  ('00000000-0000-0000-0000-0000000000c6', 'Cy Lane', '', '');
+
+-- 'OK', or the SQLSTATE (t.try) / message (t.msg) the statement failed with.
+create function t.try(p_sql text) returns text language plpgsql as $$
+begin
+  execute p_sql;
+  return 'OK';
+exception when others then
+  return sqlstate;
+end $$;
+create function t.msg(p_sql text) returns text language plpgsql as $$
+begin
+  execute p_sql;
+  return 'OK';
+exception when others then
+  return sqlerrm;
+end $$;
+-- Saves an appointment as it is now, with this instructor and length (and service / start when given).
+create function t.edit(p_id uuid, p_staff uuid, p_minutes int default 55, p_scope text default 'one',
+                       p_service text default null, p_start text default null) returns uuid language sql as $$
+  select public.save_appointment(jsonb_build_object('id', a.id, 'updated_at', a.updated_at,
+    'start', coalesce(p_start, to_char(a.starts_at at time zone 'America/Los_Angeles', 'YYYY-MM-DD HH24:MI')), 'minutes', p_minutes,
+    'staff_id', p_staff, 'service', coalesce(p_service, a.service), 'capacity', a.capacity, 'scope', p_scope,
+    'clients', coalesce((select jsonb_agg(jsonb_build_object('id', b.id)) from public.appointment_clients b
+                          where b.appointment_id = a.id and b.status <> 'CANCELLED'), '[]')))
+    from public.appointments a where a.id = p_id
+$$;
+-- Saves an appointment as it is now with this client list.
+create function t.book(p_id uuid, p_scope text, p_clients jsonb) returns uuid language sql as $$
+  select public.save_appointment(jsonb_build_object('id', a.id, 'updated_at', a.updated_at,
+    'start', to_char(a.starts_at at time zone 'America/Los_Angeles', 'YYYY-MM-DD HH24:MI'), 'minutes', a.minutes,
+    'staff_id', a.staff_id, 'service', a.service, 'capacity', a.capacity, 'scope', p_scope, 'clients', p_clients))
+    from public.appointments a where a.id = p_id
+$$;
+create function t.new(p_staff uuid) returns uuid language sql as $$
+  select public.save_appointment(jsonb_build_object('start', '2027-05-03 09:00', 'minutes', 50, 'staff_id', p_staff,
+    'service', 'Private', 'capacity', 1, 'clients', '[]'::jsonb))
+$$;
+-- A client's booking in an appointment (not cancelled).
+create function t.bk(p_appt uuid, p_student uuid) returns uuid language sql as $$
+  select id from public.appointment_clients where appointment_id = p_appt and student_id = p_student and status <> 'CANCELLED'
+$$;
+-- Who is booked on a date: 'Ava:BOOKED,Ben:NO_SHOW' (first names, cancelled ones left out).
+create function t.who(p_appt uuid) returns text language sql as $$
+  select string_agg(split_part(client_name, ' ', 1) || ':' || status, ',' order by client_name)
+    from public.appointment_clients where appointment_id = p_appt and status <> 'CANCELLED'
+$$;
+
+-- AUDIT-012: "this and following" changes only what changed, and only on later dates that still
+-- have this date's old value. Weekly Tue 09:00 Private with Ivy, 6 dates (Jan 5 … Feb 9).
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select set_config('t.rep', public.save_appointment('{"start":"2027-01-05 09:00","minutes":50,
+  "staff_id":"00000000-0000-0000-0000-0000000000b2","service":"Private","capacity":1,
+  "repeat":{"every":1,"days":[2],"ends":"count","count":6},
+  "clients":[{"student_id":"00000000-0000-0000-0000-0000000000c4"}]}')::text, true);
+select t.edit(t.nth(4), '00000000-0000-0000-0000-0000000000b4', 50);                 -- date 4: Jo substitutes (this only)
+select t.edit(t.nth(5), '00000000-0000-0000-0000-0000000000b2', 50, 'one', 'Gyrotonic'); -- date 5: another service
+select public.move_appointment(t.nth(6), '2027-02-09 10:00', 'one');                  -- date 6: an hour later
+select t.edit(t.nth(2), '00000000-0000-0000-0000-0000000000b2', 60, 'following');     -- date 2: 60 minutes from here on
+select t.check('following length: date 4 keeps its substitute and gets 60 minutes',
+  (select staff_id = '00000000-0000-0000-0000-0000000000b4' and minutes = 60 and series_changed
+     from public.appointments where id = t.nth(4)));
+select t.check('following length: a date''s own service and time stay, the length changes on every later date',
+  (select service = 'Gyrotonic' and minutes = 60 from public.appointments where id = t.nth(5))
+  and t.la(t.nth(6)) = '2027-02-09 10:00'
+  and (select bool_and(minutes = 60 and staff_id = '00000000-0000-0000-0000-0000000000b2' and service = 'Private')
+         from public.appointments where id in (t.nth(2), t.nth(3), t.nth(6)))
+  and (select minutes = 50 from public.appointments where id = t.nth(1)));
+-- Date 3: Olive takes over at 08:30 from here on. Only dates that still had Ivy take Olive, only dates still at 09:00 move.
+select t.edit(t.nth(3), '00000000-0000-0000-0000-0000000000a1', 60, 'following', null, '2027-01-19 08:30');
+select t.check('following instructor and time: each goes only where the old value still was',
+  (select staff_id = '00000000-0000-0000-0000-0000000000a1' from public.appointments where id = t.nth(3))
+  and t.la(t.nth(3)) = '2027-01-19 08:30'
+  and (select staff_id = '00000000-0000-0000-0000-0000000000b4' from public.appointments where id = t.nth(4))
+  and t.la(t.nth(4)) = '2027-01-26 08:30'
+  and (select staff_id = '00000000-0000-0000-0000-0000000000a1' and service = 'Gyrotonic' from public.appointments where id = t.nth(5))
+  and t.la(t.nth(5)) = '2027-02-02 08:30'
+  and (select staff_id = '00000000-0000-0000-0000-0000000000a1' from public.appointments where id = t.nth(6))
+  and t.la(t.nth(6)) = '2027-02-09 10:00'
+  and (select bool_and(staff_id = '00000000-0000-0000-0000-0000000000b2') from public.appointments where id in (t.nth(1), t.nth(2)))
+  and t.la(t.nth(2)) = '2027-01-12 09:00');
+-- Dragging date 1 to 07:00 with "this and following": later dates still at 09:00 go along, the others stay.
+select public.move_appointment(t.nth(1), '2027-01-05 07:00', 'following');
+select t.check('drag following: only later dates still at the old time move',
+  t.la(t.nth(1)) = '2027-01-05 07:00' and t.la(t.nth(2)) = '2027-01-12 07:00' and t.la(t.nth(3)) = '2027-01-19 08:30'
+  and t.la(t.nth(4)) = '2027-01-26 08:30' and t.la(t.nth(5)) = '2027-02-02 08:30' and t.la(t.nth(6)) = '2027-02-09 10:00');
+
+-- AUDIT-013: client adds and removals with "this and following". Weekly Thu 10:00 class of 3, 4 dates (Jan 7 … 28).
+select set_config('t.rep', public.save_appointment('{"start":"2027-01-07 10:00","minutes":50,
+  "staff_id":"00000000-0000-0000-0000-0000000000b2","service":"Pilates Group","capacity":3,
+  "repeat":{"every":1,"days":[4],"ends":"count","count":4},
+  "clients":[{"student_id":"00000000-0000-0000-0000-0000000000c4"}]}')::text, true);
+select set_config('t.u4', (select updated_at::text from public.appointments where id = t.nth(4)), true);
+select t.book(t.nth(2), 'following', jsonb_build_array(
+  jsonb_build_object('id', t.bk(t.nth(2), '00000000-0000-0000-0000-0000000000c4')),
+  jsonb_build_object('student_id', '00000000-0000-0000-0000-0000000000c5')));
+select t.check('following add: booked on this and later dates, not before',
+  t.who(t.nth(1)) = 'Ava:BOOKED' and t.who(t.nth(2)) = 'Ava:BOOKED,Ben:BOOKED'
+  and t.who(t.nth(3)) = 'Ava:BOOKED,Ben:BOOKED' and t.who(t.nth(4)) = 'Ava:BOOKED,Ben:BOOKED');
+select t.check('following add: a later date''s version moves on, so a stale copy of it is refused',
+  (select updated_at::text <> current_setting('t.u4') from public.appointments where id = t.nth(4)));
+select t.book(t.nth(2), 'following', jsonb_build_array(
+  jsonb_build_object('id', t.bk(t.nth(2), '00000000-0000-0000-0000-0000000000c4'), 'status', 'NO_SHOW'),
+  jsonb_build_object('id', t.bk(t.nth(2), '00000000-0000-0000-0000-0000000000c5'))));
+select t.check('following: a no-show stays on its own date', t.who(t.nth(2)) = 'Ava:NO_SHOW,Ben:BOOKED'
+  and t.who(t.nth(3)) = 'Ava:BOOKED,Ben:BOOKED' and t.who(t.nth(4)) = 'Ava:BOOKED,Ben:BOOKED');
+-- Date 4 fills its last seat on its own; adding Theo to date 3 and following would overfill date 4.
+select t.book(t.nth(4), 'one', jsonb_build_array(
+  jsonb_build_object('id', t.bk(t.nth(4), '00000000-0000-0000-0000-0000000000c4')),
+  jsonb_build_object('id', t.bk(t.nth(4), '00000000-0000-0000-0000-0000000000c5')),
+  jsonb_build_object('student_id', '00000000-0000-0000-0000-0000000000c6')));
+select t.check('following add over a later date''s capacity: refused, naming that date',
+  t.msg($$select t.book(t.nth(3), 'following', jsonb_build_array(
+    jsonb_build_object('id', t.bk(t.nth(3), '00000000-0000-0000-0000-0000000000c4')),
+    jsonb_build_object('id', t.bk(t.nth(3), '00000000-0000-0000-0000-0000000000c5')),
+    jsonb_build_object('student_id', '00000000-0000-0000-0000-0000000000c3')))$$) = 'Class is full on 2027-01-28. Nothing was saved.');
+select t.expect_error('following add over a later date''s capacity: class is full', '23514',
+  $$select t.book(t.nth(3), 'following', jsonb_build_array(
+    jsonb_build_object('id', t.bk(t.nth(3), '00000000-0000-0000-0000-0000000000c4')),
+    jsonb_build_object('id', t.bk(t.nth(3), '00000000-0000-0000-0000-0000000000c5')),
+    jsonb_build_object('student_id', '00000000-0000-0000-0000-0000000000c3')))$$);
+select t.check('over capacity on a later date: nothing saved on any date', t.who(t.nth(3)) = 'Ava:BOOKED,Ben:BOOKED'
+  and t.who(t.nth(4)) = 'Ava:BOOKED,Ben:BOOKED,Cy:BOOKED');
+-- Removing Ben from date 3 and following cancels him there and on date 4; date 2 keeps him.
+select t.book(t.nth(3), 'following', jsonb_build_array(
+  jsonb_build_object('id', t.bk(t.nth(3), '00000000-0000-0000-0000-0000000000c4'))));
+select t.check('following remove: cancelled on this and later dates, kept before',
+  t.who(t.nth(2)) = 'Ava:NO_SHOW,Ben:BOOKED' and t.who(t.nth(3)) = 'Ava:BOOKED' and t.who(t.nth(4)) = 'Ava:BOOKED,Cy:BOOKED'
+  and (select count(*) = 2 from public.appointment_clients where appointment_id in (t.nth(3), t.nth(4))
+        and student_id = '00000000-0000-0000-0000-0000000000c5' and status = 'CANCELLED'));
+-- Adding Cy from date 1 on: booked where Cy isn't yet, never twice.
+select t.book(t.nth(1), 'following', jsonb_build_array(
+  jsonb_build_object('id', t.bk(t.nth(1), '00000000-0000-0000-0000-0000000000c4')),
+  jsonb_build_object('student_id', '00000000-0000-0000-0000-0000000000c6')));
+select t.check('following add: no second booking where the client already is',
+  t.who(t.nth(1)) = 'Ava:BOOKED,Cy:BOOKED' and t.who(t.nth(2)) = 'Ava:NO_SHOW,Ben:BOOKED,Cy:BOOKED'
+  and t.who(t.nth(3)) = 'Ava:BOOKED,Cy:BOOKED' and t.who(t.nth(4)) = 'Ava:BOOKED,Cy:BOOKED');
+
+-- AUDIT-014: the same client somewhere else at the same time --------------------------------
+select set_config('t.p1', public.save_appointment('{"start":"2027-02-01 10:00","minutes":50,
+  "staff_id":"00000000-0000-0000-0000-0000000000b2","service":"Private","capacity":1,
+  "clients":[{"student_id":"00000000-0000-0000-0000-0000000000c4"}]}')::text, true);
+select t.check('clash: the client''s other booking overlapping this time, with its time and instructor',
+  (select array_agg(client_name || '|' || starts_at || '|' || minutes || '|' || service || '|' || instructor)
+     = '{"Ava Moon|2027-02-01 10:00|50|Private|Ivy Kim"}'
+     from public.schedule_client_clashes('{"start":"2027-02-01 10:30","minutes":50,
+       "student_ids":["00000000-0000-0000-0000-0000000000c4","00000000-0000-0000-0000-0000000000c5"]}')));
+select t.check('clash: none for the appointment itself, the times before and after, or another client',
+  (select count(*) = 0 from public.schedule_client_clashes(jsonb_build_object('id', current_setting('t.p1'),
+     'start', '2027-02-01 10:00', 'minutes', 50, 'student_ids', jsonb_build_array('00000000-0000-0000-0000-0000000000c4'))))
+  and (select count(*) = 0 from public.schedule_client_clashes('{"start":"2027-02-01 10:50","minutes":50,
+         "student_ids":["00000000-0000-0000-0000-0000000000c4"]}'))
+  and (select count(*) = 0 from public.schedule_client_clashes('{"start":"2027-02-01 09:15","minutes":45,
+         "student_ids":["00000000-0000-0000-0000-0000000000c4"]}'))
+  and (select count(*) = 0 from public.schedule_client_clashes('{"start":"2027-02-01 10:00","minutes":50,
+         "student_ids":["00000000-0000-0000-0000-0000000000c5"]}')));
+-- Another instructor at the same time: a warning only, it saves.
+select set_config('t.p2', public.save_appointment('{"start":"2027-02-01 10:00","minutes":50,
+  "staff_id":"00000000-0000-0000-0000-0000000000b4","service":"Private","capacity":1,
+  "clients":[{"student_id":"00000000-0000-0000-0000-0000000000c4"}]}')::text, true);
+select t.check('clash: same time with another instructor saves and shows up', (select count(*) = 2
+  from public.schedule_client_clashes('{"start":"2027-02-01 10:00","minutes":50,"student_ids":["00000000-0000-0000-0000-0000000000c4"]}')));
+select public.cancel_appointment(current_setting('t.p2')::uuid);
+select t.check('clash: a cancelled appointment does not count', (select count(*) = 1
+  from public.schedule_client_clashes('{"start":"2027-02-01 10:00","minutes":50,"student_ids":["00000000-0000-0000-0000-0000000000c4"]}')));
+-- The exact same booking again (same instructor, start and client) is refused, as a new appointment or an added client.
+select t.expect_error('exact duplicate appointment refused', 'LPDBL',
+  $$select public.save_appointment('{"start":"2027-02-01 10:00","minutes":50,"staff_id":"00000000-0000-0000-0000-0000000000b2",
+    "service":"Private","capacity":1,"clients":[{"student_id":"00000000-0000-0000-0000-0000000000c4"}]}')$$);
+select t.check('exact duplicate: the refusal names the client and time', t.msg($$select public.save_appointment('{"start":"2027-02-01 10:00",
+  "minutes":50,"staff_id":"00000000-0000-0000-0000-0000000000b2","service":"Private","capacity":1,
+  "clients":[{"student_id":"00000000-0000-0000-0000-0000000000c4"}]}')$$) = 'Ava Moon is already booked with this instructor at 2027-02-01 10:00.');
+select set_config('t.p3', public.save_appointment('{"start":"2027-02-01 10:00","minutes":50,
+  "staff_id":"00000000-0000-0000-0000-0000000000b2","service":"Duet","capacity":2,
+  "clients":[{"student_id":"00000000-0000-0000-0000-0000000000c5"}]}')::text, true);
+select t.expect_error('adding the client at the same instructor and time refused', 'LPDBL',
+  $$select t.book(current_setting('t.p3')::uuid, 'one', jsonb_build_array(
+    jsonb_build_object('id', t.bk(current_setting('t.p3')::uuid, '00000000-0000-0000-0000-0000000000c5')),
+    jsonb_build_object('student_id', '00000000-0000-0000-0000-0000000000c4')))$$);
+-- Duplicates already in the data (e.g. from the import) still save when edited.
+reset role;
+insert into public.appointments (id, starts_at, minutes, staff_id, service, capacity)
+select '00000000-0000-0000-0000-0000000000d1', starts_at, 50, staff_id, 'Private', 1
+  from public.appointments where id = current_setting('t.p1')::uuid;
+insert into public.appointment_clients (appointment_id, student_id, client_name, client_phone)
+values ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000c4', 'Ava Moon', '(424) 555-0144');
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.edit('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000b2', 45);
+select t.edit(current_setting('t.p1')::uuid, '00000000-0000-0000-0000-0000000000b2', 40);
+select t.check('existing duplicates can still be edited',
+  (select minutes = 45 from public.appointments where id = '00000000-0000-0000-0000-0000000000d1')
+  and (select minutes = 40 from public.appointments where id = current_setting('t.p1')::uuid));
+
+-- AUDIT-015: booked clients' full phone, email and price need Clients access ---------------------
+select t.check('owner: every column of every booking through appointment_clients_full',
+  (select count(*) from public.appointment_clients_full()) = (select count(*) from public.appointment_clients)
+  and exists (select 1 from public.appointment_clients_full() where client_phone = '(424) 555-0144' and client_email = 'ava@example.com')
+  and exists (select 1 from public.appointment_clients_full() where price_cents = 9500 and source_key like 'SCHEDULISTA|%'));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000a2');
+select t.check('admin: full booking details', exists (select 1 from public.appointment_clients_full() where client_phone = '(424) 555-0144'));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b1');
+select t.check('staff with Clients: full details through the function, the last 4 digits in the table',
+  exists (select 1 from public.appointment_clients_full() where client_phone = '(424) 555-0144')
+  and (select bool_and(phone_last4 = '0144') from public.appointment_clients where student_id = '00000000-0000-0000-0000-0000000000c4'));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select public.set_role_menu_access('STAFF', 'clients', false);
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b1');
+select t.expect_error('no Clients: full phone not readable', '42501', $$select client_phone from public.appointment_clients$$);
+select t.expect_error('no Clients: email not readable', '42501', $$select client_email from public.appointment_clients$$);
+select t.expect_error('no Clients: price not readable', '42501', $$select price_cents from public.appointment_clients$$);
+select t.expect_error('no Clients: import key (it holds the phone) not readable', '42501', $$select source_key from public.appointment_clients$$);
+select t.expect_error('no Clients: select * refused', '42501', $$select * from public.appointment_clients$$);
+select t.expect_error('no Clients: no full details', '42501', $$select * from public.appointment_clients_full()$$);
+select t.check('no Clients: names, last 4 digits and booking notes still there for the calendar',
+  exists (select 1 from public.appointment_clients where client_name = 'Mina Park' and phone_last4 = '0101' and notes = 'Knee')
+  and (select count(*) > 0 from public.appointment_clients));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select public.set_role_menu_access('STAFF', 'clients', true);
+select public.set_role_menu_access('STAFF', 'schedule', false);
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b1');
+select t.expect_error('Clients without Schedule: no booking details', '42501', $$select * from public.appointment_clients_full()$$);
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select public.set_role_menu_access('STAFF', 'schedule', true);
+reset role;
+
+-- AUDIT-016: someone who is only an Instructor changes only their own appointments --------------
+-- For each person: 4 of their own appointments and 4 of Jo's, one per change.
+create table t.m (actor uuid, kind text, id uuid default gen_random_uuid());
+grant select on t.m to authenticated;
+insert into t.m (actor, kind)
+select u::uuid, k from unnest(array['00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000a2',
+  '00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000b5']) u,
+  unnest(array['own1', 'own2', 'own3', 'own4', 'jo1', 'jo2', 'jo3', 'jo4']) k;
+insert into public.appointments (id, starts_at, minutes, staff_id, service, capacity)
+select id, '2027-03-01 17:00+00'::timestamptz + (row_number() over (order by actor, kind))::int * interval '1 day', 50,
+       case when kind like 'own%' then actor else '00000000-0000-0000-0000-0000000000b4' end, 'Private', 1
+  from t.m;
+create function t.matrix(p uuid) returns text language sql as $$
+  select concat_ws(' ',
+    'new-own:' || t.try(format('select t.new(%L::uuid)', p)),
+    'new-other:' || t.try('select t.new(''00000000-0000-0000-0000-0000000000b4'')'),
+    'new-guest:' || t.try('select t.new(null)'),
+    'edit-own:' || t.try(format('select t.edit(%L, %L)', (select id from t.m where actor = p and kind = 'own1'), p)),
+    'edit-other:' || t.try(format('select t.edit(%L, ''00000000-0000-0000-0000-0000000000b4'')',
+                                  (select id from t.m where actor = p and kind = 'jo1'))),
+    'give-away:' || t.try(format('select t.edit(%L, ''00000000-0000-0000-0000-0000000000b4'')',
+                                 (select id from t.m where actor = p and kind = 'own2'))),
+    'take-over:' || t.try(format('select t.edit(%L, %L)', (select id from t.m where actor = p and kind = 'jo2'), p)),
+    'move-own:' || t.try(format('select public.move_appointment(%L, ''2027-06-01 08:00'')', (select id from t.m where actor = p and kind = 'own3'))),
+    'move-other:' || t.try(format('select public.move_appointment(%L, ''2027-06-01 09:00'')', (select id from t.m where actor = p and kind = 'jo3'))),
+    'cancel-own:' || t.try(format('select public.cancel_appointment(%L)', (select id from t.m where actor = p and kind = 'own4'))),
+    'cancel-other:' || t.try(format('select public.cancel_appointment(%L)', (select id from t.m where actor = p and kind = 'jo4'))))
+$$;
+select set_config('t.all', 'new-own:OK new-other:OK new-guest:OK edit-own:OK edit-other:OK give-away:OK take-over:OK '
+  || 'move-own:OK move-other:OK cancel-own:OK cancel-other:OK', true);
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.check('owner changes anyone''s appointments', t.matrix('00000000-0000-0000-0000-0000000000a1') = current_setting('t.all'));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000a2');
+select t.check('admin changes anyone''s appointments', t.matrix('00000000-0000-0000-0000-0000000000a2') = current_setting('t.all'));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b1');
+select t.check('staff (the studio computer) changes anyone''s appointments', t.matrix('00000000-0000-0000-0000-0000000000b1') = current_setting('t.all'));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b5');
+select t.check('staff who also teaches changes anyone''s appointments', t.matrix('00000000-0000-0000-0000-0000000000b5') = current_setting('t.all'));
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b2');
+select set_config('t.ivy', t.matrix('00000000-0000-0000-0000-0000000000b2'), true);
+select t.check('instructor only: own appointments only, no giving away or taking over (' || current_setting('t.ivy') || ')',
+  current_setting('t.ivy') = 'new-own:OK new-other:LPOWN new-guest:LPOWN edit-own:OK edit-other:LPOWN give-away:LPOWN '
+    || 'take-over:LPOWN move-own:OK move-other:LPOWN cancel-own:OK cancel-other:LPOWN');
+select t.check('instructor only: the refusal says why', t.msg(format('select public.cancel_appointment(%L)',
+  (select id from t.m where actor = '00000000-0000-0000-0000-0000000000b1' and kind = 'jo1')))
+  = 'Instructors can only book, change or cancel their own appointments.');
+select t.check('instructor only: other appointments stay as they were', (select count(*) = 0 from public.appointments a
+  join t.m on t.m.id = a.id where t.m.actor = '00000000-0000-0000-0000-0000000000b2' and t.m.kind like 'jo%'
+  and (a.staff_id <> '00000000-0000-0000-0000-0000000000b4' or a.minutes <> 50 or a.status <> 'BOOKED')));
+reset role;
+-- "This and following" by an instructor leaves another instructor's date in the series alone.
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select set_config('t.rep', public.save_appointment('{"start":"2027-04-01 07:00","minutes":50,
+  "staff_id":"00000000-0000-0000-0000-0000000000b2","service":"Private","capacity":1,
+  "repeat":{"every":1,"days":[4],"ends":"count","count":4},"clients":[]}')::text, true);
+select t.edit(t.nth(3), '00000000-0000-0000-0000-0000000000b4', 50);
+reset role;
+select t.login('00000000-0000-0000-0000-0000000000b2');
+select t.edit(t.nth(1), '00000000-0000-0000-0000-0000000000b2', 60, 'following');
+select public.move_appointment(t.nth(2), '2027-04-08 07:30', 'following');
+select public.cancel_appointment(t.nth(2), 'following');
+select t.check('instructor following: their own dates change, the substitute''s date stays',
+  (select bool_and(minutes = 60) from public.appointments where id in (t.nth(1), t.nth(2), t.nth(4)))
+  and (select minutes = 50 and staff_id = '00000000-0000-0000-0000-0000000000b4' and status = 'BOOKED'
+         from public.appointments where id = t.nth(3))
+  and t.la(t.nth(3)) = '2027-04-15 07:00' and t.la(t.nth(4)) = '2027-04-22 07:30'
+  and (select bool_and(status = 'CANCELLED') from public.appointments where id in (t.nth(2), t.nth(4))));
+reset role;
+
+-- Signed out: neither new function.
+select set_config('request.jwt.claims', '', true);
+set local role anon;
+select t.expect_error('anon: no client clashes', '42501', $$select * from public.schedule_client_clashes('{}')$$);
+select t.expect_error('anon: no full booking details', '42501', $$select * from public.appointment_clients_full()$$);
 reset role;
 
 select app.check_api_exposure();

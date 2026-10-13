@@ -16,7 +16,7 @@ import {
 } from 'react';
 import { Check, ChevronLeft, ChevronRight, FileText, Plus, RotateCw, Search, Settings, TriangleAlert, X } from 'lucide-react';
 import { isAdmin, useStaff } from '../auth';
-import { useT, type TextKey } from '../i18n';
+import { useT, type Lang, type TextKey } from '../i18n';
 import Layout from '../Layout';
 import MinutesInput from '../MinutesInput';
 import { addDays, formatDay, laToday, type StudentHit } from '../payments';
@@ -96,6 +96,20 @@ const ROW = 'grid items-center gap-1.5 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:ga
 const LABEL = 'text-[15px]';
 const CHECK = 'h-[1.05rem] w-[1.05rem] shrink-0 accent-sage';
 
+/** A database refusal in the chosen language where there are words for it, else the database's own text. */
+const refusal = (
+  e: { code?: string; message: string; details?: string; hint?: string },
+  t: ReturnType<typeof useT>['t'],
+  lang: Lang,
+) =>
+  e.code === 'LPOWN'
+    ? t('calOwnOnly')
+    : e.code === 'LPDBL' && e.hint
+      ? t('calDuplicate', { name: e.details ?? '', when: `${formatDay(e.hint.slice(0, 10), lang)} ${ampm(toMin(e.hint.slice(11)))}` })
+      : e.code === '23514' && /^\d{4}-\d{2}-\d{2}$/.test(e.details ?? '')
+        ? t('calFullOn', { day: formatDay(e.details!, lang) })
+        : e.message;
+
 export default function Schedule() {
   const { t, lang } = useT();
   const me = useStaff();
@@ -118,6 +132,9 @@ export default function Schedule() {
   const drag = useRef<Drag | null>(null);
   const dragged = useRef(false); // the click that ends a drag must not open the dialog
   const seq = useRef(0);
+  // Signed in as only an Instructor (own phone): their own appointments move and resize, others only open.
+  const ownOnly = !me.roles.some((r) => r === 'OWNER' || r === 'ADMIN' || r === 'STAFF');
+  const mayChange = (a: Appointment) => !ownOnly || a.staff_id === me.user_id;
 
   // While a finger holds a block, moving it must not scroll the page.
   useEffect(() => {
@@ -306,6 +323,8 @@ export default function Schedule() {
       dragged.current = false;
       // A cancelled block stays put.
       if (e.button !== 0 || a.status === 'CANCELLED') return;
+      // So does another instructor's for an instructor; letting go anywhere still opens it.
+      if (!mayChange(a)) return e.currentTarget.setPointerCapture(e.pointerId);
       const el = e.currentTarget;
       const d: Drag = {
         ...grid,
@@ -356,6 +375,7 @@ export default function Schedule() {
       start={start}
       label={label(a)}
       color={color(a)}
+      locked={Boolean(grid) && !mayChange(a)}
       style={style}
       className={
         grid
@@ -403,7 +423,7 @@ export default function Schedule() {
         void reload();
         return t('calStale');
       }
-      if (error) return error.message;
+      if (error) return refusal(error, t, lang);
       // Undo saves from the copy loaded after this save; the old copy is out of date now.
       const fresh = (await reload())?.find((x) => x.id === a.id) ?? a;
       setMove(null);
@@ -428,7 +448,7 @@ export default function Schedule() {
       p_scope: scope,
       p_series_changed: true,
     });
-    if (error) return error.message;
+    if (error) return refusal(error, t, lang);
     await reload();
     setMove(null);
     setGhost(null);
@@ -712,10 +732,18 @@ function Block({
   start,
   label,
   color,
+  locked = false,
   className = '',
   style,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { a: Appointment; start: number; label: string; color: string }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  a: Appointment;
+  start: number;
+  label: string;
+  color: string;
+  /** Can't be moved or resized by this user (another instructor's, for an instructor). */
+  locked?: boolean;
+}) {
   const short = a.minutes <= 30;
   const icons = [
     a.series_id &&
@@ -749,7 +777,7 @@ function Block({
       {!short && <span className="shrink-0 text-[12.5px] font-medium">{label}</span>}
       {icons.length > 0 && <span className="absolute right-[3px] top-[3px] flex gap-0.5">{icons}</span>}
       {/* Drag the = at the bottom to change the length (mouse; on phones change it in the dialog). A cancelled one stays put. */}
-      {a.status !== 'CANCELLED' && (
+      {a.status !== 'CANCELLED' && !locked && (
         <span
           data-resize=""
           aria-hidden
@@ -1248,7 +1276,12 @@ function AppointmentDialog({
     scope: 'one' as Scope,
     clients: a?.clients ?? [],
   }));
-  const set = (patch: Partial<typeof f>) => setF((x) => ({ ...x, ...patch }));
+  // Clients already booked elsewhere at this time: shown once, then Save becomes "Book anyway". A change clears it.
+  const [clashWarn, setClashWarn] = useState('');
+  const set = (patch: Partial<typeof f>) => {
+    setClashWarn('');
+    setF((x) => ({ ...x, ...patch }));
+  };
   const [adding, setAdding] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1296,7 +1329,7 @@ function AppointmentDialog({
     const { error: e } = await supabase!.rpc(fn, args);
     setBusy(false);
     if (e?.code === 'LPSTL') setStale(true);
-    if (e) setError(e.code === 'LPSTL' ? t('calStale') : e.message);
+    if (e) setError(e.code === 'LPSTL' ? t('calStale') : refusal(e, t, lang));
     else onSaved();
   };
   /** status: give every booking this status (No-show or Late cancel from the cancel step). */
@@ -1327,6 +1360,37 @@ function AppointmentDialog({
         clients: f.clients.map((c) => ({ id: c.id, student_id: c.student_id, status: status ?? c.status, notes: c.notes })),
       },
     });
+
+  /** Save, unless a client is already booked at this time with anyone (new clients; everyone when the time changed). */
+  const checkThenSave = async () => {
+    if (clashWarn) return save();
+    const moved = !a || f.date !== a.day || toMin(f.time) !== a.start || f.minutes !== a.minutes;
+    const ids = f.clients.filter((c) => c.student_id && (moved || !c.id)).map((c) => c.student_id);
+    if (ids.length) {
+      setBusy(true);
+      const { data } = await supabase!.rpc('schedule_client_clashes', {
+        p: { id: a?.id, start: wallText(f.date, toMin(f.time)), minutes: f.minutes, student_ids: ids },
+      });
+      setBusy(false);
+      const rows = (data ?? []) as { client_name: string; starts_at: string; minutes: number; service: string; instructor: string }[];
+      if (rows.length) {
+        return setClashWarn(
+          rows
+            .map((c) => {
+              const at = toMin(c.starts_at.slice(11));
+              return t('calClientClash', {
+                name: c.client_name,
+                time: `${hm(at)} - ${hm(at + c.minutes)}`,
+                what: c.service,
+                instructor: c.instructor || t('calStudioEvent'),
+              });
+            })
+            .join(' '),
+        );
+      }
+    }
+    return save();
+  };
 
   const setClient = (i: number, patch: Partial<Booking>) =>
     set({ clients: f.clients.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
@@ -1722,6 +1786,14 @@ function AppointmentDialog({
           <ScopeRow value={f.scope} onChange={(scope) => set({ scope })} />
         </div>
       )}
+      {clashWarn && (
+        <div className="mt-5">
+          <p className="flex items-start gap-2 rounded-xl bg-clay/10 px-3 py-2.5 text-sm">
+            <TriangleAlert {...ICON} size={16} className="mt-0.5 shrink-0 text-clay" />
+            {clashWarn}
+          </p>
+        </div>
+      )}
       {error && (
         <div className="mt-5">
           <Notice tone="error">{error}</Notice>
@@ -1763,8 +1835,8 @@ function AppointmentDialog({
           ) : (
             <span />
           )}
-          <Button className="!px-8" disabled={busy || !valid} onClick={() => void save()}>
-            {busy ? t('saving') : t('save')}
+          <Button className="!px-8" disabled={busy || !valid} onClick={() => void checkThenSave()}>
+            {busy ? t('saving') : clashWarn ? t('calBookAnyway') : t('save')}
           </Button>
         </div>
       )}
