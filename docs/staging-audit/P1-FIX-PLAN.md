@@ -2,6 +2,9 @@
 
 2026-10-13 · Calvin 요청: P1 4건부터 수정. **이 문서는 계획이며, Calvin이 "진행"이라고 하기 전까지 코드는 바꾸지 않는다.**
 
+> **상태 (2026-10-13 03:10Z):** 1·2·3번 Staging 반영 `7f44c09` (마이그레이션 `20261013010000_p1_fixes.sql`, Supabase Preview 성공). Calvin의 Staging 확인 대기. 0번은 Calvin이 JSON을 받았고, Pro 대신 운영 반영 후 Calvin이 직접 매일 로컬 백업을 만들기로 함.
+> 계획과 다른 점: 길이 조절도 `keep_clients` 대신 일정 창 저장과 같은 "마지막 수정 시각" 확인을 쓴다(그사이 바뀌었으면 거부하고 다시 불러옴). 오류 문구는 "다른 사람이 이 일정을 먼저 수정했어요. 닫고 다시 열면 최신 내용이 보여요." / "Someone else changed this appointment first. Close this and open it again to see the latest."
+
 화면 디자인은 바뀌지 않는다. 새로 생기는 것은 오류 문구 한 줄(EN/KO)뿐이다.
 
 ## 순서와 이유
