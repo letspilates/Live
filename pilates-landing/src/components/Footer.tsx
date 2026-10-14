@@ -65,10 +65,10 @@ export default function Footer() {
         <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-cream/10 pt-7 text-xs text-cream/45 sm:flex-row sm:items-center">
           <p>{f.rights}</p>
           <div className="flex items-center gap-6">
-            <a href="#" className="transition-colors hover:text-cream/80">
+            <a href={`${import.meta.env.BASE_URL}terms/`} className="transition-colors hover:text-cream/80">
               {f.legal[0]}
             </a>
-            <a href="#" className="transition-colors hover:text-cream/80">
+            <a href={`${import.meta.env.BASE_URL}privacy/`} className="transition-colors hover:text-cream/80">
               {f.legal[1]}
             </a>
             <span className="rounded-full border border-cream/15 px-3 py-1">{f.langBadge}</span>
