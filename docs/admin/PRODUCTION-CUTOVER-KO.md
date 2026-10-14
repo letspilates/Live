@@ -31,7 +31,7 @@
 
 > 예전 순서(2026-10-10)는 그대로 따라 할 수 없었다. `main`에는 병합 전까지 `supabase/` 폴더가 없어서, 병합 전에는 운영 DB에 마이그레이션도 `grant_owner`도 없다.
 > 또 스케줄, Knowledge, Backup, 지출, Admin access, 가입 끄기가 빠져 있었다. 아래 순서대로 한다.
-> 데이터 복사 방법(11·12단계 세부)은 P0 AUDIT-001에서 정한 뒤 채운다 (`docs/staging-audit/REMEDIATION_BACKLOG.md` 1번).
+> 데이터 복사 방법 (결정 2026-10-14): 라이브 포털 **Settings › Backup › Restore**. Staging에서 받은 Everything (JSON) 파일을 빈 운영 포털에 한 번에 넣는다 (Owner/Admin만, 운영 DB가 비어 있을 때만 보임, 두 번째 실행은 DB가 거절). 일정은 빼고, 새 Schedulista CSV를 Settings › Schedule settings 가져오기로 넣는다. 화면이 파일과 표별 개수·월별 금액을 바로 대조해 보여준다.
 
 ### 준비 (병합 전, 운영 사이트에 영향 없음)
 
@@ -40,7 +40,7 @@
 3. **GitHub 연동 (Calvin)**: 운영 프로젝트 → Integrations → GitHub: 저장소 `letspilates/Live`, Working directory `.`, Production branch **`main`**, Deploy to production ON, Automatic branching OFF. 이 시점에는 `main`에 `supabase/`가 없어서 아무것도 적용되지 않는 게 정상이다. SQL을 손으로 붙여넣지 않는다(SETUP-KO.md 3단계 경고).
 4. **인증 설정 (Calvin)**: Authentication → Sign In / Providers → **Allow new users to sign up 끄기**, Confirm email 켜 둠, 비밀번호 최소 8자. URL Configuration → Site URL `https://letspilatesla.com/admin/`, Redirect URL `https://letspilatesla.com/admin/set-password/`. Custom SMTP(초대·비밀번호 재설정 메일).
 5. **공개 키 전달 (Calvin → Claude)**: 운영 프로젝트 URL과 publishable key. Claude가 `pilates-landing/src/supabaseProject.ts`의 `production`에 넣고 Staging에 올린다(운영에는 아직 영향 없음).
-6. **데이터 복사 리허설 (Claude + Calvin)**: 정한 방법으로 빈 테스트 프로젝트에 한 번 복사해 보고 대조한다: 표별 행 수, 1~10월 월별 `finance_report` 합계, 결제의 받은 사람 이름, 강사별 월별 일정 수가 Staging과 같아야 한다.
+6. **데이터 복사 리허설 (Claude + Calvin)** — 2026-10-14 완료: 실제 백업 파일로 빈 DB에 Restore, 14개 표 개수와 1~10월 월별 금액 전부 일치, 연결 끊긴 id 0. 기준: 정한 방법으로 빈 테스트 프로젝트에 한 번 복사해 보고 대조한다: 표별 행 수, 1~10월 월별 `finance_report` 합계, 결제의 받은 사람 이름, 강사별 월별 일정 수가 Staging과 같아야 한다.
 
 ### 반영 (손님이 적은 시간에, 짧게 연달아)
 
