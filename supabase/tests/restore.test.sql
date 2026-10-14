@@ -113,7 +113,7 @@ alter table public.payment_transactions enable trigger user;
 alter table public.expenses enable trigger user;
 delete from public.staff_profiles; delete from auth.users;
 -- What a new project seeds: back to the migration defaults.
-update public.schedule_services set staff_ids = null;
+update public.schedule_services set staff_ids = null, id = gen_random_uuid();  -- a new project has its own ids
 update public.schedule_settings set change_text_minutes = 15, other_color = null;
 delete from public.role_menu_access where role = 'INSTRUCTOR' and menu = 'schedule';
 
