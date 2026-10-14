@@ -50,13 +50,17 @@ grant execute on all functions in schema t to anon, authenticated;
 
 -- 1. Privileged functions check the caller ----------------------------------------------
 -- Every SECURITY DEFINER function in public must run a caller check, except the public
--- training form pair and the caller's own profile functions (they only touch auth.uid()'s row).
+-- training form pair, the caller's own profile functions (they only touch auth.uid()'s row)
+-- and the sms-send pair, which only the service role may run.
 select t.check('every privileged function checks the caller', not exists (
   select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.prosecdef
      and p.proname not in ('public_training_courses', 'submit_training_registration',
-                           'current_staff', 'update_my_name', 'update_my_profile')
+                           'current_staff', 'update_my_name', 'update_my_profile', 'sms_claim', 'sms_result')
      and p.prosrc !~ 'app\.(me|can|require_owner|editable_payment)\(|public\.add_staff_user\('));
+select t.check('the sms-send pair is for the service role only',
+  not has_function_privilege('authenticated', 'public.sms_claim(int)', 'execute')
+  and not has_function_privilege('authenticated', 'public.sms_result(uuid, text, text, text, int)', 'execute'));
 select app.check_api_exposure();
 select t.check('no table grants DELETE to the API', not exists (
   select 1 from information_schema.role_table_grants

@@ -35,6 +35,8 @@ const TABLES = {
   knowledge_items: ['id'],
   knowledge_item_viewers: ['item_id', 'user_id'],
   role_menu_access: ['role', 'menu'],
+  sms_settings: ['id'],
+  sms_messages: ['created_at', 'id'],
 } as const;
 type Table = keyof typeof TABLES;
 type Data = Record<Table | 'staff' | 'schedule_instructors', Row[]>;

@@ -7,3 +7,7 @@ project_id = "letspilates"
 # function verifies the caller itself (see the comment in its index.ts).
 [functions.staff-admin]
 verify_jwt = false
+
+# Called by pg_cron (app.sms_tick) and the portal; takes no input, see its index.ts.
+[functions.sms-send]
+verify_jwt = false
