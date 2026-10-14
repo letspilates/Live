@@ -83,6 +83,16 @@ const PAYMENTS = [
   pay({ id: 'p-5', amount_cents: 4000, method: 'VENMO', payer_name: 'Old Friend', business_date: LA_YESTERDAY, recorded_by: 'u-ins', recorded_by_name: 'Ana Park', recorded_at: new Date(Date.now() - 864e5).toISOString() }),
 ];
 const calls = []; // [rpc name, body]
+const SMS = { enabled: true, reminders: true, change_notices: true, cancel_notices: false, test_mode: true, test_phones: ['+13105550101'],
+  reminder_text: "Let's Pilates LA: Reminder - {service}, {time}. Reply STOP to opt out.",
+  change_text: "Let's Pilates LA: Your {service} moved to {time} (was {old_time}). Reply STOP to opt out.",
+  cancel_text: "Let's Pilates LA: Your {service} on {time} is cancelled. Reply STOP to opt out." };
+const SMS_MESSAGES = [
+  { id: 'm-1', kind: 'REMINDER', to_phone: '+13105550101', status: 'SENT', error: '', created_at: '2026-10-14T16:00:00Z' },
+  { id: 'm-2', kind: 'CHANGE', to_phone: '+12135550199', status: 'QUEUED', error: '', created_at: '2026-10-14T15:40:00Z' },
+  { id: 'm-3', kind: 'REMINDER', to_phone: '', status: 'SKIPPED', error: 'No usable phone number.', created_at: '2026-10-14T15:00:00Z' },
+  { id: 'm-4', kind: 'CANCEL', to_phone: '+13105550177', status: 'FAILED', error: '21610: Attempt to send to unsubscribed recipient', created_at: '2026-10-13T22:10:00Z' },
+];
 
 // Members (fake people)
 const member = (m) => ({ phone: '', email: '', address: '', notes: '', status: 'ACTIVE', created_at: '2026-10-10T00:00:00Z', mindbody_id: null,
@@ -441,6 +451,19 @@ async function open(who, width, path = '', options = {}) {
   await context.route(`${SUPABASE}/rest/v1/schedule_categories?**`, (r) => r.fulfill({ json: SERVICE_CATEGORIES }));
   await context.route(`${SUPABASE}/rest/v1/schedule_settings?**`, (r) => r.fulfill({ json: [{ change_text_minutes: 15 }] }));
   await context.route(`${SUPABASE}/rest/v1/rpc/schedule_instructors`, (r) => r.fulfill({ json: INSTRUCTORS }));
+  // Client texts (Settings › Notifications).
+  await context.route(`${SUPABASE}/rest/v1/sms_settings?**`, (r) => r.fulfill({ json: [SMS] }));
+  await context.route(`${SUPABASE}/rest/v1/sms_messages?**`, (r) => r.fulfill({ json: SMS_MESSAGES }));
+  for (const fn of ['save_sms_settings', 'send_test_sms']) {
+    await context.route(`${SUPABASE}/rest/v1/rpc/${fn}`, (r) => {
+      calls.push([fn, r.request().postDataJSON()]);
+      return fn === 'send_test_sms' ? r.fulfill({ json: SMS.test_phones.length }) : r.fulfill({ status: 204, body: '' });
+    });
+  }
+  await context.route(`${SUPABASE}/functions/v1/sms-send`, (r) => {
+    calls.push(['sms-send', null]);
+    return r.fulfill({ json: { SENT: 1, FAILED: 0, SKIPPED: 0 } });
+  });
   await context.route(`${SUPABASE}/rest/v1/rpc/schedule_search_clients`, (r) => {
     sched.push(['schedule_search_clients', r.request().postDataJSON()]);
     return r.fulfill({ json: [{ id: 's-leo', full_name: 'Leo Park', phone_last4: '0199' }] });
@@ -1576,11 +1599,26 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   const { page, context, errors } = await open('OWNER', width, 'notifications/');
   const sw = page.getByRole('switch', { name: 'New payment: Email' });
   await sw.waitFor();
-  check((await page.getByRole('switch').count()) === 16, `${device} notifications: 8 events × email/text`);
+  check((await page.getByRole('switch').count()) === 21, `${device} notifications: 5 client-text switches + 8 events × email/text`);
+  check(await page.getByRole('switch', { name: 'Send texts' }).isChecked() && await page.getByText('Test mode', { exact: true }).first().isVisible()
+    && await page.getByText('When an appointment in the next 7 days moves, 15 minutes after the change').isVisible(),
+    `${device} notifications: client texts card shows the saved switches and the text delay`);
+  check(await page.getByText('•••0101').isVisible() && await page.getByText('No usable phone number.').isVisible(),
+    `${device} notifications: recent texts with masked numbers and the reason`);
   check(!(await sw.isChecked()), `${device} notifications: new payment email off by default`);
   await sw.click({ force: true });
   check(await sw.isChecked(), `${device} notifications: switch turns on`);
-  check(await page.getByText(/Preview: the portal does not send notifications yet/).isVisible(), `${device} notifications: says nothing is sent or saved`);
+  check(await page.getByText(/The staff notifications below are still a preview/).isVisible(), `${device} notifications: says staff events are a preview`);
+  if (device === 'desktop') {
+    calls.length = 0;
+    await page.getByRole('switch', { name: 'Cancelled' }).click({ force: true });
+    await page.getByRole('button', { name: 'Send test text' }).click();
+    await page.getByText('Test text sent.').waitFor();
+    const saved = calls.find(([n]) => n === 'save_sms_settings')?.[1]?.p;
+    check(saved?.cancel_notices === true && /^https:\/\/\w{20}\.supabase\.co$/.test(saved.functions_url)
+      && calls.some(([n]) => n === 'send_test_sms') && calls.some(([n]) => n === 'sms-send'),
+      'notifications: a switch saves with the functions URL; test text queues and wakes sms-send');
+  }
   check(await noOverflow(page), `${device} notifications: no sideways scroll`);
   await shot(page, `${device}-notifications`);
   check(errors.length === 0, `${device} notifications: no page errors ${errors.join(' | ')}`);

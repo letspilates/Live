@@ -1,7 +1,7 @@
 // Settings › Notifications (owner). Layout follows the MindFlow reference:
 // a header card, then groups of events with one switch per channel.
-// ponytail: nothing is sent yet, so choices live in component state only;
-// save them to the database when sending is built.
+// Client texts (top card) are real, see ClientTexts.tsx. ponytail: the staff events below
+// send nothing yet, so their choices live in component state only.
 import { useState } from 'react';
 import {
   CalendarClock,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useT, type TextKey } from '../i18n';
 import Layout from '../Layout';
+import ClientTexts from './ClientTexts';
 import { Card, Switch, inputCls } from '../ui';
 
 const CHANNELS = [
@@ -107,6 +108,7 @@ export default function Notifications() {
       }
     >
       <div className="flex max-w-4xl flex-col gap-4">
+        <ClientTexts />
         {GROUPS.map((g) => (
           <Card key={g.title} pad={false} className="px-4 py-2 sm:px-6">
             <section aria-label={t(g.title)}>
