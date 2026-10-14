@@ -44,6 +44,9 @@
 
 ### 반영 (손님이 적은 시간에, 짧게 연달아)
 
+> **2026-10-14 실행 기록:** 8~10단계 완료 (PR #39, main `aec9c6b`). 12단계는 Restore로 완료 (PR #40 수정 후, 14개 표·1~10월 금액 일치). 일정 가져오기는 SMS(Twilio) 승인 후로 보류 (Calvin). 13단계 홈페이지 신청 확인 완료. 14단계(Apps Script Archive, 즐겨찾기)는 Calvin 진행 중.
+> 주의: 실제 Supabase는 WHERE 없는 UPDATE/DELETE를 DB 함수 안에서도 거절한다. 로컬 테스트 DB는 이걸 잡지 못한다.
+
 7. **입력 멈춤 + 최종 백업 (Calvin)**: 이 시점부터 Staging에 결제·일정·클라이언트를 넣지 않는다(그 사이 결제는 메모해 두었다가 운영에 넣는다). Settings › Backup › Everything (JSON)을 받는다.
 8. **main 병합 (Calvin 승인 후 Claude)**: `Staging` → `main` PR 병합. 홈페이지 배포와 운영 DB 마이그레이션이 동시에 돈다. 마이그레이션이 끝나기 전 몇 분 동안은 홈페이지 신청 폼이 코스를 못 불러올 수 있다.
 9. **적용 확인**: 운영 SQL Editor에서 `select count(*) from supabase_migrations.schema_migrations;` 결과가 저장소 `supabase/migrations/` 파일 수와 같은지, Edge Functions에 `staff-admin`이 있는지.
