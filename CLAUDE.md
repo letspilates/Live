@@ -87,11 +87,22 @@ Live/                          ← 저장소 루트
 ├── .github/workflows/         ← 배포 워크플로우
 ├── Archive/                   ← 구 정적 사이트 (서빙 안 함, 보관용)
 ├── CNAME                      ← 커스텀 도메인
+├── ADMIN-PORTAL-MASTER-PLAN.md ← 관리자 포털 마스터 플랜 (승인됨 2026-10-10)
+├── docs/admin/SETUP-KO.md     ← Supabase 설정 가이드 (사장님용)
+├── supabase/                  ← 관리자 포털 백엔드
+│   ├── migrations/            ← `<타임스탬프>_이름.sql`. Staging push 시 GitHub 연동이 스테이징 DB에 자동 적용
+│   ├── functions/             ← Edge Functions (staff-admin). 같은 연동이 자동 배포
+│   ├── config.toml            ← 함수 설정 (verify_jwt=false). Auth 설정은 대시보드에서
+│   └── tests/run-local.sh     ← 임시 Postgres로 마이그레이션 + 권한 테스트
 └── pilates-landing/           ← ★ 사이트 소스 (Vite 앱)
     ├── src/
     │   ├── components/        ← 섹션 컴포넌트
     │   ├── i18n/              ← 번역(translations.ts) — 컨텐츠는 대부분 여기
+    │   ├── admin/             ← 관리자 포털 (/admin/*, 별도 진입점, 공개 사이트와 번들 분리)
     │   └── media.ts           ← 이미지 경로 (BASE_URL 기준)
+    ├── admin/index.html       ← 관리자 포털 진입 HTML (noindex, CSP)
+    ├── public/admin/legacy/   ← 기존 코스·등록자 관리 페이지 (Apps Script, ADMIN_KEY). 프로덕션용. 스테이징은 포털 /admin/trainings/ (Supabase training_* 테이블)가 대체
+    ├── tests/admin-shell.mjs  ← 관리자 포털 화면 확인 (Playwright, Supabase 모의). 실행법은 파일 첫 줄
     ├── public/media/          ← 이미지 (webp)
     └── index.html             ← 메타/SEO/구조화 데이터(JSON-LD)
 ```
@@ -104,6 +115,7 @@ Live/                          ← 저장소 루트
 - **로컬 개발**: `cd pilates-landing && npm run dev`
 - **로컬 프로덕션 미리보기**: `cd pilates-landing && npm run build && npm run preview`
 - **빌드/린트 검증** (커밋 전 항상): `npm run build` + `npm run lint`
+- **DB 마이그레이션 검증** (supabase/ 변경 시): `bash supabase/tests/run-local.sh`
 
 ---
 
@@ -113,3 +125,10 @@ Live/                          ← 저장소 루트
 - 섹션: Hero → About(수업 방식) → Programs → Training(지도자 과정) → Instructors → Schedule(Mindbody 위젯) → FAQ → CTA → Footer.
 - Testimonials(회원 후기) 섹션은 컴포넌트만 존재, 현재 **숨김**.
 - 스케줄: Mindbody(Healcode) 신버전 위젯 사용.
+- **관리자 포털 (진행 중):** `ADMIN-PORTAL-MASTER-PLAN.md`. Phase 2(인증·직원 계정)가 Staging에 있음.
+  Supabase `studio` 프로젝트 = 스테이징 전용. 운영용 프로젝트는 아직 없음 →
+  **운영용 프로젝트를 만들기 전에는 Staging → main 반영 금지** (반영 시 프로덕션 /admin/이 "연결 안 됨" 화면이 됨).
+- **포털 권한 규칙:** 역할은 복수(`staff_profiles.roles`: OWNER/ADMIN/STAFF/INSTRUCTOR). DB에서 전체 권한은 `app.is_owner()`
+  (Owner 또는 Admin), 메뉴 접근은 `app.can('clients'|'payments'|'schedule')` (Settings › Admin access 표 `role_menu_access`).
+  `role = 'OWNER'` 직접 비교 금지. 화면에서는 `isAdmin(staff)`, `canOpen(staff, path)` + `routes.ts`의 규칙. 계획: `docs/admin/USERS-PERMISSIONS-PLAN.md`.
+- 비밀값(secret/service_role 키, DB 비밀번호, ADMIN_KEY)은 저장소·데일리 로그에 절대 쓰지 않는다. Publishable 키만 코드에 둔다.

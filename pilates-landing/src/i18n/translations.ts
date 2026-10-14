@@ -121,6 +121,7 @@ const en = {
       { id: 'E', name: 'GYROTONIC® Level 2 Program 1 — Foundation Course', tag: '4 days' },
     ],
     courseMeta: 'Dates to be announced',
+    noCourses: 'No courses are open for registration right now. Please check back soon.',
     seatsLeft: '{n} spots left',
     seatsFull: 'Full',
     seatsFullNote: 'This course is fully booked — contact us to join the waitlist.',
@@ -147,7 +148,7 @@ const en = {
     s3Subtitle: 'Just a few more details to complete your registration.',
     lblStage: 'What is your current stage in the GYROTONIC® educational track?',
     stageOptions: [
-      'New Student',
+      'New Client',
       'Level 1 Trainee',
       'Apprentice',
       'Certified Trainer',
@@ -458,6 +459,7 @@ const ko: Content = {
       { id: 'E', name: 'GYROTONIC® Level 2 Program 1 — 기초 과정 (Foundation Course)', tag: '4일' },
     ],
     courseMeta: '일정 추후 공지',
+    noCourses: '현재 신청 가능한 과정이 없습니다. 곧 다시 확인해 주세요.',
     seatsLeft: '{n}자리 남음',
     seatsFull: '마감',
     seatsFullNote: '정원이 마감되었습니다 — 대기 신청은 문의해 주세요.',
@@ -484,7 +486,7 @@ const ko: Content = {
     s3Subtitle: '등록을 완료하기 위해 몇 가지만 더 확인해 주세요.',
     lblStage: '현재 GYROTONIC® 교육 과정에서 어떤 단계에 있으신가요?',
     stageOptions: [
-      '신규 수강생',
+      '신규 클라이언트',
       'Level 1 수련생',
       '견습생 (Apprentice)',
       '인증 트레이너',

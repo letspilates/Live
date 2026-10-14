@@ -8,18 +8,25 @@ export default {
         display: ['Outfit', 'Pretendard', 'ui-sans-serif', 'sans-serif'],
       },
       colors: {
-        // Warm Editorial palette — single sage accent
-        cream: '#FBF8F2',
-        sand: '#F2EBDD',
-        paper: '#FFFFFF',
-        ink: '#1C1A16',
-        mute: '#6E6A60',
+        // Warm Editorial palette — single sage accent. Values live in src/index.css
+        // (:root) so the admin portal can swap them for dark mode; same colors.
+        cream: 'rgb(var(--c-cream) / <alpha-value>)',
+        sand: 'rgb(var(--c-sand) / <alpha-value>)',
+        paper: 'rgb(var(--c-paper) / <alpha-value>)',
+        ink: 'rgb(var(--c-ink) / <alpha-value>)',
+        mute: 'rgb(var(--c-mute) / <alpha-value>)',
         sage: {
-          DEFAULT: '#5E6B4F',
-          soft: '#7C896C',
-          deep: '#434D38',
+          DEFAULT: 'rgb(var(--c-sage) / <alpha-value>)',
+          soft: 'rgb(var(--c-sage-soft) / <alpha-value>)',
+          deep: 'rgb(var(--c-sage-deep) / <alpha-value>)',
         },
-        clay: '#B08763',
+        clay: 'rgb(var(--c-clay) / <alpha-value>)',
+        // Admin portal only (values in src/admin/admin.css).
+        canvas: 'rgb(var(--c-canvas) / <alpha-value>)',
+      },
+      boxShadow: {
+        card: '0 1px 2px rgb(var(--c-shadow) / 0.05), 0 8px 24px -12px rgb(var(--c-shadow) / 0.12)',
+        pop: '0 16px 40px -8px rgb(var(--c-shadow) / 0.22), 0 2px 6px rgb(var(--c-shadow) / 0.06)',
       },
       letterSpacing: {
         tightest: '-0.045em',
