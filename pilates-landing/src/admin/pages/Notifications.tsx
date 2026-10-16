@@ -107,7 +107,7 @@ export default function Notifications() {
         </p>
       }
     >
-      <div className="flex max-w-4xl flex-col gap-4">
+      <div className="flex flex-col gap-4">
         <ClientTexts />
         {GROUPS.map((g) => (
           <Card key={g.title} pad={false} className="px-4 py-2 sm:px-6">
