@@ -5,7 +5,6 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { DatabaseBackup, Download, Upload } from 'lucide-react';
 import { useT } from '../i18n';
-import Layout from '../Layout';
 import { IS_STAGING, supabase } from '../supabase';
 import { formatMonth, toCsv } from '../expenses';
 import { formatCents } from '../payments';
@@ -101,7 +100,7 @@ export default function Backup() {
   };
 
   return (
-    <Layout title={t('navBackup')}>
+    <>
       <div className="grid max-w-2xl gap-4">
         <Card>
           <CardTitle icon={DatabaseBackup} title={t('backupTitle')} />
@@ -140,7 +139,7 @@ export default function Backup() {
         </Card>
         {!IS_STAGING && <Restore />}
       </div>
-    </Layout>
+    </>
   );
 }
 

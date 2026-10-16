@@ -15,6 +15,7 @@ export const ADMIN_ROUTES = {
   expenses: 'owner',
   reports: 'owner',
   users: 'owner',
+  admin: 'owner',
   access: 'owner',
   notifications: 'owner',
   'schedule-settings': 'owner',
