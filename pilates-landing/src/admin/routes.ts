@@ -15,6 +15,10 @@ export const ADMIN_ROUTES = {
   payments: 'payments',
   expenses: 'owner',
   reports: 'owner',
+  'settings/users': 'owner',
+  'settings/notifications': 'owner',
+  'settings/access': 'owner',
+  // Old addresses, forwarded to the ones above.
   users: 'owner',
   admin: 'owner',
   access: 'owner',

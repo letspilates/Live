@@ -606,7 +606,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
   }
-  for (const path of ['trainings/', 'users/', 'admin/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/']) {
+  for (const path of ['trainings/', 'settings/users/', 'settings/access/', 'settings/notifications/', 'users/', 'admin/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/']) {
     const { page, context } = await open(who, 1280, path);
     await page.waitForURL(/\/admin\/$/);
     check(!(await page.getByRole('tab').count()), `${who}: /${path} redirects to dashboard`);
@@ -1438,7 +1438,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 {
   adminCalls.length = 0;
   calls.length = 0;
-  const { page, context, errors } = await open('OWNER', 393, 'users/');
+  const { page, context, errors } = await open('OWNER', 393, 'settings/users/');
   await page.getByText('Ana Park').waitFor();
   check(await page.getByRole('button', { name: 'Add user' }).isVisible(), 'users: button says Add user');
   check(await page.locator('main ul').getByText('Admin', { exact: true }).isVisible(), 'users: role chips include Admin');
@@ -1516,7 +1516,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 
 // 17. Admin: every menu, but owners are off limits
 {
-  const { page, context, errors } = await open('ADMIN', 1280, 'users/');
+  const { page, context, errors } = await open('ADMIN', 1280, 'settings/users/');
   await page.getByText('Ana Park').waitFor();
   check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin', 'admin: full menu');
   check(!(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).count()), 'admin: cannot edit the owner');
@@ -1529,19 +1529,27 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 
 // 17b. Settings › Admin: one page, tabs Admin access and Backup
 {
-  const { page, context, errors } = await open('ADMIN', 1280, 'admin/');
+  const { page, context, errors } = await open('ADMIN', 1280, 'settings/access/');
   await page.getByRole('switch', { name: 'Instructor: Payments' }).waitFor();
   check((await page.locator('h1').innerText()) === 'Admin', 'admin page: opens for an Admin');
   check((await page.locator('aside a[aria-current="page"]').getAttribute('title')) === 'Admin', 'admin page: Admin menu item active');
   check((await page.getByRole('tab').allInnerTexts()).join() === 'Admin access,Backup', 'admin page: two tabs');
   await page.getByRole('tab', { name: 'Backup' }).click();
   await page.getByRole('button', { name: 'Prepare backup' }).waitFor();
-  check(page.url().endsWith('/admin/admin/?tab=backup') && !(await page.getByRole('switch').count()), 'admin page: Backup tab shows backup only');
+  check(page.url().endsWith('/admin/settings/access/?tab=backup') && !(await page.getByRole('switch').count()), 'admin page: Backup tab shows backup only');
   await page.getByRole('tab', { name: 'Admin access' }).click();
   await page.getByRole('switch', { name: 'Instructor: Payments' }).waitFor();
-  check(page.url().endsWith('/admin/admin/?tab=access'), 'admin page: back to Admin access');
+  check(page.url().endsWith('/admin/settings/access/?tab=access'), 'admin page: back to Admin access');
   check(await noOverflow(page), 'admin page: no sideways scroll');
   check(errors.length === 0, `admin page: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 17c. Settings pages live under /admin/settings/; old addresses forward there
+for (const [from, to] of [['users/', 'settings/users/'], ['notifications/', 'settings/notifications/'], ['admin/', 'settings/access/'], ['admin/?tab=backup', 'settings/access/?tab=backup']]) {
+  const { page, context } = await open('OWNER', 1280, from);
+  await page.waitForURL(ROOT + to);
+  check(true, `old /${from} opens /${to}`);
   await context.close();
 }
 
@@ -1551,7 +1559,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   calls.length = 0;
   const { page, context, errors } = await open('OWNER', 393, 'access/');
   await page.getByRole('switch', { name: 'Instructor: Payments' }).waitFor();
-  check(page.url().endsWith('/admin/admin/?tab=access'), 'access: old address opens the Admin access tab');
+  check(page.url().endsWith('/admin/settings/access/?tab=access'), 'access: old address opens the Admin access tab');
   check(await page.getByRole('switch', { name: 'Staff: Schedule' }).isChecked(), 'access: staff schedule on by default');
   check(!(await page.getByRole('switch', { name: 'Instructor: Schedule' }).isChecked()), 'access: instructor schedule off by default');
   check(!(await page.getByRole('switch', { name: /Expenses/ }).count()), 'access: expenses is owners/admins only');
@@ -1592,7 +1600,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 
 // 20. Notifications settings (preview): grouped events, one switch per channel
 for (const [device, width] of Object.entries(WIDTHS)) {
-  const { page, context, errors } = await open('OWNER', width, 'notifications/');
+  const { page, context, errors } = await open('OWNER', width, 'settings/notifications/');
   const sw = page.getByRole('switch', { name: 'New payment: Email' });
   await sw.waitFor();
   check((await page.getByRole('switch').count()) === 16, `${device} notifications: 8 events × email/text`);
@@ -1739,7 +1747,7 @@ for (const [device, width] of Object.entries(WIDTHS)) {
 {
   const { page, context, errors } = await open('OWNER', 1280, 'backup/');
   await page.getByRole('button', { name: 'Prepare backup' }).waitFor();
-  check(page.url().endsWith('/admin/admin/?tab=backup'), 'backup: old address opens the Backup tab');
+  check(page.url().endsWith('/admin/settings/access/?tab=backup'), 'backup: old address opens the Backup tab');
   check((await page.getByRole('tab', { name: 'Backup' }).getAttribute('aria-selected')) === 'true', 'backup: Backup tab selected');
   await page.getByRole('button', { name: 'Prepare backup' }).click();
   await page.getByText(`Ready: ${MEMBERS.length} clients, ${PAYMENTS.length} payments, ${APPTS.length} appointments.`).waitFor();

@@ -366,7 +366,7 @@ function TeamCard() {
           ))}
         </dl>
       )}
-      <Button variant="secondary" className="mt-auto self-start" onClick={() => navigate('users')}>
+      <Button variant="secondary" className="mt-auto self-start" onClick={() => navigate('settings/users')}>
         {t('manageStaff')}
       </Button>
     </Card>
