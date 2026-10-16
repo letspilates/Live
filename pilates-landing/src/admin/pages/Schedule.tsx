@@ -548,7 +548,7 @@ export default function Schedule() {
               className={`${ROUND} justify-self-end`}
               aria-label={t('navScheduleSettings')}
               title={t('navScheduleSettings')}
-              onClick={() => navigate('schedule-settings')}
+              onClick={() => navigate('schedule/settings')}
             >
               <Settings {...ICON} size={20} />
             </button>

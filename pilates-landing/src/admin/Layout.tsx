@@ -6,7 +6,6 @@ import {
   BarChart3,
   Bell,
   BookOpen,
-  CalendarCog,
   CalendarDays,
   ClipboardList,
   Contact,
@@ -64,7 +63,6 @@ export const NAV: { group: TextKey; items: NavItem[] }[] = [
       { to: 'users', label: 'navUsers', Icon: Users, hero: ['heroUsers', 'heroUsersBody'] },
       { to: 'notifications', label: 'navNotifications', Icon: Bell, hero: ['notifHeroTitle', 'notifHeroBody'] },
       { to: 'admin', label: 'navAdmin', Icon: ShieldCheck, hero: ['heroAdmin', 'heroAdminBody'] },
-      { to: 'schedule-settings', label: 'navScheduleSettings', Icon: CalendarCog, hero: ['heroScheduleSettings', 'heroScheduleSettingsBody'] },
     ],
   },
 ];
@@ -123,7 +121,7 @@ export default function Layout({
 }) {
   const { t } = useT();
   const route = useRoute();
-  const item = NAV.flatMap((g) => g.items).find((i) => i.to === route);
+  const item = NAV.flatMap((g) => g.items).find((i) => i.to === route || (i.to && route?.startsWith(`${i.to}/`)));
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const drawer = useRef<HTMLDialogElement>(null);
 
@@ -257,7 +255,7 @@ function SidebarContent({
                 className={`mx-3 mb-1 border-t border-ink/10 ${alwaysWide ? 'hidden' : wide ? 'lg:hidden' : ''}`}
               />
               {mine.map(({ to, label: key, Icon }) => {
-                const active = route === to;
+                const active = route === to || Boolean(to && route?.startsWith(`${to}/`));
                 return (
                   <Link
                     key={to}
