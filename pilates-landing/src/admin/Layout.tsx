@@ -60,9 +60,9 @@ export const NAV: { group: TextKey; items: NavItem[] }[] = [
   {
     group: 'navGroupSettings',
     items: [
-      { to: 'users', label: 'navUsers', Icon: Users, hero: ['heroUsers', 'heroUsersBody'] },
-      { to: 'notifications', label: 'navNotifications', Icon: Bell, hero: ['notifHeroTitle', 'notifHeroBody'] },
-      { to: 'admin', label: 'navAdmin', Icon: ShieldCheck, hero: ['heroAdmin', 'heroAdminBody'] },
+      { to: 'settings/users', label: 'navUsers', Icon: Users, hero: ['heroUsers', 'heroUsersBody'] },
+      { to: 'settings/notifications', label: 'navNotifications', Icon: Bell, hero: ['notifHeroTitle', 'notifHeroBody'] },
+      { to: 'settings/access', label: 'navAdmin', Icon: ShieldCheck, hero: ['heroAdmin', 'heroAdminBody'] },
     ],
   },
 ];
@@ -201,7 +201,7 @@ export default function Layout({
           tabIndex={-1}
           className={`mx-auto w-full ${wide ? '' : 'max-w-6xl'} px-4 pb-10 pt-4 outline-none sm:px-6 lg:px-8 lg:pt-6`}
         >
-          {item?.hero && <PageHero Icon={item.Icon} hero={item.hero} dot={route === 'notifications'} note={heroNote} />}
+          {item?.hero && <PageHero Icon={item.Icon} hero={item.hero} dot={route === 'settings/notifications'} note={heroNote} />}
           {actions && <div className="mb-6 flex flex-wrap justify-end gap-3">{actions}</div>}
           {children}
         </main>
