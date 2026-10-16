@@ -521,8 +521,8 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Trainings' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup', `${device}: owner menu`);
-    if (device === 'desktop') check(await page.locator('aside').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
+    check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin,Schedule settings', `${device}: owner menu`);
+    if (device === 'desktop') check(await page.locator('aside nav p').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
     } else {
@@ -606,7 +606,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
   }
-  for (const path of ['trainings/', 'users/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/']) {
+  for (const path of ['trainings/', 'users/', 'admin/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/']) {
     const { page, context } = await open(who, 1280, path);
     await page.waitForURL(/\/admin\/$/);
     check(!(await page.getByRole('tab').count()), `${who}: /${path} redirects to dashboard`);
@@ -1518,12 +1518,30 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 {
   const { page, context, errors } = await open('ADMIN', 1280, 'users/');
   await page.getByText('Ana Park').waitFor();
-  check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup', 'admin: full menu');
+  check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin,Schedule settings', 'admin: full menu');
   check(!(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).count()), 'admin: cannot edit the owner');
   check(await page.getByRole('button', { name: 'Edit user: Ana Park' }).isVisible(), 'admin: can edit others');
   await page.getByRole('button', { name: 'Add user' }).click();
   check(await page.locator('dialog[open]').getByLabel('Owner', { exact: true }).isDisabled(), 'admin: cannot hand out the owner role');
   check(errors.length === 0, `admin: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 17b. Settings › Admin: one page, tabs Admin access and Backup
+{
+  const { page, context, errors } = await open('ADMIN', 1280, 'admin/');
+  await page.getByRole('switch', { name: 'Instructor: Payments' }).waitFor();
+  check((await page.locator('h1').innerText()) === 'Admin', 'admin page: opens for an Admin');
+  check((await page.locator('aside a[aria-current="page"]').getAttribute('title')) === 'Admin', 'admin page: Admin menu item active');
+  check((await page.getByRole('tab').allInnerTexts()).join() === 'Admin access,Backup', 'admin page: two tabs');
+  await page.getByRole('tab', { name: 'Backup' }).click();
+  await page.getByRole('button', { name: 'Prepare backup' }).waitFor();
+  check(page.url().endsWith('/admin/admin/?tab=backup') && !(await page.getByRole('switch').count()), 'admin page: Backup tab shows backup only');
+  await page.getByRole('tab', { name: 'Admin access' }).click();
+  await page.getByRole('switch', { name: 'Instructor: Payments' }).waitFor();
+  check(page.url().endsWith('/admin/admin/?tab=access'), 'admin page: back to Admin access');
+  check(await noOverflow(page), 'admin page: no sideways scroll');
+  check(errors.length === 0, `admin page: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 
@@ -1533,6 +1551,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   calls.length = 0;
   const { page, context, errors } = await open('OWNER', 393, 'access/');
   await page.getByRole('switch', { name: 'Instructor: Payments' }).waitFor();
+  check(page.url().endsWith('/admin/admin/?tab=access'), 'access: old address opens the Admin access tab');
   check(await page.getByRole('switch', { name: 'Staff: Schedule' }).isChecked(), 'access: staff schedule on by default');
   check(!(await page.getByRole('switch', { name: 'Instructor: Schedule' }).isChecked()), 'access: instructor schedule off by default');
   check(!(await page.getByRole('switch', { name: /Expenses/ }).count()), 'access: expenses is owners/admins only');
@@ -1719,7 +1738,9 @@ for (const [device, width] of Object.entries(WIDTHS)) {
 // 21. Settings → Backup: owner downloads clients, payments and everything as files
 {
   const { page, context, errors } = await open('OWNER', 1280, 'backup/');
-  check((await page.locator('h1').innerText()) === 'Backup', 'backup: page opens');
+  await page.getByRole('button', { name: 'Prepare backup' }).waitFor();
+  check(page.url().endsWith('/admin/admin/?tab=backup'), 'backup: old address opens the Backup tab');
+  check((await page.getByRole('tab', { name: 'Backup' }).getAttribute('aria-selected')) === 'true', 'backup: Backup tab selected');
   await page.getByRole('button', { name: 'Prepare backup' }).click();
   await page.getByText(`Ready: ${MEMBERS.length} clients, ${PAYMENTS.length} payments, ${APPTS.length} appointments.`).waitFor();
   check(true, 'backup: counts what it read');

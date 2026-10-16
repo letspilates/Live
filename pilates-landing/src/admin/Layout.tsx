@@ -10,7 +10,6 @@ import {
   CalendarDays,
   ClipboardList,
   Contact,
-  DatabaseBackup,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -64,9 +63,8 @@ export const NAV: { group: TextKey; items: NavItem[] }[] = [
     items: [
       { to: 'users', label: 'navUsers', Icon: Users, hero: ['heroUsers', 'heroUsersBody'] },
       { to: 'notifications', label: 'navNotifications', Icon: Bell, hero: ['notifHeroTitle', 'notifHeroBody'] },
-      { to: 'access', label: 'navAccess', Icon: ShieldCheck, hero: ['heroAccess', 'accessIntro'] },
+      { to: 'admin', label: 'navAdmin', Icon: ShieldCheck, hero: ['heroAdmin', 'heroAdminBody'] },
       { to: 'schedule-settings', label: 'navScheduleSettings', Icon: CalendarCog, hero: ['heroScheduleSettings', 'heroScheduleSettingsBody'] },
-      { to: 'backup', label: 'navBackup', Icon: DatabaseBackup, hero: ['heroBackup', 'heroBackupBody'] },
     ],
   },
 ];

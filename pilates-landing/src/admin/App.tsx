@@ -17,8 +17,7 @@ import Members from './pages/Members';
 import Notifications from './pages/Notifications';
 import Reports from './pages/Reports';
 import SetPassword from './pages/SetPassword';
-import Access from './pages/Access';
-import Backup from './pages/Backup';
+import Admin from './pages/Admin';
 import Schedule from './pages/Schedule';
 import ScheduleSettings from './pages/ScheduleSettings';
 import StaffPage from './pages/Staff';
@@ -33,10 +32,11 @@ const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType>
   expenses: Expenses,
   reports: Reports,
   users: StaffPage,
-  access: Access,
+  admin: Admin,
+  access: () => <Redirect to="admin" search="?tab=access" />,
   notifications: Notifications,
   'schedule-settings': ScheduleSettings,
-  backup: Backup,
+  backup: () => <Redirect to="admin" search="?tab=backup" />,
   account: Account,
 };
 
