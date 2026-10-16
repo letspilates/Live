@@ -331,7 +331,7 @@ export function CourseEditor({ initial, reload }: { initial: Course[]; reload: (
   const conductors = [...new Set([...CONDUCTORS, ...list.map((c) => c.conducted_by)].filter(Boolean))];
 
   return (
-    <div className="max-w-4xl">
+    <div>
       <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
         <p
           role="status"

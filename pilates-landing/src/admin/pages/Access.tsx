@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Check, Minus } from 'lucide-react';
 import { MENUS, ROLES, type Menu, type Role } from '../auth';
 import { useT, type TextKey } from '../i18n';
-import Layout, { NAV } from '../Layout';
+import { NAV } from '../Layout';
 import { ADMIN_ROUTES } from '../routes';
 import { supabase } from '../supabase';
 import { Card, Notice, Skeleton } from '../ui';
@@ -69,8 +69,8 @@ export default function Access() {
   };
 
   return (
-    <Layout title={t('navAccess')}>
-      <div className="flex max-w-3xl flex-col gap-4">
+    <>
+      <div className="flex flex-col gap-4">
         {loadFailed && <Notice tone="error">{t('somethingWrong')}</Notice>}
         {status && <Notice tone={status.tone}>{status.text}</Notice>}
         <Card className="p-0 sm:p-0">
@@ -121,6 +121,6 @@ export default function Access() {
           <li>{t('accessNoteFixed')}</li>
         </ul>
       </div>
-    </Layout>
+    </>
   );
 }

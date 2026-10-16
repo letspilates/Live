@@ -80,6 +80,8 @@ const en = {
   heroScheduleSettings: 'Make the calendar yours',
   heroScheduleSettingsBody: 'Instructor colors, services and text reminders.',
   heroBackup: 'Keep a safe copy',
+  heroAdmin: 'Access and backups',
+  heroAdminBody: 'Choose which menus each role can open, and download your studio data.',
   heroBackupBody: 'Download your studio data whenever you need it.',
   notifPreview: 'Preview: the portal does not send notifications yet, so these choices are not saved. They will be once sending is turned on.',
   notifEmail: 'Email',
@@ -519,6 +521,7 @@ const en = {
   // users, roles, Settings → Admin, theme
   ADMIN: 'Admin',
   navAccess: 'Admin access',
+  navAdmin: 'Admin',
   // Settings → Backup
   navBackup: 'Backup',
   backupTitle: 'Download a backup',
@@ -963,6 +966,8 @@ const ko: Dict = {
   heroScheduleSettings: '캘린더를 우리 방식대로',
   heroScheduleSettingsBody: '강사 색, 서비스, 문자 알림을 정해요.',
   heroBackup: '안전하게 보관하기',
+  heroAdmin: '권한과 백업',
+  heroAdminBody: '역할마다 열 수 있는 메뉴를 정하고, 스튜디오 데이터를 내려받아요.',
   heroBackupBody: '스튜디오 데이터를 언제든 내려받아요.',
   notifPreview: '미리보기: 포털은 아직 알림을 보내지 않아서 이 선택은 저장되지 않습니다. 발송 기능이 켜지면 저장됩니다.',
   notifEmail: '이메일',
@@ -1396,6 +1401,7 @@ const ko: Dict = {
   // users, roles, Settings → Admin, theme
   ADMIN: '어드민',
   navAccess: '권한 (Admin)',
+  navAdmin: '관리자',
   // Settings → Backup
   navBackup: '백업',
   backupTitle: '백업 내려받기',

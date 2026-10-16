@@ -2,9 +2,10 @@
 // (laid out like Schedulista's settings), instructor and Other colors, the change-text delay and the Schedulista
 // CSV import. Every save goes through an owner-only database function.
 import { useEffect, useId, useRef, useState, type DragEvent } from 'react';
-import { GripVertical, MessageSquare, Pencil, Plus, Sparkles, Trash2, Upload, Users } from 'lucide-react';
+import { ChevronLeft, GripVertical, MessageSquare, Pencil, Plus, Sparkles, Trash2, Upload, Users } from 'lucide-react';
 import { useT } from '../i18n';
 import Layout from '../Layout';
+import { navigate } from '../router';
 import MinutesInput from '../MinutesInput';
 import { EVENT_COLOR, loadInstructors, loadServices, PALETTE, type Category, type Instructor, type Service } from '../schedule';
 import { scheduleFromCsv, type ImportProblem, type ScheduleImportRow } from '../scheduleImport';
@@ -115,9 +116,16 @@ export default function ScheduleSettings() {
     setData({ ...data, textMinutes: minutes });
   };
 
+  const back = (
+    <Button variant="secondary" onClick={() => navigate('schedule')}>
+      <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+      {t('navSchedule')}
+    </Button>
+  );
+
   if (failed) {
     return (
-      <Layout title={t('navScheduleSettings')}>
+      <Layout title={t('navScheduleSettings')} actions={back}>
         <div className="max-w-xl">
           <Notice tone="error">{t('somethingWrong')}</Notice>
           <Button variant="secondary" className="mt-4" onClick={reload}>
@@ -129,7 +137,7 @@ export default function ScheduleSettings() {
   }
 
   return (
-    <Layout title={t('navScheduleSettings')}>
+    <Layout title={t('navScheduleSettings')} actions={back}>
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
         <ServicesCard data={data} reload={reload} onReorder={(lists) => setData((d) => d && { ...d, ...lists })} />
 

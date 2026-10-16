@@ -521,8 +521,8 @@ for (const [device, width] of Object.entries(WIDTHS)) {
     await drawer.getByRole('link', { name: 'Trainings' }).click();
     check(!(await page.locator('dialog[open]').count()), 'phone: drawer closes after navigating');
   } else {
-    check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup', `${device}: owner menu`);
-    if (device === 'desktop') check(await page.locator('aside').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
+    check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin', `${device}: owner menu`);
+    if (device === 'desktop') check(await page.locator('aside nav p').getByText('Admin', { exact: true }).isVisible(), 'desktop: menu groups labelled');
     if (device === 'tablet') {
       check(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), 'tablet: menu button opens labelled drawer');
     } else {
@@ -606,7 +606,7 @@ for (const who of ['INSTRUCTOR', 'STAFF']) {
     check(errors.length === 0, `${who} ${device}: no page errors`);
     await context.close();
   }
-  for (const path of ['trainings/', 'users/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/']) {
+  for (const path of ['trainings/', 'users/', 'admin/', 'access/', 'expenses/', 'reports/', 'notifications/', 'backup/']) {
     const { page, context } = await open(who, 1280, path);
     await page.waitForURL(/\/admin\/$/);
     check(!(await page.getByRole('tab').count()), `${who}: /${path} redirects to dashboard`);
@@ -1518,12 +1518,30 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
 {
   const { page, context, errors } = await open('ADMIN', 1280, 'users/');
   await page.getByText('Ana Park').waitFor();
-  check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin access,Schedule settings,Backup', 'admin: full menu');
+  check((await navLabels(page)).join() === 'Dashboard,Clients,Schedule,Trainings,Knowledge,Payments,Expenses,Reports,Users,Notifications,Admin', 'admin: full menu');
   check(!(await page.getByRole('button', { name: 'Edit user: Calvin Kim' }).count()), 'admin: cannot edit the owner');
   check(await page.getByRole('button', { name: 'Edit user: Ana Park' }).isVisible(), 'admin: can edit others');
   await page.getByRole('button', { name: 'Add user' }).click();
   check(await page.locator('dialog[open]').getByLabel('Owner', { exact: true }).isDisabled(), 'admin: cannot hand out the owner role');
   check(errors.length === 0, `admin: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+
+// 17b. Settings › Admin: one page, tabs Admin access and Backup
+{
+  const { page, context, errors } = await open('ADMIN', 1280, 'admin/');
+  await page.getByRole('switch', { name: 'Instructor: Payments' }).waitFor();
+  check((await page.locator('h1').innerText()) === 'Admin', 'admin page: opens for an Admin');
+  check((await page.locator('aside a[aria-current="page"]').getAttribute('title')) === 'Admin', 'admin page: Admin menu item active');
+  check((await page.getByRole('tab').allInnerTexts()).join() === 'Admin access,Backup', 'admin page: two tabs');
+  await page.getByRole('tab', { name: 'Backup' }).click();
+  await page.getByRole('button', { name: 'Prepare backup' }).waitFor();
+  check(page.url().endsWith('/admin/admin/?tab=backup') && !(await page.getByRole('switch').count()), 'admin page: Backup tab shows backup only');
+  await page.getByRole('tab', { name: 'Admin access' }).click();
+  await page.getByRole('switch', { name: 'Instructor: Payments' }).waitFor();
+  check(page.url().endsWith('/admin/admin/?tab=access'), 'admin page: back to Admin access');
+  check(await noOverflow(page), 'admin page: no sideways scroll');
+  check(errors.length === 0, `admin page: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
 
@@ -1533,6 +1551,7 @@ for (const [device, width] of [['phone', 393], ['desktop', 1280]]) {
   calls.length = 0;
   const { page, context, errors } = await open('OWNER', 393, 'access/');
   await page.getByRole('switch', { name: 'Instructor: Payments' }).waitFor();
+  check(page.url().endsWith('/admin/admin/?tab=access'), 'access: old address opens the Admin access tab');
   check(await page.getByRole('switch', { name: 'Staff: Schedule' }).isChecked(), 'access: staff schedule on by default');
   check(!(await page.getByRole('switch', { name: 'Instructor: Schedule' }).isChecked()), 'access: instructor schedule off by default');
   check(!(await page.getByRole('switch', { name: /Expenses/ }).count()), 'access: expenses is owners/admins only');
@@ -1719,7 +1738,9 @@ for (const [device, width] of Object.entries(WIDTHS)) {
 // 21. Settings → Backup: owner downloads clients, payments and everything as files
 {
   const { page, context, errors } = await open('OWNER', 1280, 'backup/');
-  check((await page.locator('h1').innerText()) === 'Backup', 'backup: page opens');
+  await page.getByRole('button', { name: 'Prepare backup' }).waitFor();
+  check(page.url().endsWith('/admin/admin/?tab=backup'), 'backup: old address opens the Backup tab');
+  check((await page.getByRole('tab', { name: 'Backup' }).getAttribute('aria-selected')) === 'true', 'backup: Backup tab selected');
   await page.getByRole('button', { name: 'Prepare backup' }).click();
   await page.getByText(`Ready: ${MEMBERS.length} clients, ${PAYMENTS.length} payments, ${APPTS.length} appointments.`).waitFor();
   check(true, 'backup: counts what it read');
@@ -2031,11 +2052,33 @@ for (const [device, width] of Object.entries(WIDTHS)) {
   check(errors.length === 0, `schedule phone touch: no page errors ${errors.join(' | ')}`);
   await context.close();
 }
-for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'schedule/', true], ['STAFF', 'schedule-settings/', false]]) {
+for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'schedule/', true], ['INSTRUCTOR', 'schedule/settings/', false]]) {
   const { page, context } = await open(who, 1280, path);
   await page.locator('h1').waitFor();
   const h1 = await page.locator('h1').innerText();
   check((h1 === 'Schedule' || h1 === 'Schedule settings') === ok, `${who} ${path}: ${ok ? 'opens' : 'not allowed (Settings → Admin access / owner only)'}`);
+  await context.close();
+}
+
+// 22a. Schedule settings open inside Schedule: gear for Owner/Admin only, back button, old address, Staff sent back
+for (const who of ['OWNER', 'ADMIN']) {
+  const { page, context, errors } = await open(who, 1280, 'schedule/');
+  await page.getByRole('button', { name: 'Schedule settings' }).click();
+  await page.waitForURL(/\/admin\/schedule\/settings\/$/);
+  check((await page.locator('h1').innerText()) === 'Schedule settings', `${who}: gear opens Schedule settings`);
+  check((await page.locator('aside a[aria-current="page"]').getAttribute('title')) === 'Schedule', `${who}: Schedule stays active in the menu`);
+  await page.locator('main').getByRole('button', { name: 'Schedule', exact: true }).click();
+  await page.waitForURL(/\/admin\/schedule\/$/);
+  check((await page.locator('h1').innerText()) === 'Schedule', `${who}: back button returns to Schedule`);
+  check(errors.length === 0, `${who} schedule settings: no page errors ${errors.join(' | ')}`);
+  await context.close();
+}
+for (const path of ['schedule/settings/', 'schedule-settings/']) {
+  const { page, context } = await open('STAFF', 1280, path);
+  await page.waitForURL(/\/admin\/schedule\/$/);
+  await page.locator('h1').waitFor();
+  check((await page.locator('h1').innerText()) === 'Schedule', `STAFF /${path}: sent back to Schedule`);
+  check(!(await page.getByRole('button', { name: 'Schedule settings' }).count()), `STAFF /${path}: no gear button`);
   await context.close();
 }
 
@@ -2185,7 +2228,8 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
 {
   sched.length = 0;
   const { page, context, errors } = await open('OWNER', 1280, 'schedule-settings/');
-  check((await page.locator('h1').innerText()) === 'Schedule settings', 'schedule settings: page opens');
+  await page.waitForURL(/\/admin\/schedule\/settings\/$/);
+  check((await page.locator('h1').innerText()) === 'Schedule settings', 'schedule settings: old address opens the new one');
   const fs = await import('node:fs');
   const os = await import('node:os');
   const dir = fs.mkdtempSync(`${os.tmpdir()}/sched-`);
@@ -2231,7 +2275,7 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
 // dialogs that save every field, reorder by keyboard and by dragging
 {
   sched.length = 0;
-  const { page, context, errors } = await open('OWNER', 1280, 'schedule-settings/');
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule/settings/');
   const btn = (name) => page.getByRole('button', { name, exact: true });
   const dialog = page.locator('dialog[open]');
   const saved = (rpc) => sched.filter(([n]) => n === rpc).map(([, b]) => b);
@@ -2357,7 +2401,7 @@ for (const [who, path, ok] of [['INSTRUCTOR', 'schedule/', false], ['STAFF', 'sc
   await context.close();
 }
 for (const colorScheme of ['light', 'dark']) {
-  const { page, context, errors } = await open('OWNER', 393, 'schedule-settings/', { colorScheme });
+  const { page, context, errors } = await open('OWNER', 393, 'schedule/settings/', { colorScheme });
   await page.getByRole('button', { name: 'Individual Classes (2)', exact: true }).waitFor();
   check(await noOverflow(page), `services phone ${colorScheme}: no sideways scroll`);
   await shot(page, `services-phone-${colorScheme}`);
@@ -2376,7 +2420,7 @@ for (const colorScheme of ['light', 'dark']) {
 // Other's color: picked like an instructor's; a color an instructor uses is greyed out.
 {
   sched.length = 0;
-  const { page, context, errors } = await open('OWNER', 1280, 'schedule-settings/');
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule/settings/');
   const other = page.getByRole('group', { name: 'Other', exact: true });
   await other.waitFor();
   check(await other.getByRole('button', { name: '#EB5366' }).getAttribute('aria-pressed') === 'true'
@@ -2393,7 +2437,7 @@ for (const colorScheme of ['light', 'dark']) {
 
 // Phone: a long service and guest name wrap inside the row instead of pushing the page sideways.
 {
-  const { page, context, errors } = await open('OWNER', 393, 'schedule-settings/');
+  const { page, context, errors } = await open('OWNER', 393, 'schedule/settings/');
   await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) => r.fulfill({ json: [...SERVICES, { ...SERVICES[0], id: 'v-long',
     name: 'Gyrotonic Level 1 Apprentice Review', guest_instructor: "Rich O'Connor", cleanup_minutes: 5, sort: 9 }] }));
   await page.reload();
@@ -2409,7 +2453,7 @@ for (const colorScheme of ['light', 'dark']) {
 // a typed length that isn't a multiple of 5 still saves.
 {
   sched.length = 0;
-  const { page, context, errors } = await open('OWNER', 1280, 'schedule-settings/');
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule/settings/');
   await context.route(`${SUPABASE}/rest/v1/rpc/schedule_instructors`, (r) =>
     r.fulfill({ json: [...INSTRUCTORS, { user_id: 'i-old', full_name: 'Gia Moon', calendar_color: null, active: false }] }));
   await context.route(`${SUPABASE}/rest/v1/schedule_services?**`, (r) =>
@@ -2437,7 +2481,7 @@ const withGuests = async (context) => {
 };
 {
   sched.length = 0;
-  const { page, context, errors } = await open('OWNER', 1280, 'schedule-settings/');
+  const { page, context, errors } = await open('OWNER', 1280, 'schedule/settings/');
   await withGuests(context);
   await page.reload();
   const btn = (name) => page.getByRole('button', { name, exact: true });
