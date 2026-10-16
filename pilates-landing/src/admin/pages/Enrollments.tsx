@@ -116,7 +116,7 @@ export default function Enrollments() {
 
 function ListSkeleton() {
   return (
-    <div className="grid max-w-3xl gap-4" aria-busy="true">
+    <div className="grid gap-4" aria-busy="true">
       <Skeleton className="h-40 w-full rounded-2xl" />
       <Skeleton className="h-40 w-full rounded-2xl" />
     </div>
@@ -232,7 +232,7 @@ function Registrants({
   const pickable = autoOrder(courses).filter((c) => !c.ends_on || c.ends_on >= today);
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <div className="mb-4 flex gap-3">
         <select
           aria-label={t('allCourses')}
