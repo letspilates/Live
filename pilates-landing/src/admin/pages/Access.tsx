@@ -70,7 +70,7 @@ export default function Access() {
 
   return (
     <>
-      <div className="flex max-w-3xl flex-col gap-4">
+      <div className="flex flex-col gap-4">
         {loadFailed && <Notice tone="error">{t('somethingWrong')}</Notice>}
         {status && <Notice tone={status.tone}>{status.text}</Notice>}
         <Card className="p-0 sm:p-0">
