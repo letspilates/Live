@@ -101,7 +101,7 @@ export default function Backup() {
 
   return (
     <>
-      <div className="grid max-w-2xl gap-4">
+      <div className="grid gap-4">
         <Card>
           <CardTitle icon={DatabaseBackup} title={t('backupTitle')} />
           <p className="mb-4 text-sm text-mute">{t('backupBody')}</p>
