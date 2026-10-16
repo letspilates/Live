@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowRight, ChartColumn, ClipboardList, Plus, ReceiptText, TrendingUp, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowRight, ChartColumn, ClipboardList, ReceiptText, TrendingUp, Users, Wallet, type LucideIcon } from 'lucide-react';
 import { isAdmin, useStaff } from '../auth';
 import { addMonths } from '../expenses';
 import { loadReport, monthEnd, type Report } from '../finance';
@@ -73,12 +73,6 @@ export default function Dashboard() {
             {t(greetingKey())}, {firstName}
           </p>
         </div>
-        {paymentsMenu && (
-          <Button onClick={() => navigate('payments')}>
-            <Plus size={18} strokeWidth={2} aria-hidden="true" />
-            {t('recordPayment')}
-          </Button>
-        )}
       </div>
 
       {owner ? (
