@@ -9,6 +9,7 @@ export const ADMIN_ROUTES = {
   'set-password': 'public',
   clients: 'clients',
   schedule: 'schedule',
+  'schedule/settings': 'schedule',
   trainings: 'owner',
   knowledge: 'staff',
   payments: 'payments',
@@ -18,7 +19,7 @@ export const ADMIN_ROUTES = {
   admin: 'owner',
   access: 'owner',
   notifications: 'owner',
-  'schedule-settings': 'owner',
+  'schedule-settings': 'schedule',
   backup: 'owner',
   account: 'staff',
 } as const;

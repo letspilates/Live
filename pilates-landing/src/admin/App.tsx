@@ -1,7 +1,7 @@
 // Access gate for every admin page. Hiding a page here is convenience only:
 // the database refuses the data to anyone without the right role.
 import { useEffect, type ComponentType } from 'react';
-import { canOpen, useAuth } from './auth';
+import { canOpen, isAdmin, useAuth } from './auth';
 import { useT, type TextKey } from './i18n';
 import { navigate, useRoute } from './router';
 import type { AdminPath } from './routes';
@@ -35,7 +35,8 @@ const PAGES: Record<Exclude<AdminPath, 'login' | 'set-password'>, ComponentType>
   admin: Admin,
   access: () => <Redirect to="admin" search="?tab=access" />,
   notifications: Notifications,
-  'schedule-settings': ScheduleSettings,
+  'schedule/settings': ScheduleSettings,
+  'schedule-settings': () => <Redirect to="schedule/settings" />,
   backup: () => <Redirect to="admin" search="?tab=backup" />,
   account: Account,
 };
@@ -94,6 +95,7 @@ export default function App() {
   }
 
   if (!canOpen(staff, route)) return <Redirect to="" />;
+  if (route === 'schedule/settings' && !isAdmin(staff)) return <Redirect to="schedule" />;
 
   const Page = PAGES[route];
   return <Page />;
